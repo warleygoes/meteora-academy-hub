@@ -6,49 +6,49 @@
 
 @layer base {
   :root {
-    --background: 220 20% 6%;
+    --background: 207 94% 6%;
     --foreground: 0 0% 95%;
 
-    --card: 220 18% 10%;
+    --card: 207 60% 9%;
     --card-foreground: 0 0% 95%;
 
-    --popover: 220 18% 10%;
+    --popover: 207 60% 9%;
     --popover-foreground: 0 0% 95%;
 
-    --primary: 28 100% 55%;
+    --primary: 349 100% 62%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 16%;
+    --secondary: 207 40% 14%;
     --secondary-foreground: 0 0% 90%;
 
-    --muted: 220 15% 14%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 207 35% 12%;
+    --muted-foreground: 207 15% 50%;
 
-    --accent: 28 80% 45%;
+    --accent: 349 85% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 28 100% 55%;
+    --border: 207 30% 16%;
+    --input: 207 30% 16%;
+    --ring: 349 100% 62%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 220 20% 8%;
+    --sidebar-background: 207 70% 7%;
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 28 100% 55%;
+    --sidebar-primary: 349 100% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 14%;
+    --sidebar-accent: 207 35% 12%;
     --sidebar-accent-foreground: 0 0% 90%;
-    --sidebar-border: 220 15% 15%;
-    --sidebar-ring: 28 100% 55%;
+    --sidebar-border: 207 30% 13%;
+    --sidebar-ring: 349 100% 62%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(28 100% 55%), hsl(15 100% 50%));
-    --gradient-card-hover: linear-gradient(180deg, transparent 0%, hsl(28 100% 55% / 0.1) 100%);
-    --shadow-glow: 0 0 30px hsl(28 100% 55% / 0.15);
-    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.4);
+    --gradient-primary: linear-gradient(135deg, hsl(349 100% 62%), hsl(340 100% 50%));
+    --gradient-card-hover: linear-gradient(180deg, transparent 0%, hsl(349 100% 62% / 0.1) 100%);
+    --shadow-glow: 0 0 30px hsl(349 100% 62% / 0.2);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.5);
 
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
