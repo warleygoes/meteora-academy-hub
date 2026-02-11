@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Trash2, CheckCircle2, XCircle, Search, Eye, Ban, UserCheck,
-  Clock, Globe, Building2, Phone, Wifi, Shield, Plus
+  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,6 +55,7 @@ interface ProfileUser {
   main_problems: string | null;
   main_desires: string | null;
   approved: boolean;
+  status: string;
   created_at: string;
 }
 
@@ -64,8 +65,8 @@ interface AdminUser {
 }
 
 interface AdminUsersProps {
-  stats: { total: number; approved: number; pending: number };
-  onStatsUpdate: (stats: { total: number; approved: number; pending: number }) => void;
+  stats: { total: number; approved: number; pending: number; rejected: number };
+  onStatsUpdate: (stats: { total: number; approved: number; pending: number; rejected: number }) => void;
 }
 
 const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
@@ -74,13 +75,15 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const [activeTab, setActiveTab] = useState('pending');
 
   const [pendingUsers, setPendingUsers] = useState<ProfileUser[]>([]);
+  const [rejectedUsers, setRejectedUsers] = useState<ProfileUser[]>([]);
   const [loadingPending, setLoadingPending] = useState(true);
+  const [loadingRejected, setLoadingRejected] = useState(true);
   const [selectedUser, setSelectedUser] = useState<ProfileUser | null>(null);
 
   const [allUsers, setAllUsers] = useState<ProfileUser[]>([]);
   const [loadingAll, setLoadingAll] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const [userFilter, setUserFilter] = useState<'all' | 'approved' | 'pending'>('all');
+  const [userFilter, setUserFilter] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all');
 
   const [showAdminManager, setShowAdminManager] = useState(false);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -88,94 +91,105 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [adding, setAdding] = useState(false);
 
+  const computeStats = useCallback((users: ProfileUser[]) => {
+    onStatsUpdate({
+      total: users.length,
+      approved: users.filter(u => u.status === 'approved').length,
+      pending: users.filter(u => u.status === 'pending').length,
+      rejected: users.filter(u => u.status === 'rejected').length,
+    });
+  }, [onStatsUpdate]);
+
   const fetchPendingUsers = useCallback(async () => {
     setLoadingPending(true);
-    const { data } = await supabase.from('profiles').select('*').eq('approved', false).order('created_at', { ascending: false });
+    const { data } = await supabase.from('profiles').select('*').eq('status', 'pending').order('created_at', { ascending: false });
     setPendingUsers(data || []);
     setLoadingPending(false);
+  }, []);
+
+  const fetchRejectedUsers = useCallback(async () => {
+    setLoadingRejected(true);
+    const { data } = await supabase.from('profiles').select('*').eq('status', 'rejected').order('created_at', { ascending: false });
+    setRejectedUsers(data || []);
+    setLoadingRejected(false);
   }, []);
 
   const fetchAllUsers = useCallback(async () => {
     setLoadingAll(true);
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
     setAllUsers(data || []);
-    if (data) {
-      onStatsUpdate({
-        total: data.length,
-        approved: data.filter(u => u.approved).length,
-        pending: data.filter(u => !u.approved).length,
-      });
-    }
+    if (data) computeStats(data);
     setLoadingAll(false);
-  }, [onStatsUpdate]);
+  }, [computeStats]);
 
   useEffect(() => {
     fetchPendingUsers();
+    fetchRejectedUsers();
     fetchAllUsers();
-  }, [fetchPendingUsers, fetchAllUsers]);
+  }, [fetchPendingUsers, fetchRejectedUsers, fetchAllUsers]);
 
   const approveUser = async (userId: string) => {
-    // Optimistic update
     setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
-    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: true } : u));
-    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: true } : prev);
-    onStatsUpdate({ total: stats.total, approved: stats.approved + 1, pending: Math.max(0, stats.pending - 1) });
+    setRejectedUsers(prev => prev.filter(u => u.user_id !== userId));
+    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: true, status: 'approved' } : u));
+    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: true, status: 'approved' } : prev);
 
-    const { error } = await supabase.from('profiles').update({ approved: true }).eq('user_id', userId);
+    const { error } = await supabase.from('profiles').update({ approved: true, status: 'approved' }).eq('user_id', userId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
-      fetchPendingUsers(); fetchAllUsers(); // rollback
+      fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
     } else {
       toast({ title: t('userApproved') });
+      fetchAllUsers();
     }
   };
 
   const rejectUser = async (userId: string) => {
-    // Optimistic: remove from pending list
+    const user = allUsers.find(u => u.user_id === userId) || pendingUsers.find(u => u.user_id === userId);
+    const rejectedUser = user ? { ...user, approved: false, status: 'rejected' } : null;
+    
     setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
-    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false } : prev);
+    if (rejectedUser) setRejectedUsers(prev => [rejectedUser, ...prev]);
+    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: false, status: 'rejected' } : u));
+    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false, status: 'rejected' } : prev);
 
-    const { error } = await supabase.from('profiles').update({ approved: false }).eq('user_id', userId);
+    const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', userId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
-      fetchPendingUsers(); fetchAllUsers();
+      fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
     } else {
       toast({ title: t('userRejected') });
+      fetchAllUsers();
     }
   };
 
   const suspendUser = async (userId: string) => {
-    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: false } : u));
-    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false } : prev);
-    onStatsUpdate({ total: stats.total, approved: Math.max(0, stats.approved - 1), pending: stats.pending + 1 });
+    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: false, status: 'rejected' } : u));
+    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false, status: 'rejected' } : prev);
 
-    const { error } = await supabase.from('profiles').update({ approved: false }).eq('user_id', userId);
+    const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', userId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
       fetchAllUsers();
     } else {
       toast({ title: t('userSuspended') });
+      fetchAllUsers(); fetchRejectedUsers();
     }
   };
 
   const deleteUser = async (userId: string) => {
-    // Optimistic remove
     setAllUsers(prev => prev.filter(u => u.user_id !== userId));
     setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
+    setRejectedUsers(prev => prev.filter(u => u.user_id !== userId));
     setSelectedUser(null);
-    const user = allUsers.find(u => u.user_id === userId);
-    onStatsUpdate({
-      total: Math.max(0, stats.total - 1),
-      approved: user?.approved ? Math.max(0, stats.approved - 1) : stats.approved,
-      pending: !user?.approved ? Math.max(0, stats.pending - 1) : stats.pending,
-    });
 
     const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
-      fetchPendingUsers(); fetchAllUsers();
+      fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
     } else {
       toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
+      fetchAllUsers();
     }
   };
 
@@ -215,21 +229,29 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       (u.company_name?.toLowerCase().includes(userSearch.toLowerCase())) ||
       (u.country?.toLowerCase().includes(userSearch.toLowerCase()));
     const matchesFilter = userFilter === 'all' ||
-      (userFilter === 'approved' && u.approved) ||
-      (userFilter === 'pending' && !u.approved);
+      (userFilter === 'approved' && u.status === 'approved') ||
+      (userFilter === 'pending' && u.status === 'pending') ||
+      (userFilter === 'rejected' && u.status === 'rejected');
     return matchesSearch && matchesFilter;
   });
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-LA', { day: '2-digit', month: 'short', year: 'numeric' });
 
+  const getStatusBadge = (user: ProfileUser) => {
+    if (user.status === 'approved') return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">{t('approved')}</Badge>;
+    if (user.status === 'rejected') return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">{t('rejected')}</Badge>;
+    return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">{t('pending')}</Badge>;
+  };
+
   return (
     <div>
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         {[
           { label: t('totalStudents'), value: stats.total, icon: Users, color: 'text-primary' },
           { label: t('approvedUsers'), value: stats.approved, icon: UserCheck, color: 'text-green-500' },
           { label: t('pendingUsers'), value: stats.pending, icon: Clock, color: 'text-yellow-500' },
+          { label: t('rejectedUsers'), value: stats.rejected, icon: UserX, color: 'text-red-500' },
           { label: t('countries'), value: [...new Set(allUsers.map(u => u.country).filter(Boolean))].length, icon: Globe, color: 'text-blue-500' },
         ].map((stat, i) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
@@ -252,6 +274,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           <TabsTrigger value="pending" className="gap-2">
             <Clock className="w-4 h-4" /> {t('pendingUsers')}
             {stats.pending > 0 && <Badge variant="destructive" className="ml-1 text-xs h-5 min-w-[20px] px-1.5">{stats.pending}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="rejected" className="gap-2">
+            <UserX className="w-4 h-4" /> {t('rejectedUsers')}
+            {stats.rejected > 0 && <Badge variant="secondary" className="ml-1 text-xs h-5 min-w-[20px] px-1.5">{stats.rejected}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="all" className="gap-2">
             <Users className="w-4 h-4" /> {t('allUsers')}
@@ -305,6 +331,49 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           )}
         </TabsContent>
 
+        <TabsContent value="rejected">
+          {loadingRejected ? (
+            <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
+          ) : rejectedUsers.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+              <p className="text-lg font-display font-semibold text-foreground">{t('noRejectedUsers')}</p>
+              <p className="text-sm text-muted-foreground">{t('noRejectedUsersDesc')}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {rejectedUsers.map((user) => (
+                <motion.div key={user.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="bg-card rounded-xl border border-border p-5 flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-display font-semibold text-foreground truncate">{user.display_name || 'Sin nombre'}</p>
+                      <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-xs shrink-0">{t('rejected')}</Badge>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {user.company_name && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{user.company_name}</span>}
+                      {user.country && <span className="flex items-center gap-1"><FlagImg country={user.country} size={14} />{user.country}</span>}
+                      {user.email && <span>{user.email}</span>}
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDate(user.created_at)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="gap-1 text-muted-foreground">
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" onClick={() => approveUser(user.user_id)} className="gap-1 bg-green-600 hover:bg-green-700 text-white">
+                      <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { if (confirm('¿Eliminar permanentemente?')) deleteUser(user.user_id); }} className="text-destructive hover:text-destructive">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="all">
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
             <div className="relative flex-1">
@@ -316,6 +385,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <option value="all">{t('allFilter')}</option>
               <option value="approved">{t('approvedFilter')}</option>
               <option value="pending">{t('pendingFilter')}</option>
+              <option value="rejected">{t('rejectedFilter')}</option>
             </select>
           </div>
 
@@ -346,15 +416,11 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                       <td className="py-3 hidden md:table-cell text-muted-foreground">{user.company_name || '—'}</td>
                       <td className="py-3 hidden lg:table-cell text-muted-foreground">{user.country || '—'}</td>
                       <td className="py-3 hidden lg:table-cell text-muted-foreground">{user.client_count || '—'}</td>
-                      <td className="py-3">
-                        <Badge variant={user.approved ? 'default' : 'secondary'} className={user.approved ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}>
-                          {user.approved ? t('approved') : t('pending')}
-                        </Badge>
-                      </td>
+                      <td className="py-3">{getStatusBadge(user)}</td>
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)}><Eye className="w-4 h-4" /></Button>
-                          {user.approved ? (
+                          {user.status === 'approved' ? (
                             <Button variant="ghost" size="sm" onClick={() => suspendUser(user.user_id)} className="text-destructive hover:text-destructive"><Ban className="w-4 h-4" /></Button>
                           ) : (
                             <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-500"><CheckCircle2 className="w-4 h-4" /></Button>
@@ -390,7 +456,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                 {selectedUser.cheapest_plan_usd && (
                   <div><span className="text-muted-foreground">{t('cheapestPlan')}</span><p className="font-medium text-foreground">U$ {selectedUser.cheapest_plan_usd}</p></div>
                 )}
-                <div><span className="text-muted-foreground">Status</span><p className="font-medium">{selectedUser.approved ? <Badge className="bg-green-500/10 text-green-500 border-green-500/20">{t('approved')}</Badge> : <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">{t('pending')}</Badge>}</p></div>
+                <div><span className="text-muted-foreground">Status</span><p className="font-medium">{getStatusBadge(selectedUser)}</p></div>
               </div>
               {selectedUser.main_problems && (
                 <div><p className="text-sm text-muted-foreground mb-1">{t('mainProblems')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{selectedUser.main_problems}</p></div>
@@ -398,12 +464,14 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               {selectedUser.main_desires && (
                 <div><p className="text-sm text-muted-foreground mb-1">{t('mainDesires')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{selectedUser.main_desires}</p></div>
               )}
-              {!selectedUser.approved ? (
+              {selectedUser.status !== 'approved' ? (
                 <div className="flex flex-col gap-2 pt-2">
                   <div className="flex gap-2">
-                    <Button variant="destructive" className="flex-1 gap-2" onClick={() => rejectUser(selectedUser.user_id)}>
-                      <XCircle className="w-4 h-4" /> {t('rejectUser')}
-                    </Button>
+                    {selectedUser.status !== 'rejected' && (
+                      <Button variant="destructive" className="flex-1 gap-2" onClick={() => rejectUser(selectedUser.user_id)}>
+                        <XCircle className="w-4 h-4" /> {t('rejectUser')}
+                      </Button>
+                    )}
                     <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => approveUser(selectedUser.user_id)}>
                       <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
                     </Button>

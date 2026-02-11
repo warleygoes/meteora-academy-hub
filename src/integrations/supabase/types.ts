@@ -32,6 +32,7 @@ export type Database = {
           network_type: string | null
           phone: string | null
           role_type: string | null
+          status: string
           updated_at: string
           user_id: string
         }
@@ -52,6 +53,7 @@ export type Database = {
           network_type?: string | null
           phone?: string | null
           role_type?: string | null
+          status?: string
           updated_at?: string
           user_id: string
         }
@@ -72,6 +74,7 @@ export type Database = {
           network_type?: string | null
           phone?: string | null
           role_type?: string | null
+          status?: string
           updated_at?: string
           user_id?: string
         }
