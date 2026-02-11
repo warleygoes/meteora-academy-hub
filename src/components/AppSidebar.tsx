@@ -3,12 +3,14 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/lib/i18n';
+import { useAuth } from '@/hooks/useAuth';
 import meteoraLogo from '@/assets/logo-white-pink.png';
 
 const languageLabels: Record<Language, string> = { pt: 'PT', en: 'EN', es: 'ES' };
 
 export const AppSidebar: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
+  const { user, isAdmin, signOut } = useAuth();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -17,7 +19,7 @@ export const AppSidebar: React.FC = () => {
     { to: '/', icon: Home, label: t('home') },
     { to: '/courses', icon: BookOpen, label: t('courses') },
     { to: '/community', icon: Users, label: t('community') },
-    { to: '/admin', icon: Shield, label: t('admin') },
+    ...(isAdmin ? [{ to: '/admin', icon: Shield, label: t('admin') }] : []),
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -94,11 +96,18 @@ export const AppSidebar: React.FC = () => {
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">Aluno</p>
-              <p className="text-xs text-muted-foreground truncate">aluno@meteora.com</p>
+              <p className="text-sm font-medium text-foreground truncate">{user?.user_metadata?.display_name || 'Aluno'}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
           )}
         </div>
+        <button
+          onClick={() => signOut()}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors w-full text-sm"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span>{t('logout')}</span>}
+        </button>
       </div>
     </div>
   );

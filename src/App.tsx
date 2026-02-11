@@ -2,35 +2,57 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
 import Index from "./pages/Index";
 import CoursesPage from "./pages/Courses";
 import CommunityPage from "./pages/Community";
 import AdminPage from "./pages/Admin";
+import Login from "./pages/Login";
+import AdminLogin from "./pages/AdminLogin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading, isAdmin } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/admin/login" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <LanguageProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/courses" element={<CoursesPage />} />
-              <Route path="/community" element={<CommunityPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route path="/" element={<Index />} />
+                <Route path="/courses" element={<CoursesPage />} />
+                <Route path="/community" element={<CommunityPage />} />
+                <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </LanguageProvider>
   </QueryClientProvider>
 );
