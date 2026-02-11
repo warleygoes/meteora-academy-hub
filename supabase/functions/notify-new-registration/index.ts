@@ -21,6 +21,25 @@ function getCorsHeaders(req: Request) {
 const MAX_FIELD_LENGTH = 500;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// In-memory rate limiting per user (max 3 calls per hour)
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW_MS = 3600000; // 1 hour
+const rateLimits = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimits.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rateLimits.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
 function sanitize(value: unknown, maxLen = MAX_FIELD_LENGTH): string {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, maxLen);
@@ -60,6 +79,15 @@ serve(async (req) => {
     if (claimsError || !data?.claims) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Rate limit per authenticated user
+    const userId = (data.claims as Record<string, unknown>).sub as string;
+    if (!checkRateLimit(userId)) {
+      return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+        status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
