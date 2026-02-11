@@ -1,11 +1,26 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import React from 'react';
+import { HeroBanner } from '@/components/HeroBanner';
+import { CourseCarousel } from '@/components/CourseCarousel';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { courses } from '@/lib/mockData';
 
-const Index = () => {
+const Index: React.FC = () => {
+  const { t } = useLanguage();
+
+  const continueWatching = courses.filter(c => c.progress !== undefined);
+  const popular = courses.filter(c => c.isTrending);
+  const newCourses = courses.filter(c => c.isNew);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div>
+      <HeroBanner />
+      <div className="px-6 md:px-12 -mt-16 relative z-10 pb-12">
+        {continueWatching.length > 0 && (
+          <CourseCarousel title={t('continueWatching')} courses={continueWatching} />
+        )}
+        <CourseCarousel title={t('popularCourses')} courses={popular} />
+        <CourseCarousel title={t('newReleases')} courses={newCourses} />
+        <CourseCarousel title={t('recommended')} courses={courses} />
       </div>
     </div>
   );
