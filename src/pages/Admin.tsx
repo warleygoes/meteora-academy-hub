@@ -11,9 +11,9 @@ import { cn } from '@/lib/utils';
 const AdminPage: React.FC = () => {
   const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState('users');
-  const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0 });
+  const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
 
-  const handleStatsUpdate = useCallback((newStats: { total: number; approved: number; pending: number }) => {
+  const handleStatsUpdate = useCallback((newStats: { total: number; approved: number; pending: number; rejected: number }) => {
     setStats(newStats);
   }, []);
 
