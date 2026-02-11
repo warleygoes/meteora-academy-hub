@@ -59,14 +59,14 @@ const LandingPage: React.FC = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between gap-2">
           <img src={meteoraLogo} alt="Meteora Academy" className="h-6 md:h-8 shrink-0" />
-          <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
+          <div className="hidden lg:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#sobre" className="hover:text-foreground transition-colors">{t('experienceTitle')}</a>
             <a href="#cursos" className="hover:text-foreground transition-colors">{t('courses')}</a>
             <a href="#oraculo" className="hover:text-foreground transition-colors">{t('feat3Title')}</a>
             <a href="#depoimentos" className="hover:text-foreground transition-colors">{t('testimonialsLabel')}</a>
             <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value as Language)}
@@ -79,8 +79,8 @@ const LandingPage: React.FC = () => {
             <Link to="/login">
               <Button size="sm" className="glow-primary font-semibold gap-1.5 text-xs md:text-sm whitespace-nowrap">
                 <MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                <span className="hidden sm:inline">{t('accessCommunity')}</span>
-                <span className="sm:hidden">{t('community')}</span>
+                <span className="hidden md:inline">{t('accessCommunity')}</span>
+                <span className="md:hidden">{t('community')}</span>
               </Button>
             </Link>
           </div>
