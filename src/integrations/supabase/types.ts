@@ -16,29 +16,59 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
+          approved: boolean
           avatar_url: string | null
           bio: string | null
+          cheapest_plan_usd: number | null
+          client_count: string | null
+          company_name: string | null
+          country: string | null
           created_at: string
           display_name: string | null
           id: string
+          main_desires: string | null
+          main_problems: string | null
+          network_type: string | null
+          phone: string | null
+          role_type: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          approved?: boolean
           avatar_url?: string | null
           bio?: string | null
+          cheapest_plan_usd?: number | null
+          client_count?: string | null
+          company_name?: string | null
+          country?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
+          main_desires?: string | null
+          main_problems?: string | null
+          network_type?: string | null
+          phone?: string | null
+          role_type?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          approved?: boolean
           avatar_url?: string | null
           bio?: string | null
+          cheapest_plan_usd?: number | null
+          client_count?: string | null
+          company_name?: string | null
+          country?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
+          main_desires?: string | null
+          main_problems?: string | null
+          network_type?: string | null
+          phone?: string | null
+          role_type?: string | null
           updated_at?: string
           user_id?: string
         }
