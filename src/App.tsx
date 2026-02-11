@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
+import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import CoursesPage from "./pages/Courses";
 import CommunityPage from "./pages/Community";
@@ -27,7 +28,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, isAdmin } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/admin/login" replace />;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to="/app" replace />;
   return <>{children}</>;
 };
 
@@ -40,14 +41,19 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Public */}
+              <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin/login" element={<AdminLogin />} />
+
+              {/* Member area */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route path="/" element={<Index />} />
-                <Route path="/courses" element={<CoursesPage />} />
-                <Route path="/community" element={<CommunityPage />} />
-                <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+                <Route path="/app" element={<Index />} />
+                <Route path="/app/courses" element={<CoursesPage />} />
+                <Route path="/app/community" element={<CommunityPage />} />
+                <Route path="/app/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
               </Route>
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
