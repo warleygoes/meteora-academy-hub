@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ const Login: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
+  const [signupComplete, setSignupComplete] = useState(false);
 
   // Signup form fields
   const [step, setStep] = useState(1);
@@ -112,7 +113,15 @@ const Login: React.FC = () => {
         main_desires: mainDesires,
       });
       if (!result.error) {
-        toast({ title: t('signupSuccess') });
+        setSignupComplete(true);
+        // Trigger n8n workflow notification
+        try {
+          await supabase.functions.invoke('notify-new-registration', {
+            body: { email, displayName, companyName, country, roleType },
+          });
+        } catch (e) {
+          console.error('Failed to notify registration workflow:', e);
+        }
         setSubmitting(false);
         return;
       }
@@ -144,6 +153,27 @@ const Login: React.FC = () => {
 
   const canProceedStep1 = displayName && email && password.length >= 6 && roleType;
   const canProceedStep2 = companyName && country && phone;
+
+  // Signup success screen
+  if (signupComplete) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center max-w-md">
+          <img src={meteoraLogo} alt="Meteora Academy" className="h-10 mx-auto mb-8" />
+          <div className="bg-card rounded-2xl p-8 border border-border">
+            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-green-500" />
+            </div>
+            <h2 className="text-2xl font-display font-bold text-foreground mb-2">{t('signupSuccessTitle')}</h2>
+            <p className="text-muted-foreground text-sm mb-6">{t('signupSuccessMsg')}</p>
+            <Button onClick={() => window.location.href = '/'} variant="secondary" className="gap-2">
+              <ArrowLeft className="w-4 h-4" /> {t('signupSuccessBack')}
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex">
