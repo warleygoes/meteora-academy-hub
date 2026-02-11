@@ -13,19 +13,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const countryFlags: Record<string, string> = {
-  'Argentina': '🇦🇷', 'Brasil': '🇧🇷', 'Brazil': '🇧🇷', 'Colombia': '🇨🇴', 'Venezuela': '🇻🇪',
-  'Perú': '🇵🇪', 'Peru': '🇵🇪', 'Ecuador': '🇪🇨', 'Chile': '🇨🇱', 'Uruguay': '🇺🇾',
-  'Paraguay': '🇵🇾', 'Bolivia': '🇧🇴', 'México': '🇲🇽', 'Mexico': '🇲🇽', 'Panamá': '🇵🇦',
-  'Panama': '🇵🇦', 'Costa Rica': '🇨🇷', 'Guatemala': '🇬🇹', 'Honduras': '🇭🇳',
-  'El Salvador': '🇸🇻', 'Nicaragua': '🇳🇮', 'Cuba': '🇨🇺', 'República Dominicana': '🇩🇴',
-  'Dominican Republic': '🇩🇴', 'Puerto Rico': '🇵🇷', 'España': '🇪🇸', 'Spain': '🇪🇸',
-  'United States': '🇺🇸', 'Estados Unidos': '🇺🇸',
+const countryCodes: Record<string, string> = {
+  'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
+  'Perú': 'pe', 'Peru': 'pe', 'Ecuador': 'ec', 'Chile': 'cl', 'Uruguay': 'uy',
+  'Paraguay': 'py', 'Bolivia': 'bo', 'México': 'mx', 'Mexico': 'mx', 'Panamá': 'pa',
+  'Panama': 'pa', 'Costa Rica': 'cr', 'Guatemala': 'gt', 'Honduras': 'hn',
+  'El Salvador': 'sv', 'Nicaragua': 'ni', 'Cuba': 'cu', 'República Dominicana': 'do',
+  'Dominican Republic': 'do', 'Puerto Rico': 'pr', 'España': 'es', 'Spain': 'es',
+  'United States': 'us', 'Estados Unidos': 'us',
 };
 
-const getFlag = (country: string | null) => {
-  if (!country) return '';
-  return countryFlags[country] || '🌐';
+const FlagImg: React.FC<{ country: string | null; size?: number }> = ({ country, size = 16 }) => {
+  if (!country) return null;
+  const code = countryCodes[country];
+  if (!code) return <Globe className="w-4 h-4 text-muted-foreground" />;
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${code}.png`}
+      srcSet={`https://flagcdn.com/w80/${code}.png 2x`}
+      width={size}
+      height={Math.round(size * 0.75)}
+      alt={country}
+      className="inline-block rounded-sm object-cover"
+      style={{ width: size, height: Math.round(size * 0.75) }}
+    />
+  );
 };
 
 interface ProfileUser {
@@ -248,7 +260,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       {user.company_name && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{user.company_name}</span>}
-                      {user.country && <span className="flex items-center gap-1"><span>{getFlag(user.country)}</span>{user.country}</span>}
+                      {user.country && <span className="flex items-center gap-1"><FlagImg country={user.country} size={14} />{user.country}</span>}
                       {user.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{user.phone}</span>}
                       {user.client_count && <span className="flex items-center gap-1"><Users className="w-3 h-3" />{user.client_count} clientes</span>}
                       {user.network_type && <span className="flex items-center gap-1"><Wifi className="w-3 h-3" />{user.network_type}</span>}
@@ -348,7 +360,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="col-span-2"><span className="text-muted-foreground">Email</span><p className="font-medium text-foreground">{selectedUser.email || '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('roleType')}</span><p className="font-medium text-foreground">{selectedUser.role_type === 'owner' ? t('ispOwner') : t('ispEmployee')}</p></div>
-                <div><span className="text-muted-foreground">{t('country')}</span><p className="font-medium text-foreground">{selectedUser.country ? `${getFlag(selectedUser.country)} ${selectedUser.country}` : '—'}</p></div>
+                <div><span className="text-muted-foreground">{t('country')}</span><p className="font-medium text-foreground flex items-center gap-1.5">{selectedUser.country ? <><FlagImg country={selectedUser.country} size={18} /> {selectedUser.country}</> : '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('companyName')}</span><p className="font-medium text-foreground">{selectedUser.company_name || '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('phone')}</span><p className="font-medium text-foreground">{selectedUser.phone || '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('clientCount')}</span><p className="font-medium text-foreground">{selectedUser.client_count || '—'}</p></div>
