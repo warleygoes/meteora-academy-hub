@@ -92,28 +92,26 @@ const Login: React.FC = () => {
         return;
       }
     } else if (mode === 'signup') {
-      result = await signUp(email, password, displayName);
-      if (!result.error) {
-        // Update profile with qualification data
-        // Wait briefly for the trigger to create the profile
-        setTimeout(async () => {
-          const { data: { user: newUser } } = await supabase.auth.getUser();
-          if (newUser) {
-            await supabase.from('profiles').update({
-              role_type: roleType,
-              company_name: companyName,
-              country,
-              phone,
-              client_count: clientCount,
-              network_type: networkType,
-              cheapest_plan_usd: cheapestPlan ? Number(cheapestPlan) : null,
-              main_problems: mainProblems,
-              main_desires: mainDesires,
-              approved: false,
-            }).eq('user_id', newUser.id);
-          }
-        }, 1500);
+      // Validate inputs
+      if (displayName.length > 100 || companyName.length > 200 || phone.length > 20 || mainProblems.length > 2000 || mainDesires.length > 2000) {
+        toast({ title: t('errorOccurred'), variant: 'destructive' });
+        setSubmitting(false);
+        return;
+      }
 
+      result = await signUp(email, password, {
+        display_name: displayName,
+        role_type: roleType,
+        company_name: companyName,
+        country,
+        phone,
+        client_count: clientCount,
+        network_type: networkType || undefined,
+        cheapest_plan_usd: cheapestPlan || undefined,
+        main_problems: mainProblems,
+        main_desires: mainDesires,
+      });
+      if (!result.error) {
         toast({ title: t('signupSuccess') });
         setSubmitting(false);
         return;
