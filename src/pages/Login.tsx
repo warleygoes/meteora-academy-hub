@@ -125,7 +125,7 @@ const Login: React.FC = () => {
         // Trigger n8n workflow notification
         try {
           await supabase.functions.invoke('notify-new-registration', {
-            body: { email, displayName, companyName, country, roleType },
+            body: { email, displayName, companyName, country, roleType, phone, clientCount, networkType, cheapestPlan: cheapestPlan, mainProblems, mainDesires },
           });
         } catch (e) {
           console.error('Failed to notify registration workflow:', e);
