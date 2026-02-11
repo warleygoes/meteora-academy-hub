@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import meteoraLogo from '@/assets/logo-white-pink.png';
+
+const LATAM_COUNTRIES = [
+  'Argentina', 'Bolivia', 'Brasil', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
+  'Ecuador', 'El Salvador', 'Guatemala', 'Honduras', 'México', 'Nicaragua',
+  'Panamá', 'Paraguay', 'Perú', 'República Dominicana', 'Uruguay', 'Venezuela', 'Otro',
+];
 
 const Login: React.FC = () => {
   const { user, loading, signIn, signUp, signInWithMagicLink } = useAuth();
@@ -18,9 +25,58 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
+
+  // Signup form fields
+  const [step, setStep] = useState(1);
+  const [roleType, setRoleType] = useState<'owner' | 'employee' | ''>('');
+  const [companyName, setCompanyName] = useState('');
+  const [country, setCountry] = useState('');
+  const [phone, setPhoneVal] = useState('');
+  const [clientCount, setClientCount] = useState('');
+  const [networkType, setNetworkType] = useState('');
+  const [cheapestPlan, setCheapestPlan] = useState('');
+  const [mainProblems, setMainProblems] = useState('');
+  const [mainDesires, setMainDesires] = useState('');
 
   if (loading) return null;
-  if (user) return <Navigate to="/app" replace />;
+
+  // Check if user is approved
+  if (user) {
+    // We need to check approval status
+    const checkApproval = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('approved')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data && !data.approved) {
+        setPendingApproval(true);
+      }
+    };
+    if (!pendingApproval) {
+      checkApproval();
+    }
+    if (pendingApproval) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center px-6">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-md">
+            <img src={meteoraLogo} alt="Meteora Academy" className="h-10 mx-auto mb-8" />
+            <div className="bg-card rounded-2xl p-8 border border-border">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-2xl font-display font-bold text-foreground mb-2">{t('pendingApproval')}</h2>
+              <p className="text-muted-foreground text-sm">{t('pendingApprovalMsg')}</p>
+            </div>
+          </motion.div>
+        </div>
+      );
+    }
+    return <Navigate to="/app" replace />;
+  }
+
+  const totalSteps = 3;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,12 +94,48 @@ const Login: React.FC = () => {
     } else if (mode === 'signup') {
       result = await signUp(email, password, displayName);
       if (!result.error) {
-        toast({ title: t('checkEmail') });
+        // Update profile with qualification data
+        // Wait briefly for the trigger to create the profile
+        setTimeout(async () => {
+          const { data: { user: newUser } } = await supabase.auth.getUser();
+          if (newUser) {
+            await supabase.from('profiles').update({
+              role_type: roleType,
+              company_name: companyName,
+              country,
+              phone,
+              client_count: clientCount,
+              network_type: networkType,
+              cheapest_plan_usd: cheapestPlan ? Number(cheapestPlan) : null,
+              main_problems: mainProblems,
+              main_desires: mainDesires,
+              approved: false,
+            }).eq('user_id', newUser.id);
+          }
+        }, 1500);
+
+        toast({ title: t('signupSuccess') });
         setSubmitting(false);
         return;
       }
     } else {
       result = await signIn(email, password);
+      if (!result.error) {
+        // Check if approved
+        const { data: { user: loggedUser } } = await supabase.auth.getUser();
+        if (loggedUser) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('approved')
+            .eq('user_id', loggedUser.id)
+            .maybeSingle();
+          if (profile && !profile.approved) {
+            setPendingApproval(true);
+            setSubmitting(false);
+            return;
+          }
+        }
+      }
     }
 
     if (result.error) {
@@ -51,6 +143,9 @@ const Login: React.FC = () => {
     }
     setSubmitting(false);
   };
+
+  const canProceedStep1 = displayName && email && password.length >= 6 && roleType;
+  const canProceedStep2 = companyName && country && phone;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -61,12 +156,12 @@ const Login: React.FC = () => {
         <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full bg-primary/5 blur-2xl" />
         <div className="relative z-10 text-center px-16">
           <img src={meteoraLogo} alt="Meteora Academy" className="h-14 mx-auto mb-8" />
-          <p className="text-xl text-muted-foreground font-display">{t('heroTitle')}</p>
+          <p className="text-xl text-muted-foreground font-display">{t('heroTitle')} ISP</p>
         </div>
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center px-6">
+      <div className="flex-1 flex items-center justify-center px-6 py-8">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -79,54 +174,169 @@ const Login: React.FC = () => {
           <h1 className="text-3xl font-display font-bold text-foreground mb-1">
             {mode === 'signup' ? t('signupTitle') : t('loginTitle')}
           </h1>
-          <p className="text-muted-foreground mb-8">
+          <p className="text-muted-foreground mb-6">
             {mode === 'signup' ? t('signupSubtitle') : t('loginSubtitle')}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder={t('displayName')}
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="pl-10 bg-secondary border-border"
-                  required
-                />
-              </div>
-            )}
-
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="email"
-                placeholder={t('email')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 bg-secondary border-border"
-                required
-              />
+          {mode === 'signup' && (
+            <div className="flex items-center gap-2 mb-6">
+              {[1, 2, 3].map((s) => (
+                <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${s <= step ? 'bg-primary' : 'bg-border'}`} />
+              ))}
+              <span className="text-xs text-muted-foreground ml-2">{t('step')} {step} {t('of')} {totalSteps}</span>
             </div>
+          )}
 
-            {mode !== 'magic' && (
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="password"
-                  placeholder={t('password')}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 bg-secondary border-border"
-                  required
-                  minLength={6}
-                />
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* LOGIN MODE */}
+            {mode === 'login' && (
+              <>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input type="email" placeholder={t('email')} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={6} />
+                </div>
+                <Button type="submit" className="w-full glow-primary font-semibold" size="lg" disabled={submitting}>
+                  {t('login')}
+                </Button>
+              </>
             )}
 
-            <Button type="submit" className="w-full glow-primary font-semibold" size="lg" disabled={submitting}>
-              {mode === 'magic' ? t('magicLink') : mode === 'signup' ? t('signup') : t('login')}
-            </Button>
+            {/* MAGIC LINK MODE */}
+            {mode === 'magic' && (
+              <>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input type="email" placeholder={t('email')} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                </div>
+                <Button type="submit" className="w-full glow-primary font-semibold" size="lg" disabled={submitting}>
+                  {t('magicLink')}
+                </Button>
+              </>
+            )}
+
+            {/* SIGNUP MODE */}
+            {mode === 'signup' && step === 1 && (
+              <>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder={t('displayName')} value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                </div>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input type="email" placeholder={t('email')} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={6} />
+                </div>
+
+                {/* Role selection */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('roleType')}</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setRoleType('owner')} className={`p-3 rounded-xl border text-sm font-medium transition-all ${roleType === 'owner' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground hover:border-primary/30'}`}>
+                      {t('ispOwner')}
+                    </button>
+                    <button type="button" onClick={() => setRoleType('employee')} className={`p-3 rounded-xl border text-sm font-medium transition-all ${roleType === 'employee' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground hover:border-primary/30'}`}>
+                      {t('ispEmployee')}
+                    </button>
+                  </div>
+                </div>
+
+                <Button type="button" onClick={() => setStep(2)} className="w-full glow-primary font-semibold gap-2" size="lg" disabled={!canProceedStep1}>
+                  {t('next')} <ArrowRight className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+
+            {mode === 'signup' && step === 2 && (
+              <>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder={t('companyName')} value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('country')}</label>
+                  <select value={country} onChange={(e) => setCountry(e.target.value)} className="w-full bg-secondary text-foreground border border-border rounded-md px-3 py-2.5 text-sm">
+                    <option value="">{t('selectCountry')}</option>
+                    {LATAM_COUNTRIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder={t('phone')} value={phone} onChange={(e) => setPhoneVal(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                </div>
+
+                {roleType === 'owner' && (
+                  <>
+                    <div className="relative">
+                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input placeholder={t('clientCountPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">{t('networkType')}</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {['radio', 'fiber', 'both'].map((type) => (
+                          <button key={type} type="button" onClick={() => setNetworkType(type)} className={`p-2.5 rounded-xl border text-sm font-medium transition-all ${networkType === type ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground hover:border-primary/30'}`}>
+                            {t(type)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input type="number" placeholder={t('cheapestPlanPlaceholder')} value={cheapestPlan} onChange={(e) => setCheapestPlan(e.target.value)} className="pl-10 bg-secondary border-border" />
+                    </div>
+                  </>
+                )}
+
+                <div className="flex gap-3">
+                  <Button type="button" onClick={() => setStep(1)} variant="secondary" className="flex-1 gap-2" size="lg">
+                    <ArrowLeft className="w-4 h-4" /> {t('back')}
+                  </Button>
+                  <Button type="button" onClick={() => setStep(3)} className="flex-1 glow-primary font-semibold gap-2" size="lg" disabled={!canProceedStep2}>
+                    {t('next')} <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {mode === 'signup' && step === 3 && (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    {roleType === 'employee' ? t('mainProblemsEmployee') : t('mainProblems')}
+                  </label>
+                  <textarea value={mainProblems} onChange={(e) => setMainProblems(e.target.value)} className="w-full bg-secondary text-foreground border border-border rounded-md px-3 py-2.5 text-sm min-h-[100px] resize-none placeholder:text-muted-foreground" required />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    {roleType === 'employee' ? t('mainDesiresEmployee') : t('mainDesires')}
+                  </label>
+                  <textarea value={mainDesires} onChange={(e) => setMainDesires(e.target.value)} className="w-full bg-secondary text-foreground border border-border rounded-md px-3 py-2.5 text-sm min-h-[100px] resize-none placeholder:text-muted-foreground" required />
+                </div>
+
+                <div className="flex gap-3">
+                  <Button type="button" onClick={() => setStep(2)} variant="secondary" className="flex-1 gap-2" size="lg">
+                    <ArrowLeft className="w-4 h-4" /> {t('back')}
+                  </Button>
+                  <Button type="submit" className="flex-1 glow-primary font-semibold" size="lg" disabled={submitting || !mainProblems || !mainDesires}>
+                    {t('signup')}
+                  </Button>
+                </div>
+              </>
+            )}
           </form>
 
           <div className="mt-6 space-y-3 text-sm text-center">
@@ -137,14 +347,14 @@ const Login: React.FC = () => {
                 </button>
                 <p className="text-muted-foreground">
                   {t('noAccount')}{' '}
-                  <button onClick={() => setMode('signup')} className="text-primary hover:underline">{t('signup')}</button>
+                  <button onClick={() => { setMode('signup'); setStep(1); }} className="text-primary hover:underline">{t('signup')}</button>
                 </p>
               </>
             )}
             {mode === 'signup' && (
               <p className="text-muted-foreground">
                 {t('hasAccount')}{' '}
-                <button onClick={() => setMode('login')} className="text-primary hover:underline">{t('login')}</button>
+                <button onClick={() => { setMode('login'); setStep(1); }} className="text-primary hover:underline">{t('login')}</button>
               </p>
             )}
             {mode === 'magic' && (
