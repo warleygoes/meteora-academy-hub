@@ -12,7 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    // Authenticate the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -34,16 +33,16 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    // Validate the user via getUser instead of getClaims
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userEmail = claimsData.claims.email;
+    const userEmail = userData.user.email;
 
     const N8N_WEBHOOK_URL = Deno.env.get("N8N_WEBHOOK_URL");
     if (!N8N_WEBHOOK_URL) {
@@ -55,7 +54,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, displayName, companyName, country, roleType } = body;
+    const { email, displayName, companyName, country, roleType, phone, clientCount, networkType, cheapestPlan, mainProblems, mainDesires } = body;
 
     // Validate that the request email matches the authenticated user
     if (email && email !== userEmail) {
@@ -65,19 +64,27 @@ serve(async (req) => {
       });
     }
 
-    const response = await fetch(N8N_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event: "new_registration",
-        email: userEmail,
-        display_name: displayName,
-        company_name: companyName,
-        country,
-        role_type: roleType,
-        timestamp: new Date().toISOString(),
-      }),
+    // Build query params for GET webhook
+    const params = new URLSearchParams({
+      event: "new_registration",
+      email: userEmail || "",
+      display_name: displayName || "",
+      company_name: companyName || "",
+      country: country || "",
+      role_type: roleType || "",
+      phone: phone || "",
+      client_count: clientCount || "",
+      network_type: networkType || "",
+      cheapest_plan_usd: cheapestPlan || "",
+      main_problems: mainProblems || "",
+      main_desires: mainDesires || "",
+      timestamp: new Date().toISOString(),
     });
+
+    const webhookUrl = `${N8N_WEBHOOK_URL}?${params.toString()}`;
+    console.log("Calling n8n webhook:", webhookUrl);
+
+    const response = await fetch(webhookUrl, { method: "GET" });
 
     if (!response.ok) {
       const text = await response.text();
