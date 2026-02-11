@@ -42,40 +42,45 @@ const Login: React.FC = () => {
   const [mainProblems, setMainProblems] = useState('');
   const [mainDesires, setMainDesires] = useState('');
 
+  const [approvalChecked, setApprovalChecked] = useState(false);
+
   if (loading) return null;
 
   // Check if user is approved
-  if (user) {
-    // We need to check approval status
-    const checkApproval = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('approved')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (data && !data.approved) {
-        setPendingApproval(true);
-      }
-    };
-    if (!pendingApproval) {
-      checkApproval();
-    }
-    if (pendingApproval) {
-      return (
-        <div className="min-h-screen bg-background flex items-center justify-center px-6">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-md">
-            <img src={meteoraLogo} alt="Meteora Academy" className="h-10 mx-auto mb-8" />
-            <div className="bg-card rounded-2xl p-8 border border-border">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-primary" />
-              </div>
-              <h2 className="text-2xl font-display font-bold text-foreground mb-2">{t('pendingApproval')}</h2>
-              <p className="text-muted-foreground text-sm">{t('pendingApprovalMsg')}</p>
+  if (user && !approvalChecked && !pendingApproval) {
+    supabase
+      .from('profiles')
+      .select('approved')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && !data.approved) {
+          setPendingApproval(true);
+        }
+        setApprovalChecked(true);
+      });
+  }
+
+  if (user && !approvalChecked) return null; // Wait for approval check
+
+  if (user && pendingApproval) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-md">
+          <img src={meteoraLogo} alt="Meteora Academy" className="h-10 mx-auto mb-8" />
+          <div className="bg-card rounded-2xl p-8 border border-border">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Users className="w-8 h-8 text-primary" />
             </div>
-          </motion.div>
-        </div>
-      );
-    }
+            <h2 className="text-2xl font-display font-bold text-foreground mb-2">{t('pendingApproval')}</h2>
+            <p className="text-muted-foreground text-sm">{t('pendingApprovalMsg')}</p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (user && approvalChecked && !pendingApproval) {
     return <Navigate to="/app" replace />;
   }
 
