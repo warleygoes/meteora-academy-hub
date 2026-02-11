@@ -1,65 +1,69 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Play, Star, Users, BookOpen, Award, ChevronRight, ArrowRight, Zap, Target, Globe, MessageCircle, ChevronDown, Instagram, Youtube, Linkedin, Mail } from 'lucide-react';
+import { Play, Star, Users, BookOpen, Award, ChevronRight, ArrowRight, Zap, Target, Globe, MessageCircle, ChevronDown, Instagram, Youtube, Linkedin, Mail, Wifi, Server, BarChart3, Headphones, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useLanguage } from '@/contexts/LanguageContext';
 import meteoraLogo from '@/assets/logo-white-pink.png';
 import landingHero from '@/assets/landing-hero.jpg';
 import testimonial1 from '@/assets/testimonial-1.jpg';
 import testimonial2 from '@/assets/testimonial-2.jpg';
 import testimonial3 from '@/assets/testimonial-3.jpg';
+import vinheta from '@/assets/vinheta.mp4';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
   visible: (i: number = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.15, duration: 0.7, ease: "easeOut" as const },
+    transition: { delay: i * 0.12, duration: 0.6, ease: "easeOut" as const },
   }),
 };
 
 const LandingPage: React.FC = () => {
-  const { t } = useLanguage();
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const stats = [
-    { value: '10.000+', label: 'Alunos Ativos' },
-    { value: '150+', label: 'Aulas Exclusivas' },
-    { value: '98%', label: 'Satisfação' },
-    { value: '24/7', label: 'Suporte' },
+    { value: '2.5M', label: 'Visualizações' },
+    { value: '27k', label: 'Inscritos' },
+    { value: '682', label: 'Vídeos' },
+    { value: '600+', label: 'Alunos' },
+    { value: '16', label: 'Países' },
+    { value: '30k', label: 'ISPs Impactados' },
+  ];
+
+  const expertise = [
+    'Conceptos avanzados en ISP',
+    'Planificación y dimensionamiento de un ISP',
+    'Infraestructura de red para ISP',
+    'Servicios ofrecidos por los ISP',
+    'Gestión y operación de un ISP',
+    'Cursos técnicos y formación',
+    'Consultoría estratégica',
   ];
 
   const features = [
-    { icon: BookOpen, title: 'Cursos Premium', desc: 'Conteúdo de alta qualidade produzido por especialistas do mercado com metodologia comprovada.' },
-    { icon: Users, title: 'Comunidade Ativa', desc: 'Conecte-se com milhares de alunos, troque experiências e faça networking de verdade.' },
-    { icon: Zap, title: 'Aprendizado Acelerado', desc: 'Metodologia prática e objetiva para você dominar novas habilidades em tempo recorde.' },
-    { icon: Award, title: 'Certificação', desc: 'Certificados reconhecidos pelo mercado que valorizam seu currículo profissional.' },
-    { icon: Target, title: 'Foco em Resultados', desc: 'Nossos alunos não apenas aprendem — eles aplicam e transformam suas carreiras.' },
-    { icon: Globe, title: 'Acesso Global', desc: 'Estude de qualquer lugar do mundo, no seu ritmo, com suporte em português, inglês e espanhol.' },
-  ];
-
-  const courses = [
-    { title: 'Marketing Digital Avançado', category: 'Marketing', students: '2.3k', rating: 4.9 },
-    { title: 'Liderança & Gestão de Equipes', category: 'Gestão', students: '1.8k', rating: 4.8 },
-    { title: 'Vendas de Alta Performance', category: 'Vendas', students: '3.1k', rating: 4.9 },
-    { title: 'Mindset & Produtividade', category: 'Desenvolvimento', students: '2.7k', rating: 4.7 },
+    { icon: Wifi, title: 'Cursos para ISPs', desc: 'Conteúdo especializado para provedores de internet, desde conceitos avançados até gestão e operação.' },
+    { icon: Users, title: 'Comunidade Exclusiva', desc: 'Conecte-se com mais de 600 alunos e ISPs de 16 países da América Latina.' },
+    { icon: Headphones, title: 'Oráculo', desc: 'Sessões semanais ao vivo com especialistas para resolver suas dúvidas em tempo real.' },
+    { icon: Target, title: 'Mentoria', desc: 'Leve seu ISP para outro nível com acompanhamento estratégico personalizado.' },
+    { icon: Server, title: 'Infraestrutura', desc: 'Domine planejamento, dimensionamento e infraestrutura de rede para seu provedor.' },
+    { icon: Globe, title: 'Presença Global', desc: 'Atuamos em toda América Latina — Venezuela, Uruguai, Peru, Paraguai, Equador, Colômbia e Argentina.' },
   ];
 
   const testimonials = [
-    { name: 'Camila Oliveira', role: 'Empreendedora Digital', img: testimonial1, text: 'A Meteora mudou completamente a minha visão de negócios. Em 3 meses triplicamos o faturamento da minha empresa seguindo as estratégias dos cursos.' },
-    { name: 'Rafael Mendes', role: 'CEO, TechStart', img: testimonial2, text: 'A comunidade é o maior diferencial. O networking que fiz na Meteora me abriu portas que eu jamais imaginaria. Recomendo de olhos fechados.' },
-    { name: 'Dra. Patricia Santos', role: 'Consultora de Carreira', img: testimonial3, text: 'Qualidade excepcional. Os instrutores são referências no mercado e o suporte é impecável. É investimento, não gasto.' },
+    { name: 'Deivis Nibaldo Montes Zambrano', role: 'ISP Owner', img: testimonial1, text: 'La Mentoria me gusta la forma en que nos ayudamos mutuamente y lo que más me impacta es donde nos reunimos y podemos interactuar y resolver nuestras dudas.' },
+    { name: 'Lizbeth Hernandez', role: 'ISP Manager', img: testimonial2, text: 'Me gusta la interacción que se tiene entre los compañeros, porque se aprenden cosas nuevas. Y bueno mejorar más en la parte de nuestros ISPs con estas mentorias prácticas.' },
+    { name: 'Aluno Meteora', role: 'Provedor de Internet', img: testimonial3, text: 'A Meteora transformou a forma como gerenciamos nosso ISP. O conhecimento prático e a comunidade de apoio fizeram toda a diferença para escalar nosso negócio.' },
   ];
 
   const faqs = [
-    { q: 'Como funciona a Meteora Academy?', a: 'A Meteora é uma plataforma de educação premium com cursos online, comunidade exclusiva e certificação. Ao se tornar membro, você tem acesso a todo o conteúdo e à nossa comunidade de alunos.' },
-    { q: 'Posso acessar de qualquer dispositivo?', a: 'Sim! Nossa plataforma é 100% responsiva e funciona em computadores, tablets e smartphones. Estude onde e quando quiser.' },
-    { q: 'Como funciona a comunidade?', a: 'Nossa comunidade funciona como um fórum exclusivo onde membros podem interagir, compartilhar experiências, fazer networking e tirar dúvidas diretamente com instrutores.' },
-    { q: 'Existe garantia de satisfação?', a: 'Sim, oferecemos 7 dias de garantia incondicional. Se não estiver satisfeito, devolvemos 100% do valor investido.' },
-    { q: 'Recebo certificado?', a: 'Sim! Ao concluir cada curso, você recebe um certificado digital reconhecido que pode ser compartilhado no LinkedIn e adicionado ao seu currículo.' },
+    { q: 'O que é a Meteora Academy?', a: 'A Meteora Academy é uma plataforma educacional especializada em provedores de internet (ISPs). Oferecemos cursos, mentoria, comunidade e consultoria estratégica para ajudar seu ISP a crescer e se tornar imparável.' },
+    { q: 'Para quem são os cursos?', a: 'Nossos cursos são voltados para donos, gestores e técnicos de provedores de internet (ISPs) de toda América Latina que desejam escalar seus negócios.' },
+    { q: 'O que é o Oráculo?', a: 'O Oráculo são sessões semanais ao vivo com um especialista dedicado para resolver suas dúvidas em tempo real. O investimento é de U$ 39/mês.' },
+    { q: 'Em quais países a Meteora atua?', a: 'Atuamos em 16 países, incluindo Brasil, Argentina, Colômbia, Peru, Venezuela, Equador, Paraguai, Uruguai e outros países da América Latina.' },
+    { q: 'Como funciona a comunidade?', a: 'Nossa comunidade é um espaço exclusivo onde alunos e donos de ISPs interagem, compartilham experiências, fazem networking e se ajudam mutuamente a crescer no mercado.' },
+    { q: 'Quem é o fundador?', a: 'Nosso fundador é um brasileiro que vive na Argentina, dono de um ISP e professor de tecnologia. Ele compartilha seus conhecimentos e tem como missão melhorar a internet na América Latina através da educação.' },
   ];
-
-  const [openFaq, setOpenFaq] = React.useState<number | null>(null);
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -70,6 +74,7 @@ const LandingPage: React.FC = () => {
           <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#sobre" className="hover:text-foreground transition-colors">Sobre</a>
             <a href="#cursos" className="hover:text-foreground transition-colors">Cursos</a>
+            <a href="#oraculo" className="hover:text-foreground transition-colors">Oráculo</a>
             <a href="#depoimentos" className="hover:text-foreground transition-colors">Depoimentos</a>
             <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
           </div>
@@ -92,16 +97,25 @@ const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center pt-16">
         <div className="absolute inset-0">
-          <img src={landingHero} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/60" />
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+            poster={landingHero}
+          >
+            <source src={vinheta} type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/50" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-background/70" />
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 w-full">
           <div className="max-w-2xl">
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}>
               <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
-                <Zap className="w-3 h-3" /> Seja Imparável
+                <Zap className="w-3 h-3" /> Sea Imparable
               </span>
             </motion.div>
 
@@ -109,19 +123,19 @@ const LandingPage: React.FC = () => {
               variants={fadeUp} initial="hidden" animate="visible" custom={1}
               className="text-5xl md:text-7xl font-display font-bold leading-[1.1] mb-6"
             >
-              <span className="text-foreground">Transforme sua</span>
+              <span className="text-foreground">Aceleramos el</span>
               <br />
-              <span className="text-gradient">carreira</span>
-              <span className="text-foreground"> com quem</span>
+              <span className="text-foreground">crecimiento de</span>
               <br />
-              <span className="text-foreground">já chegou lá.</span>
+              <span className="text-foreground">tu </span>
+              <span className="text-gradient">ISP</span>
             </motion.h1>
 
             <motion.p
               variants={fadeUp} initial="hidden" animate="visible" custom={2}
               className="text-lg md:text-xl text-muted-foreground mb-10 max-w-lg leading-relaxed"
             >
-              A Meteora Academy reúne os melhores cursos, uma comunidade exclusiva e mentoria de especialistas para acelerar seus resultados.
+              Los conocimientos necesarios para que tu proveedor de Internet crezca y sea Imparable. Cursos, mentoria y comunidad exclusiva.
             </motion.p>
 
             <motion.div
@@ -130,12 +144,12 @@ const LandingPage: React.FC = () => {
             >
               <Link to="/login">
                 <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
-                  <Play className="w-5 h-5" /> Começar Agora
+                  <Play className="w-5 h-5" /> Comenzar Ahora
                 </Button>
               </Link>
               <a href="#sobre">
                 <Button size="lg" variant="secondary" className="font-semibold gap-2 text-base">
-                  Conhecer a Meteora <ChevronRight className="w-4 h-4" />
+                  Conocer Meteora <ChevronRight className="w-4 h-4" />
                 </Button>
               </a>
             </motion.div>
@@ -149,12 +163,12 @@ const LandingPage: React.FC = () => {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8, duration: 0.6 }}
-              className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-t-2xl overflow-hidden"
+              className="grid grid-cols-3 md:grid-cols-6 gap-px bg-border rounded-t-2xl overflow-hidden"
             >
               {stats.map((stat) => (
-                <div key={stat.label} className="bg-card/80 backdrop-blur-sm px-6 py-5 text-center">
-                  <p className="text-2xl md:text-3xl font-display font-bold text-primary">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+                <div key={stat.label} className="bg-card/80 backdrop-blur-sm px-4 py-5 text-center">
+                  <p className="text-xl md:text-2xl font-display font-bold text-primary">{stat.value}</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground mt-1">{stat.label}</p>
                 </div>
               ))}
             </motion.div>
@@ -162,20 +176,78 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* About / Features */}
+      {/* Expertise Section */}
       <section id="sobre" className="py-24 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+              <span className="text-primary text-sm font-semibold uppercase tracking-wider">Experiencia</span>
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground mt-3 mb-6">
+                Experiencia en resolución de <span className="text-gradient">problemas.</span>
+              </h2>
+              <p className="text-muted-foreground text-lg leading-relaxed mb-8">
+                Experiencia en resolver desafíos de proveedores de servicios de Internet (ISP), transformando obstáculos en oportunidades de crecimiento.
+              </p>
+              <div className="space-y-3">
+                {expertise.map((item, i) => (
+                  <motion.div
+                    key={i}
+                    variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i}
+                    className="flex items-center gap-3"
+                  >
+                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+                    <span className="text-foreground">{item}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div
+              variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={2}
+              className="relative"
+            >
+              <div className="bg-card rounded-3xl p-8 border border-border relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl" />
+                <div className="relative z-10">
+                  <h3 className="text-2xl font-display font-bold text-foreground mb-3">
+                    Missão
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+                    Proporcionar conexões sólidas que vão além da mera transmissão de dados, tornando-nos facilitadores de experiências enriquecedoras e vitais para a vida moderna.
+                  </p>
+                  <h3 className="text-2xl font-display font-bold text-foreground mb-3">
+                    Visão
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+                    Aspiramos a ser pioneiros na transformação digital, destacando-nos como líderes no setor de provedores de serviços de Internet.
+                  </p>
+                  <h3 className="text-2xl font-display font-bold text-foreground mb-3">
+                    Valores
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    Inovação, Integridade, Colaboração, Responsabilidade Social. Esses valores são a bússola que orienta nosso caminho para o sucesso sustentável.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="cursos" className="py-24 px-6 bg-card/30">
         <div className="max-w-7xl mx-auto">
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <span className="text-primary text-sm font-semibold uppercase tracking-wider">Por que a Meteora?</span>
+            <span className="text-primary text-sm font-semibold uppercase tracking-wider">O que oferecemos</span>
             <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground mt-3 mb-4">
-              Mais do que cursos.<br />
-              <span className="text-gradient">Uma transformação completa.</span>
+              Tudo que seu ISP precisa<br />
+              <span className="text-gradient">em um só lugar.</span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Combinamos educação de excelência, comunidade engajada e suporte contínuo para que você alcance resultados reais.
+              Cursos, mentoria, comunidade e consultoria para provedores de internet de toda América Latina.
             </p>
           </motion.div>
 
@@ -197,62 +269,46 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Featured Courses */}
-      <section id="cursos" className="py-24 px-6 bg-card/30">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="flex items-end justify-between mb-12"
-          >
-            <div>
-              <span className="text-primary text-sm font-semibold uppercase tracking-wider">Cursos</span>
-              <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground mt-3">
-                Cursos em <span className="text-gradient">Destaque</span>
-              </h2>
+      {/* Oráculo */}
+      <section id="oraculo" className="py-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+            <div className="bg-gradient-to-br from-primary/10 via-card to-card rounded-3xl p-12 md:p-16 border border-primary/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl" />
+              <div className="relative z-10">
+                <span className="text-4xl mb-4 block">🔮</span>
+                <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
+                  <span className="text-gradient">Oráculo</span>
+                </h2>
+                <p className="text-xl text-muted-foreground mb-2">
+                  Sesiones semanales con un especialista para resolver dudas.
+                </p>
+                <p className="text-3xl font-display font-bold text-primary mb-8">
+                  U$ 39 <span className="text-lg text-muted-foreground font-normal">/ mes</span>
+                </p>
+                <Link to="/login">
+                  <Button size="lg" className="glow-primary font-bold gap-2 text-base px-10">
+                    <Headphones className="w-5 h-5" /> Quiero el Oráculo
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <Link to="/login" className="hidden md:flex items-center gap-1 text-primary hover:underline font-medium text-sm">
-              Ver todos <ArrowRight className="w-4 h-4" />
-            </Link>
           </motion.div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {courses.map((c, i) => (
-              <motion.div
-                key={c.title}
-                variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i}
-                className="bg-card rounded-2xl overflow-hidden border border-border hover:border-primary/30 transition-all duration-300 group cursor-pointer"
-              >
-                <div className="aspect-video bg-gradient-to-br from-primary/20 via-secondary to-card flex items-center justify-center">
-                  <BookOpen className="w-10 h-10 text-primary/40 group-hover:text-primary/60 transition-colors" />
-                </div>
-                <div className="p-5">
-                  <span className="text-xs font-medium text-primary uppercase tracking-wider">{c.category}</span>
-                  <h3 className="font-display font-semibold text-foreground mt-1 mb-3 leading-snug">{c.title}</h3>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Star className="w-3 h-3 text-primary fill-primary" /> {c.rating}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3" /> {c.students}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
         </div>
       </section>
 
       {/* Testimonials */}
-      <section id="depoimentos" className="py-24 px-6">
+      <section id="depoimentos" className="py-24 px-6 bg-card/30">
         <div className="max-w-7xl mx-auto">
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <span className="text-primary text-sm font-semibold uppercase tracking-wider">Depoimentos</span>
+            <span className="text-primary text-sm font-semibold uppercase tracking-wider">Mentoria</span>
             <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground mt-3">
-              Quem faz parte, <span className="text-gradient">recomenda.</span>
+              Ellos usan nuestra mentoria para llevar su<br />
+              <span className="text-gradient">negocio a otro nivel.</span>
             </h2>
           </motion.div>
 
@@ -282,27 +338,48 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* CTA - Founder */}
+      <section className="py-24 px-6">
+        <div className="max-w-7xl mx-auto">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+            <div className="bg-card rounded-3xl p-12 md:p-16 border border-border relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+              <div className="max-w-2xl relative z-10">
+                <span className="text-primary text-sm font-semibold uppercase tracking-wider">Fundador</span>
+                <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mt-3 mb-6">
+                  Conozca a nuestro <span className="text-gradient">Fundador</span>
+                </h2>
+                <p className="text-muted-foreground leading-relaxed mb-4">
+                  Brasileño que vive en Argentina, dueño de un ISP y profesor de tecnología. Comparte sus conocimientos en las redes sociales y tiene como misión mejorar Internet en América Latina a través de la educación y el entrenamiento de pequeños ISPs.
+                </p>
+                <p className="text-muted-foreground leading-relaxed mb-8">
+                  Fundador de la empresa MISP (Mastering Internet Service Provider), que ofrece entrenamientos tanto pagos como gratuitos.
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+                  <Award className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">El curso mejor valorado en Latinoamérica</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-            <div className="bg-gradient-to-br from-primary/10 via-card to-card rounded-3xl p-12 md:p-16 border border-primary/20 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl" />
-              <div className="relative z-10">
-                <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
-                  Pronto para ser <span className="text-gradient">imparável</span>?
-                </h2>
-                <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-                  Junte-se a milhares de alunos que já estão transformando suas carreiras com a Meteora Academy.
-                </p>
-                <Link to="/login">
-                  <Button size="lg" className="glow-primary font-bold gap-2 text-base px-10">
-                    <Play className="w-5 h-5" /> Quero Fazer Parte
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
+              ¿Listo para ser <span className="text-gradient">Imparable</span>?
+            </h2>
+            <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
+              Únete a miles de ISPs que ya están transformando sus negocios con la Meteora Academy.
+            </p>
+            <Link to="/login">
+              <Button size="lg" className="glow-primary font-bold gap-2 text-base px-10">
+                <Play className="w-5 h-5" /> Quiero Hacer Parte
+              </Button>
+            </Link>
           </motion.div>
         </div>
       </section>
@@ -350,25 +427,25 @@ const LandingPage: React.FC = () => {
             <div>
               <img src={meteoraLogo} alt="Meteora Academy" className="h-7 mb-4" />
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Educação de excelência para transformar carreiras e vidas.
+                Estamos ayudando a construir el futuro de los ISP. Educación, comunidad y tecnología para provedores de internet.
               </p>
             </div>
             <div>
               <h4 className="font-display font-semibold text-foreground mb-4 text-sm">Plataforma</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="#cursos" className="hover:text-foreground transition-colors">Cursos</a></li>
-                <li><a href="#sobre" className="hover:text-foreground transition-colors">Comunidade</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Planos</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Certificados</a></li>
+                <li><a href="#oraculo" className="hover:text-foreground transition-colors">Oráculo</a></li>
+                <li><Link to="/login" className="hover:text-foreground transition-colors">Comunidade</Link></li>
+                <li><a href="#depoimentos" className="hover:text-foreground transition-colors">Mentoria</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-display font-semibold text-foreground mb-4 text-sm">Institucional</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#sobre" className="hover:text-foreground transition-colors">Sobre</a></li>
+                <li><a href="#sobre" className="hover:text-foreground transition-colors">Empresa</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Termos de Uso</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Política de Privacidade</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contato</a></li>
+                <li><a href="https://forms.gle/AUMjzehP8guXcYLXA" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Trabalhe Conosco</a></li>
               </ul>
             </div>
             <div>
@@ -391,7 +468,7 @@ const LandingPage: React.FC = () => {
           </div>
           <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-muted-foreground">© 2025 Meteora Academy. Todos os direitos reservados.</p>
-            <p className="text-xs text-muted-foreground">CNPJ: 00.000.000/0001-00</p>
+            <p className="text-xs text-muted-foreground">MISP - Mastering Internet Service Provider</p>
           </div>
         </div>
       </footer>
