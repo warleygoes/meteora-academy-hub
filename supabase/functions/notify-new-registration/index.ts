@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,38 +11,6 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    // Validate the user via getUser instead of getClaims
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userEmail = userData.user.email;
-
     const N8N_WEBHOOK_URL = Deno.env.get("N8N_WEBHOOK_URL");
     if (!N8N_WEBHOOK_URL) {
       console.error("N8N_WEBHOOK_URL is not configured");
@@ -56,18 +23,10 @@ serve(async (req) => {
     const body = await req.json();
     const { email, displayName, companyName, country, roleType, phone, clientCount, networkType, cheapestPlan, mainProblems, mainDesires } = body;
 
-    // Validate that the request email matches the authenticated user
-    if (email && email !== userEmail) {
-      return new Response(JSON.stringify({ error: "Email mismatch" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // Build query params for GET webhook
     const params = new URLSearchParams({
       event: "new_registration",
-      email: userEmail || "",
+      email: email || "",
       display_name: displayName || "",
       company_name: companyName || "",
       country: country || "",
@@ -82,7 +41,7 @@ serve(async (req) => {
     });
 
     const webhookUrl = `${N8N_WEBHOOK_URL}?${params.toString()}`;
-    console.log("Calling n8n webhook:", webhookUrl);
+    console.log("Calling n8n webhook for:", email);
 
     const response = await fetch(webhookUrl, { method: "GET" });
 
