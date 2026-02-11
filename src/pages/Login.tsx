@@ -273,13 +273,13 @@ const Login: React.FC = () => {
                   <Input placeholder={t('phone')} value={phone} onChange={(e) => setPhoneVal(e.target.value)} className="pl-10 bg-secondary border-border" required />
                 </div>
 
+                <div className="relative">
+                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder={t('clientCountPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
+                </div>
+
                 {roleType === 'owner' && (
                   <>
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input placeholder={t('clientCountPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
-                    </div>
-
                     <div>
                       <label className="text-sm font-medium text-foreground mb-2 block">{t('networkType')}</label>
                       <div className="grid grid-cols-3 gap-3">
