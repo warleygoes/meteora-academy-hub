@@ -3,6 +3,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const ALLOWED_ORIGINS = [
   "https://meteoraacademy.lovable.app",
+  "https://meteora.academy",
+  "https://www.meteora.academy",
   "https://id-preview--ac0966f3-2002-481d-a0ce-6416e5364f4e.lovable.app",
   "http://localhost:5173",
   "http://localhost:8080",
