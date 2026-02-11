@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/lib/i18n';
+import meteoraLogo from '@/assets/logo-white-pink.png';
 
 const languageLabels: Record<Language, string> = { pt: 'PT', en: 'EN', es: 'ES' };
 
@@ -24,12 +25,13 @@ export const AppSidebar: React.FC = () => {
   const sidebar = (
     <div className={`flex flex-col h-full bg-sidebar border-r border-sidebar-border ${collapsed ? 'w-16' : 'w-60'} transition-all duration-300`}>
       {/* Logo */}
-      <div className="px-4 py-5 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center font-display font-bold text-primary-foreground text-lg flex-shrink-0">
-          M
-        </div>
-        {!collapsed && (
-          <span className="font-display font-bold text-foreground text-lg whitespace-nowrap">Meteora</span>
+      <div className="px-4 py-5 flex items-center">
+        {collapsed ? (
+          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center font-display font-bold text-primary-foreground text-lg flex-shrink-0">
+            M
+          </div>
+        ) : (
+          <img src={meteoraLogo} alt="Meteora Academy" className="h-8 w-auto" />
         )}
       </div>
 

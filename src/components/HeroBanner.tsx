@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Play, Info } from 'lucide-react';
 import heroBanner from '@/assets/hero-banner.jpg';
+import meteoraLogo from '@/assets/logo-white-pink.png';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 
@@ -24,11 +25,10 @@ export const HeroBanner: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <h1 className="text-5xl md:text-7xl font-display font-bold mb-2 leading-tight">
-            <span className="text-gradient">Meteora</span>
-            <br />
-            <span className="text-foreground">Academy</span>
-          </h1>
+          <img src={meteoraLogo} alt="Meteora Academy" className="h-12 md:h-16 w-auto mb-4" />
+          <p className="text-lg md:text-xl text-muted-foreground mb-2 font-display font-medium">
+            {t('heroTitle')}
+          </p>
           <p className="text-lg md:text-xl text-muted-foreground mb-2 font-display font-medium">
             {t('heroTitle')}
           </p>
