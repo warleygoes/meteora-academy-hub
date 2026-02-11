@@ -13,9 +13,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+const countryFlags: Record<string, string> = {
+  'Argentina': '🇦🇷', 'Brasil': '🇧🇷', 'Brazil': '🇧🇷', 'Colombia': '🇨🇴', 'Venezuela': '🇻🇪',
+  'Perú': '🇵🇪', 'Peru': '🇵🇪', 'Ecuador': '🇪🇨', 'Chile': '🇨🇱', 'Uruguay': '🇺🇾',
+  'Paraguay': '🇵🇾', 'Bolivia': '🇧🇴', 'México': '🇲🇽', 'Mexico': '🇲🇽', 'Panamá': '🇵🇦',
+  'Panama': '🇵🇦', 'Costa Rica': '🇨🇷', 'Guatemala': '🇬🇹', 'Honduras': '🇭🇳',
+  'El Salvador': '🇸🇻', 'Nicaragua': '🇳🇮', 'Cuba': '🇨🇺', 'República Dominicana': '🇩🇴',
+  'Dominican Republic': '🇩🇴', 'Puerto Rico': '🇵🇷', 'España': '🇪🇸', 'Spain': '🇪🇸',
+  'United States': '🇺🇸', 'Estados Unidos': '🇺🇸',
+};
+
+const getFlag = (country: string | null) => {
+  if (!country) return '';
+  return countryFlags[country] || '🌐';
+};
+
 interface ProfileUser {
   id: string;
   user_id: string;
+  email: string | null;
   display_name: string | null;
   company_name: string | null;
   country: string | null;
@@ -87,21 +103,47 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   }, [fetchPendingUsers, fetchAllUsers]);
 
   const approveUser = async (userId: string) => {
+    // Optimistic update
+    setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
+    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: true } : u));
+    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: true } : prev);
+    onStatsUpdate({ total: stats.total, approved: stats.approved + 1, pending: Math.max(0, stats.pending - 1) });
+
     const { error } = await supabase.from('profiles').update({ approved: true }).eq('user_id', userId);
-    if (error) { toast({ title: error.message, variant: 'destructive' }); }
-    else { toast({ title: t('userApproved') }); fetchPendingUsers(); fetchAllUsers(); setSelectedUser(null); }
+    if (error) {
+      toast({ title: error.message, variant: 'destructive' });
+      fetchPendingUsers(); fetchAllUsers(); // rollback
+    } else {
+      toast({ title: t('userApproved') });
+    }
   };
 
   const rejectUser = async (userId: string) => {
+    // Optimistic: remove from pending list
+    setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
+    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false } : prev);
+
     const { error } = await supabase.from('profiles').update({ approved: false }).eq('user_id', userId);
-    if (error) { toast({ title: error.message, variant: 'destructive' }); }
-    else { toast({ title: t('userRejected') }); fetchPendingUsers(); fetchAllUsers(); setSelectedUser(null); }
+    if (error) {
+      toast({ title: error.message, variant: 'destructive' });
+      fetchPendingUsers(); fetchAllUsers();
+    } else {
+      toast({ title: t('userRejected') });
+    }
   };
 
   const suspendUser = async (userId: string) => {
+    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: false } : u));
+    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false } : prev);
+    onStatsUpdate({ total: stats.total, approved: Math.max(0, stats.approved - 1), pending: stats.pending + 1 });
+
     const { error } = await supabase.from('profiles').update({ approved: false }).eq('user_id', userId);
-    if (error) { toast({ title: error.message, variant: 'destructive' }); }
-    else { toast({ title: t('userSuspended') }); fetchAllUsers(); setSelectedUser(null); }
+    if (error) {
+      toast({ title: error.message, variant: 'destructive' });
+      fetchAllUsers();
+    } else {
+      toast({ title: t('userSuspended') });
+    }
   };
 
   const fetchAdmins = async () => {
@@ -206,7 +248,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       {user.company_name && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{user.company_name}</span>}
-                      {user.country && <span className="flex items-center gap-1"><Globe className="w-3 h-3" />{user.country}</span>}
+                      {user.country && <span className="flex items-center gap-1"><span>{getFlag(user.country)}</span>{user.country}</span>}
                       {user.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{user.phone}</span>}
                       {user.client_count && <span className="flex items-center gap-1"><Users className="w-3 h-3" />{user.client_count} clientes</span>}
                       {user.network_type && <span className="flex items-center gap-1"><Wifi className="w-3 h-3" />{user.network_type}</span>}
@@ -220,7 +262,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                     <Button variant="destructive" size="sm" onClick={() => rejectUser(user.user_id)} className="gap-1">
                       <XCircle className="w-4 h-4" /> {t('rejectUser')}
                     </Button>
-                    <Button size="sm" onClick={() => approveUser(user.user_id)} className="gap-1 glow-primary">
+                    <Button size="sm" onClick={() => approveUser(user.user_id)} className="gap-1 bg-green-600 hover:bg-green-700 text-white">
                       <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
                     </Button>
                   </div>
@@ -304,8 +346,9 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           {selectedUser && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="col-span-2"><span className="text-muted-foreground">Email</span><p className="font-medium text-foreground">{selectedUser.email || '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('roleType')}</span><p className="font-medium text-foreground">{selectedUser.role_type === 'owner' ? t('ispOwner') : t('ispEmployee')}</p></div>
-                <div><span className="text-muted-foreground">{t('country')}</span><p className="font-medium text-foreground">{selectedUser.country || '—'}</p></div>
+                <div><span className="text-muted-foreground">{t('country')}</span><p className="font-medium text-foreground">{selectedUser.country ? `${getFlag(selectedUser.country)} ${selectedUser.country}` : '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('companyName')}</span><p className="font-medium text-foreground">{selectedUser.company_name || '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('phone')}</span><p className="font-medium text-foreground">{selectedUser.phone || '—'}</p></div>
                 <div><span className="text-muted-foreground">{t('clientCount')}</span><p className="font-medium text-foreground">{selectedUser.client_count || '—'}</p></div>
@@ -321,22 +364,22 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               {selectedUser.main_desires && (
                 <div><p className="text-sm text-muted-foreground mb-1">{t('mainDesires')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{selectedUser.main_desires}</p></div>
               )}
-              <div className="flex gap-2 pt-2">
-                {selectedUser.approved ? (
+              {!selectedUser.approved ? (
+                <div className="flex gap-2 pt-2">
+                  <Button variant="destructive" className="flex-1 gap-2" onClick={() => rejectUser(selectedUser.user_id)}>
+                    <XCircle className="w-4 h-4" /> {t('rejectUser')}
+                  </Button>
+                  <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => approveUser(selectedUser.user_id)}>
+                    <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2 pt-2">
                   <Button variant="destructive" className="flex-1 gap-2" onClick={() => suspendUser(selectedUser.user_id)}>
                     <Ban className="w-4 h-4" /> {t('suspendUser')}
                   </Button>
-                ) : (
-                  <>
-                    <Button variant="destructive" className="flex-1 gap-2" onClick={() => rejectUser(selectedUser.user_id)}>
-                      <XCircle className="w-4 h-4" /> {t('rejectUser')}
-                    </Button>
-                    <Button className="flex-1 gap-2 glow-primary" onClick={() => approveUser(selectedUser.user_id)}>
-                      <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
-                    </Button>
-                  </>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
