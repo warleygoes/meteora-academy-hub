@@ -16,10 +16,10 @@ export const AppSidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navItems = [
-    { to: '/', icon: Home, label: t('home') },
-    { to: '/courses', icon: BookOpen, label: t('courses') },
-    { to: '/community', icon: Users, label: t('community') },
-    ...(isAdmin ? [{ to: '/admin', icon: Shield, label: t('admin') }] : []),
+    { to: '/app', icon: Home, label: t('home') },
+    { to: '/app/courses', icon: BookOpen, label: t('courses') },
+    { to: '/app/community', icon: Users, label: t('community') },
+    ...(isAdmin ? [{ to: '/app/admin', icon: Shield, label: t('admin') }] : []),
   ];
 
   const isActive = (path: string) => location.pathname === path;

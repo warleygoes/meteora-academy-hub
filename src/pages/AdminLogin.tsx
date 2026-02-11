@@ -18,7 +18,7 @@ const AdminLogin: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   if (loading) return null;
-  if (user && isAdmin) return <Navigate to="/admin" replace />;
+  if (user && isAdmin) return <Navigate to="/app/admin" replace />;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
