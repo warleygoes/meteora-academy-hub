@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,8 @@ const Login: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
   const [signupComplete, setSignupComplete] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneTouched, setPhoneTouched] = useState(false);
 
   // Signup form fields
   const [step, setStep] = useState(1);
@@ -151,8 +153,25 @@ const Login: React.FC = () => {
     setSubmitting(false);
   };
 
+  const validatePhone = (value: string): boolean => {
+    const cleaned = value.replace(/[\s\-\(\)]/g, '');
+    return /^\+\d{10,15}$/.test(cleaned);
+  };
+
+  const handlePhoneBlur = () => {
+    setPhoneTouched(true);
+    if (!phone) {
+      setPhoneError(t('phoneRequired'));
+    } else if (!validatePhone(phone)) {
+      setPhoneError(t('phoneInvalid'));
+    } else {
+      setPhoneError('');
+    }
+  };
+
+  const isPhoneValid = phone && validatePhone(phone);
   const canProceedStep1 = displayName && email && password.length >= 6 && roleType;
-  const canProceedStep2 = companyName && country && phone;
+  const canProceedStep2 = companyName && country && isPhoneValid;
 
   // Signup success screen
   if (signupComplete) {
@@ -298,9 +317,37 @@ const Login: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder={t('phone')} value={phone} onChange={(e) => setPhoneVal(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                <div>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder={t('phonePlaceholder')}
+                      value={phone}
+                      onChange={(e) => {
+                        setPhoneVal(e.target.value);
+                        if (phoneTouched) {
+                          if (!e.target.value) setPhoneError(t('phoneRequired'));
+                          else if (!validatePhone(e.target.value)) setPhoneError(t('phoneInvalid'));
+                          else setPhoneError('');
+                        }
+                      }}
+                      onBlur={handlePhoneBlur}
+                      className={`pl-10 bg-secondary border-border ${phoneTouched && phoneError ? 'border-destructive' : phoneTouched && !phoneError && phone ? 'border-green-500' : ''}`}
+                      required
+                    />
+                    {phoneTouched && !phoneError && phone && (
+                      <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                    )}
+                    {phoneTouched && phoneError && (
+                      <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-destructive" />
+                    )}
+                  </div>
+                  {phoneTouched && phoneError && (
+                    <p className="text-xs text-destructive mt-1.5 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {phoneError}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-muted-foreground mt-1">{t('phoneHint')}</p>
                 </div>
 
                 <div className="relative">
@@ -380,10 +427,20 @@ const Login: React.FC = () => {
               </>
             )}
             {mode === 'signup' && (
-              <p className="text-muted-foreground">
-                {t('hasAccount')}{' '}
-                <button onClick={() => { setMode('login'); setStep(1); }} className="text-primary hover:underline">{t('login')}</button>
-              </p>
+              <>
+                <p className="text-muted-foreground">
+                  {t('hasAccount')}{' '}
+                  <button onClick={() => { setMode('login'); setStep(1); }} className="text-primary hover:underline">{t('login')}</button>
+                </p>
+                <a
+                  href="https://wa.me/5491100000000?text=Hola%2C%20necesito%20ayuda%20para%20registrarme%20en%20Meteora%20Academy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" /> {t('needHelp')}
+                </a>
+              </>
             )}
             {mode === 'magic' && (
               <button onClick={() => setMode('login')} className="text-primary hover:underline">
