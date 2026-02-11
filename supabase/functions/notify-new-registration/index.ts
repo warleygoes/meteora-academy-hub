@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 
 const ALLOWED_ORIGINS = [
   "https://meteoraacademy.lovable.app",
@@ -60,32 +60,20 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
+    // Validate the request comes from our app via the apikey header
+    // (automatically sent by supabase.functions.invoke)
+    const apiKey = req.headers.get("apikey");
+    const expectedKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    if (!apiKey || apiKey !== expectedKey) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    if (claimsError || !data?.claims) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Rate limit per authenticated user
-    const userId = (data.claims as Record<string, unknown>).sub as string;
-    if (!checkRateLimit(userId)) {
+    // Rate limit by IP as fallback (user not yet authenticated at signup)
+    const clientIp = req.headers.get("x-forwarded-for") || "unknown";
+    if (!checkRateLimit(clientIp)) {
       return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
         status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
