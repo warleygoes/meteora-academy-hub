@@ -158,6 +158,27 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     }
   };
 
+  const deleteUser = async (userId: string) => {
+    // Optimistic remove
+    setAllUsers(prev => prev.filter(u => u.user_id !== userId));
+    setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
+    setSelectedUser(null);
+    const user = allUsers.find(u => u.user_id === userId);
+    onStatsUpdate({
+      total: Math.max(0, stats.total - 1),
+      approved: user?.approved ? Math.max(0, stats.approved - 1) : stats.approved,
+      pending: !user?.approved ? Math.max(0, stats.pending - 1) : stats.pending,
+    });
+
+    const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
+    if (error) {
+      toast({ title: error.message, variant: 'destructive' });
+      fetchPendingUsers(); fetchAllUsers();
+    } else {
+      toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
+    }
+  };
+
   const fetchAdmins = async () => {
     setLoadingAdmins(true);
     const { data: roles } = await supabase.from('user_roles').select('user_id').eq('role', 'admin');
@@ -338,6 +359,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                           ) : (
                             <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-500"><CheckCircle2 className="w-4 h-4" /></Button>
                           )}
+                          <Button variant="ghost" size="sm" onClick={() => { if (confirm('¿Eliminar este usuario permanentemente?')) deleteUser(user.user_id); }} className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
                         </div>
                       </td>
                     </tr>
@@ -377,18 +399,26 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                 <div><p className="text-sm text-muted-foreground mb-1">{t('mainDesires')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{selectedUser.main_desires}</p></div>
               )}
               {!selectedUser.approved ? (
-                <div className="flex gap-2 pt-2">
-                  <Button variant="destructive" className="flex-1 gap-2" onClick={() => rejectUser(selectedUser.user_id)}>
-                    <XCircle className="w-4 h-4" /> {t('rejectUser')}
-                  </Button>
-                  <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => approveUser(selectedUser.user_id)}>
-                    <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
+                <div className="flex flex-col gap-2 pt-2">
+                  <div className="flex gap-2">
+                    <Button variant="destructive" className="flex-1 gap-2" onClick={() => rejectUser(selectedUser.user_id)}>
+                      <XCircle className="w-4 h-4" /> {t('rejectUser')}
+                    </Button>
+                    <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => approveUser(selectedUser.user_id)}>
+                      <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
+                    </Button>
+                  </div>
+                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive w-full" onClick={() => { if (confirm('¿Eliminar este usuario permanentemente?')) deleteUser(selectedUser.user_id); }}>
+                    <Trash2 className="w-4 h-4" /> {t('deleteUser') || 'Eliminar permanentemente'}
                   </Button>
                 </div>
               ) : (
                 <div className="flex gap-2 pt-2">
                   <Button variant="destructive" className="flex-1 gap-2" onClick={() => suspendUser(selectedUser.user_id)}>
                     <Ban className="w-4 h-4" /> {t('suspendUser')}
+                  </Button>
+                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este usuario permanentemente?')) deleteUser(selectedUser.user_id); }}>
+                    <Trash2 className="w-4 h-4" /> {t('deleteUser') || 'Eliminar'}
                   </Button>
                 </div>
               )}
