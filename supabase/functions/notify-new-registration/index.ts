@@ -23,8 +23,7 @@ serve(async (req) => {
     const body = await req.json();
     const { email, displayName, companyName, country, roleType, phone, clientCount, networkType, cheapestPlan, mainProblems, mainDesires } = body;
 
-    // Build query params for GET webhook
-    const params = new URLSearchParams({
+    const payload = {
       event: "new_registration",
       email: email || "",
       display_name: displayName || "",
@@ -38,12 +37,15 @@ serve(async (req) => {
       main_problems: mainProblems || "",
       main_desires: mainDesires || "",
       timestamp: new Date().toISOString(),
+    };
+
+    console.log("Calling n8n webhook (POST) for:", email);
+
+    const response = await fetch(N8N_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
-
-    const webhookUrl = `${N8N_WEBHOOK_URL}?${params.toString()}`;
-    console.log("Calling n8n webhook for:", email);
-
-    const response = await fetch(webhookUrl, { method: "GET" });
 
     if (!response.ok) {
       const text = await response.text();
