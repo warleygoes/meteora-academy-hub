@@ -21,6 +21,7 @@ const Login: React.FC = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [mode, setMode] = useState<'login' | 'signup' | 'magic'>('login');
+  const [rememberMe, setRememberMe] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -250,6 +251,18 @@ const Login: React.FC = () => {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={6} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-border bg-secondary accent-primary cursor-pointer"
+                  />
+                  <label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer select-none">
+                    {t('rememberMe')}
+                  </label>
                 </div>
                 <Button type="submit" className="w-full glow-primary font-semibold" size="lg" disabled={submitting}>
                   {t('login')}
