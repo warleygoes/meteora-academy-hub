@@ -60,18 +60,7 @@ serve(async (req) => {
   }
 
   try {
-    // Validate the request comes from our app via the apikey header
-    // (automatically sent by supabase.functions.invoke)
-    const apiKey = req.headers.get("apikey");
-    const expectedKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    if (!apiKey || apiKey !== expectedKey) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Rate limit by IP as fallback (user not yet authenticated at signup)
+    // Rate limit by IP to prevent abuse (no auth required - signup context)
     const clientIp = req.headers.get("x-forwarded-for") || "unknown";
     if (!checkRateLimit(clientIp)) {
       return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
