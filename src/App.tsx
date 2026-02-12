@@ -13,6 +13,7 @@ import CommunityPage from "./pages/Community";
 import AdminPage from "./pages/Admin";
 import Login from "./pages/Login";
 import AdminLogin from "./pages/AdminLogin";
+import Diagnostico from "./pages/Diagnostico";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +60,7 @@ const App = () => (
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/diagnostico" element={<Diagnostico />} />
 
               {/* Member area */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
