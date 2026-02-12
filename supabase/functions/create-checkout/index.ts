@@ -32,60 +32,63 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { email: user.email });
 
-    const { planId } = await req.json();
-    if (!planId) throw new Error("planId is required");
-    logStep("Plan requested", { planId });
+    const { offerId } = await req.json();
+    if (!offerId) throw new Error("offerId is required");
+    logStep("Offer requested", { offerId });
 
-    // Fetch plan details
+    // Fetch offer details
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
-    const { data: plan, error: planError } = await supabaseAdmin
-      .from("plans")
+    const { data: offer, error: offerError } = await supabaseAdmin
+      .from("offers")
       .select("*")
-      .eq("id", planId)
+      .eq("id", offerId)
       .eq("active", true)
       .single();
 
-    if (planError || !plan) throw new Error("Plan not found or inactive");
-    if (!plan.stripe_price_id) throw new Error("Plan has no Stripe price configured");
-    logStep("Plan found", { name: plan.name, stripe_price_id: plan.stripe_price_id, payment_type: plan.payment_type });
+    if (offerError || !offer) throw new Error("Offer not found or inactive");
+    if (!offer.stripe_price_id) throw new Error("Offer has no Stripe price configured");
+
+    // Determine payment type from linked product or package
+    let paymentType = "one_time";
+    let metaRef: Record<string, string> = { offer_id: offerId, user_id: user.id };
+
+    if (offer.product_id) {
+      const { data: product } = await supabaseAdmin.from("products").select("payment_type").eq("id", offer.product_id).single();
+      if (product) paymentType = product.payment_type;
+      metaRef.product_id = offer.product_id;
+    } else if (offer.package_id) {
+      const { data: pkg } = await supabaseAdmin.from("packages").select("payment_type").eq("id", offer.package_id).single();
+      if (pkg) paymentType = pkg.payment_type;
+      metaRef.package_id = offer.package_id;
+    }
+
+    logStep("Offer found", { stripe_price_id: offer.stripe_price_id, paymentType });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Check if Stripe customer exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    }
-    logStep("Customer lookup", { customerId: customerId || "new" });
+    if (customers.data.length > 0) customerId = customers.data[0].id;
 
-    const mode = plan.payment_type === "monthly" ? "subscription" : "payment";
+    const mode = paymentType === "monthly" ? "subscription" : "payment";
     const origin = req.headers.get("origin") || "https://meteoraacademy.lovable.app";
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
-      line_items: [
-        {
-          price: plan.stripe_price_id,
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: offer.stripe_price_id, quantity: 1 }],
       mode,
-      success_url: `${origin}/app?checkout=success&plan=${planId}`,
+      success_url: `${origin}/app?checkout=success&offer=${offerId}`,
       cancel_url: `${origin}/app?checkout=canceled`,
-      metadata: {
-        plan_id: planId,
-        user_id: user.id,
-      },
+      metadata: metaRef,
     });
-    logStep("Checkout session created", { sessionId: session.id, url: session.url });
+    logStep("Checkout session created", { sessionId: session.id });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

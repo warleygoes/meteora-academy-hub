@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, ExternalLink, Video, Clock } from 'lucide-react';
@@ -15,7 +15,7 @@ interface Meeting {
   description: string | null;
   meeting_link: string;
   meeting_date: string;
-  plan_id: string;
+  package_id: string;
   plan_name?: string;
 }
 
@@ -30,10 +30,9 @@ const Meetings: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const fetchMeetings = async () => {
-      // Get user's active plan IDs
       const { data: userPlans } = await supabase
         .from('user_plans')
-        .select('plan_id')
+        .select('package_id')
         .eq('user_id', user.id)
         .eq('status', 'active');
 
@@ -42,28 +41,26 @@ const Meetings: React.FC = () => {
         return;
       }
 
-      const planIds = userPlans.map(up => up.plan_id);
+      const packageIds = userPlans.map(up => up.package_id);
 
-      // Get meetings for those plans
       const { data: meetingsData } = await supabase
         .from('plan_meetings')
         .select('*')
-        .in('plan_id', planIds)
+        .in('package_id', packageIds)
         .gte('meeting_date', new Date().toISOString())
         .order('meeting_date', { ascending: true });
 
-      // Get plan names
-      const { data: plans } = await supabase
-        .from('plans')
+      const { data: packages } = await supabase
+        .from('packages')
         .select('id, name')
-        .in('id', planIds);
+        .in('id', packageIds);
 
-      const planMap = new Map(plans?.map(p => [p.id, p.name]) || []);
+      const packageMap = new Map(packages?.map(p => [p.id, p.name]) || []);
 
       setMeetings(
         (meetingsData || []).map(m => ({
           ...m,
-          plan_name: planMap.get(m.plan_id) || '',
+          plan_name: packageMap.get(m.package_id) || '',
         }))
       );
       setLoading(false);
@@ -72,7 +69,6 @@ const Meetings: React.FC = () => {
   }, [user]);
 
   const upcomingMeetings = meetings.filter(m => new Date(m.meeting_date) >= new Date());
-  const pastMeetings = meetings.filter(m => new Date(m.meeting_date) < new Date());
 
   if (loading) {
     return (

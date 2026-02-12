@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { Users, BookOpen, DollarSign, TrendingUp, Settings, Shield, ClipboardList, Wrench } from 'lucide-react';
+import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AdminUsers from '@/components/admin/AdminUsers';
 import AdminCourses from '@/components/admin/AdminCourses';
-import AdminPlans from '@/components/admin/AdminPlans';
-import AdminServices from '@/components/admin/AdminServices';
+import AdminPackages from '@/components/admin/AdminPackages';
+import AdminProducts from '@/components/admin/AdminProducts';
 import AdminAnalytics from '@/components/admin/AdminAnalytics';
 import AdminSettings from '@/components/admin/AdminSettings';
 import AdminDiagnostics from '@/components/admin/AdminDiagnostics';
@@ -21,8 +21,8 @@ const AdminPage: React.FC = () => {
 
   const sections = [
     { id: 'courses', label: t('manageCourses'), icon: BookOpen, desc: t('adminCoursesDesc') },
-    { id: 'plans', label: t('managePlans'), icon: DollarSign, desc: t('adminPlansDesc') },
-    { id: 'services', label: t('manageServices') || 'Servicios', icon: Wrench, desc: t('adminServicesDesc') || 'Gestionar servicios' },
+    { id: 'products', label: t('manageProducts') || 'Productos', icon: ShoppingBag, desc: t('adminProductsDesc') || 'Gestionar productos' },
+    { id: 'packages', label: t('managePackages') || 'Paquetes', icon: Package, desc: t('adminPackagesDesc') || 'Gestionar paquetes' },
     { id: 'users', label: t('manageUsers'), icon: Users, desc: t('adminUsersDesc') },
     { id: 'diagnostics', label: t('adminDiagnostics') || 'Diagnósticos', icon: ClipboardList, desc: t('adminDiagnosticsDesc') || 'Diagnósticos recibidos' },
     { id: 'analytics', label: t('analytics'), icon: TrendingUp, desc: t('analyticsDesc') },
@@ -34,7 +34,7 @@ const AdminPage: React.FC = () => {
       <h1 className="text-3xl font-display font-bold mb-8">{t('adminPanel')}</h1>
 
       {/* Navigation Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-8">
         {sections.map(section => (
           <button
             key={section.id}
@@ -55,8 +55,8 @@ const AdminPage: React.FC = () => {
       {/* Content */}
       {activeSection === 'users' && <AdminUsers stats={stats} onStatsUpdate={handleStatsUpdate} />}
       {activeSection === 'courses' && <AdminCourses />}
-      {activeSection === 'plans' && <AdminPlans />}
-      {activeSection === 'services' && <AdminServices />}
+      {activeSection === 'products' && <AdminProducts />}
+      {activeSection === 'packages' && <AdminPackages />}
       {activeSection === 'analytics' && <AdminAnalytics stats={stats} />}
       {activeSection === 'settings' && <AdminSettings />}
       {activeSection === 'diagnostics' && <AdminDiagnostics />}
