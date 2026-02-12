@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Trash2, CheckCircle2, XCircle, Search, Eye, Ban, UserCheck,
-  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound
+  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound, Package
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import UserPackagesManager from './UserPackagesManager';
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -567,6 +568,11 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               {selectedUser.main_desires && (
                 <div><p className="text-sm text-muted-foreground mb-1">{t('mainDesires')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{selectedUser.main_desires}</p></div>
               )}
+              {/* Packages & Products Manager */}
+              <div className="border-t border-border pt-4">
+                <UserPackagesManager userId={selectedUser.user_id} onUpdate={() => fetchActivePlansCounts()} />
+              </div>
+
               {selectedUser.status !== 'approved' ? (
                 <div className="flex flex-col gap-2 pt-2">
                   <div className="flex gap-2">
