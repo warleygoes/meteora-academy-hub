@@ -51,7 +51,7 @@ const AdminProducts: React.FC = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
-  const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -66,7 +66,7 @@ const AdminProducts: React.FC = () => {
 
   const [form, setForm] = useState({
     name: '', description: '', type: 'service' as string, payment_type: 'one_time',
-    course_id: '', thumbnail_url: '', thumbnail_vertical_url: '',
+    thumbnail_url: '', thumbnail_vertical_url: '',
   });
 
   const [offerForm, setOfferForm] = useState({
@@ -100,16 +100,11 @@ const AdminProducts: React.FC = () => {
     setLoading(false);
   }, []);
 
-  const fetchCourses = useCallback(async () => {
-    const { data } = await supabase.from('courses').select('id, title').order('title');
-    if (data) setCourses(data);
-  }, []);
-
-  useEffect(() => { fetchProducts(); fetchCourses(); }, [fetchProducts, fetchCourses]);
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', course_id: '', thumbnail_url: '', thumbnail_vertical_url: '' });
+    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '' });
     setShowEditor(true);
   };
 
@@ -117,7 +112,7 @@ const AdminProducts: React.FC = () => {
     setEditing(p);
     setForm({
       name: p.name, description: p.description || '', type: p.type,
-      payment_type: p.payment_type, course_id: p.course_id || '',
+      payment_type: p.payment_type,
       thumbnail_url: p.thumbnail_url || '', thumbnail_vertical_url: p.thumbnail_vertical_url || '',
     });
     setShowEditor(true);
@@ -130,16 +125,41 @@ const AdminProducts: React.FC = () => {
       description: form.description || null,
       type: form.type,
       payment_type: form.payment_type,
-      course_id: form.type === 'course' && form.course_id ? form.course_id : null,
       thumbnail_url: form.thumbnail_url || null,
       thumbnail_vertical_url: form.thumbnail_vertical_url || null,
     };
 
     if (editing) {
       await supabase.from('products').update(payload).eq('id', editing.id);
+      // Sync linked course if type is course
+      if (form.type === 'course' && editing.course_id) {
+        await supabase.from('courses').update({
+          title: form.name,
+          description: form.description || null,
+          thumbnail_url: form.thumbnail_url || null,
+          thumbnail_vertical_url: form.thumbnail_vertical_url || null,
+        }).eq('id', editing.course_id);
+      }
       toast({ title: t('productUpdated') || 'Producto actualizado' });
     } else {
-      const { data: newProduct } = await supabase.from('products').insert({ ...payload, active: true }).select().single();
+      let courseId: string | null = null;
+      // Auto-create course entry if type is course
+      if (form.type === 'course') {
+        const { data: newCourse } = await supabase.from('courses').insert({
+          title: form.name,
+          description: form.description || null,
+          thumbnail_url: form.thumbnail_url || null,
+          thumbnail_vertical_url: form.thumbnail_vertical_url || null,
+        }).select().single();
+        courseId = newCourse?.id || null;
+      }
+
+      const { data: newProduct } = await supabase.from('products').insert({
+        ...payload,
+        active: true,
+        course_id: courseId,
+      }).select().single();
+
       // Create default offer
       if (newProduct) {
         await supabase.from('offers').insert({
@@ -402,19 +422,8 @@ const AdminProducts: React.FC = () => {
               </div>
             </div>
 
-            {form.type === 'course' && (
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">{t('linkedCourse') || 'Curso vinculado'}</label>
-                <Select value={form.course_id} onValueChange={v => setForm(f => ({ ...f, course_id: v }))}>
-                  <SelectTrigger className="bg-secondary border-border"><SelectValue placeholder={t('selectCourse') || 'Seleccionar curso...'} /></SelectTrigger>
-                  <SelectContent>
-                    {courses.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+
+
 
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">{t('thumbnailHorizontal') || 'Imagen Horizontal (URL)'}</label>
