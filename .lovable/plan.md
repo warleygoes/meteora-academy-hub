@@ -1,43 +1,64 @@
 
 
-# Pagina de Diagnostico ISP (`/diagnostico`)
+# Ajustes no Painel de Usuarios Aprovados
 
-## Resumo
-Criar uma pagina publica dedicada ao formulario de diagnostico do ISP, acessivel em `/diagnostico`. O formulario coleta informacoes estrategicas do provedor e envia os dados para processamento.
+## 1. Botao "Redefinir Senha" na lista de aprovados
 
-## Estrutura da Pagina
+Adicionar um botao de redefinir senha na coluna de acoes da tabela de usuarios aprovados. Como a redefinicao de senha de outro usuario requer privilegios administrativos, sera necessario criar uma edge function que usa a service role key para enviar o email de reset.
 
-A pagina tera o mesmo estilo visual da landing page (dark, com logo Meteora, animacoes framer-motion) e contera:
+**Edge function `reset-user-password`**:
+- Recebe o `email` do usuario
+- Valida que quem chama e admin (verificando o token JWT)
+- Usa `supabase.auth.admin.generateLink({ type: 'recovery', email })` ou `supabase.auth.resetPasswordForEmail(email)` com a service role key
+- Retorna sucesso/erro
 
-1. **Header simples** - Logo + botao voltar para home
-2. **Titulo e contexto** - Explicacao breve do diagnostico
-3. **Formulario multi-step** (3 etapas):
-   - **Etapa 1 - Dados Pessoais**: Nome, Email, Telefone (com validacao internacional), Pais (LATAM)
-   - **Etapa 2 - Dados do ISP**: Nome da empresa, Cargo (dono/funcionario), Numero de clientes, Tipo de rede (fibra/radio/hibrido), Ticket medio / preco do plano mais barato
-   - **Etapa 3 - Situacao Atual**: Principais problemas atuais (textarea), Nivel de conhecimento tecnico do gestor (select), Objetivos principais (textarea)
-4. **Tela de sucesso** - Confirmacao com mensagem de proximo contato
+**No frontend (AdminUsers.tsx)**:
+- Adicionar icone `KeyRound` do lucide-react
+- Novo botao na coluna de acoes dos aprovados que chama a edge function
+- Toast de confirmacao/erro
 
-## Detalhes Tecnicos
+## 2. Corrigir coluna "Planos Ativos"
 
-### Arquivos a criar:
-- `src/pages/Diagnostico.tsx` - Pagina com formulario multi-step
+A coluna "Planos Ativos" atualmente mostra o `cheapest_plan_usd` (preco do plano mais barato), que nao e o dado correto. O que se precisa e a quantidade numerica de planos ativos que o usuario possui.
 
-### Arquivos a modificar:
-- `src/App.tsx` - Adicionar rota publica `/diagnostico`
-- `src/lib/i18n.ts` - Adicionar traducoes PT/ES/EN para todos os campos do formulario
+**Novas tabelas no banco de dados**:
 
-### Banco de dados:
-- Criar tabela `diagnostics` para armazenar as respostas com campos: id, name, email, phone, country, company_name, role_type, client_count, network_type, cheapest_plan, main_problems, tech_knowledge, main_goals, created_at
-- RLS: permitir INSERT para anon (formulario publico), SELECT apenas para admins
+- **`plans`**: id, name, description, price, currency, active, created_at
+  - Representa os planos comerciais (conjuntos de cursos com preco)
+  - RLS: admins podem CRUD, usuarios autenticados podem SELECT
 
-### Edge Function (opcional):
-- Reaproveitar o padrao do `notify-new-registration` para notificar via webhook quando um diagnostico e preenchido
+- **`user_plans`**: id, user_id, plan_id, status (active/cancelled/expired), starts_at, expires_at, created_at
+  - Vincula usuarios a planos adquiridos
+  - RLS: admins podem CRUD, usuarios podem ver os proprios
 
-### Padroes reutilizados:
-- Mesmo estilo de formulario multi-step do `Login.tsx` (steps com barra de progresso)
-- Mesma lista `LATAM_COUNTRIES` do Login
-- Validacao de telefone identica ao Login
-- Animacoes `fadeUp` do framer-motion
-- Componentes UI existentes (Input, Button, Textarea)
-- Sistema i18n com 3 idiomas
+**No frontend**:
+- Na tabela de aprovados, fazer uma query em `user_plans` contando planos com `status = 'active'` para cada usuario
+- Exibir o numero (ex: "2" ou "0") em vez do preco
+
+## 3. Habilitar gestao de admin funcional
+
+O sistema de admin management ja existe parcialmente (dialog com addAdmin/removeAdmin). Ajustes necessarios:
+
+- **Busca por email** em vez de display_name na funcao `addAdmin` (mais confiavel)
+- **Adicionar botao "Tornar Admin"** diretamente na lista de usuarios aprovados (icone Shield)
+- **Indicador visual** de quem ja e admin na lista (badge "Admin")
+- Buscar roles junto com os perfis aprovados para saber quem ja e admin
+
+## Arquivos a modificar
+
+- `src/components/admin/AdminUsers.tsx` - Botao reset senha, corrigir active plans, botao tornar admin
+- `src/lib/i18n.ts` - Traducoes para novos labels
+
+## Arquivos a criar
+
+- `supabase/functions/reset-user-password/index.ts` - Edge function para reset de senha
+- Migration SQL para tabelas `plans` e `user_plans`
+
+## Fluxo do Reset de Senha
+
+1. Admin clica no botao "Redefinir Senha" na linha do usuario
+2. Confirmacao via dialog/confirm
+3. Chama edge function `reset-user-password` com o email do usuario
+4. Edge function envia email de recuperacao ao usuario
+5. Toast de sucesso informando que o email foi enviado
 
