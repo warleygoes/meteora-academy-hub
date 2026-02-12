@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Plus, Edit, Trash2, CheckCircle2, BookOpen, Link as LinkIcon, Users, ExternalLink } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, CheckCircle2, BookOpen, Link as LinkIcon, Users, ExternalLink, Wrench, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ interface Plan {
   features: string[];
   subscriber_count?: number;
   linked_courses?: { id: string; title: string }[];
+  linked_services?: { id: string; title: string }[];
 }
 
 interface Course {
@@ -34,17 +35,27 @@ interface Course {
   title: string;
 }
 
+interface Service {
+  id: string;
+  title: string;
+  payment_type: string;
+}
+
 const AdminPlans: React.FC = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
   const [showCourseLinker, setShowCourseLinker] = useState(false);
+  const [showServiceLinker, setShowServiceLinker] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedPlanPaymentType, setSelectedPlanPaymentType] = useState<string>('monthly');
   const [linkedCourseIds, setLinkedCourseIds] = useState<Set<string>>(new Set());
+  const [linkedServiceIds, setLinkedServiceIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
@@ -84,11 +95,24 @@ const AdminPlans: React.FC = () => {
         if (pc.courses) courseMap[pc.plan_id].push({ id: pc.courses.id, title: pc.courses.title });
       });
 
+      // Get linked services
+      const { data: planServices } = await supabase
+        .from('plan_services')
+        .select('plan_id, service_id, services(id, title)')
+        .order('created_at');
+
+      const serviceMap: Record<string, { id: string; title: string }[]> = {};
+      planServices?.forEach((ps: any) => {
+        if (!serviceMap[ps.plan_id]) serviceMap[ps.plan_id] = [];
+        if (ps.services) serviceMap[ps.plan_id].push({ id: ps.services.id, title: ps.services.title });
+      });
+
       const mapped: Plan[] = plansData.map((p: any) => ({
         ...p,
         features: p.features || [],
         subscriber_count: countMap[p.id] || 0,
         linked_courses: courseMap[p.id] || [],
+        linked_services: serviceMap[p.id] || [],
       }));
       setPlans(mapped);
     }
@@ -100,10 +124,16 @@ const AdminPlans: React.FC = () => {
     if (data) setCourses(data);
   }, []);
 
+  const fetchServices = useCallback(async () => {
+    const { data } = await supabase.from('services').select('id, title, payment_type').order('title');
+    if (data) setServices(data);
+  }, []);
+
   useEffect(() => {
     fetchPlans();
     fetchCourses();
-  }, [fetchPlans, fetchCourses]);
+    fetchServices();
+  }, [fetchPlans, fetchCourses, fetchServices]);
 
   const openNew = () => {
     setEditingPlan(null);
@@ -202,6 +232,43 @@ const AdminPlans: React.FC = () => {
     fetchPlans();
   };
 
+  // Service linking
+  const openServiceLinker = async (planId: string) => {
+    const plan = plans.find(p => p.id === planId);
+    setSelectedPlanId(planId);
+    setSelectedPlanPaymentType(plan?.payment_type || 'monthly');
+    const { data } = await supabase.from('plan_services').select('service_id').eq('plan_id', planId);
+    setLinkedServiceIds(new Set((data || []).map(d => d.service_id)));
+    setShowServiceLinker(true);
+  };
+
+  const toggleServiceLink = (serviceId: string) => {
+    setLinkedServiceIds(prev => {
+      const next = new Set(prev);
+      next.has(serviceId) ? next.delete(serviceId) : next.add(serviceId);
+      return next;
+    });
+  };
+
+  const saveServiceLinks = async () => {
+    if (!selectedPlanId) return;
+    await supabase.from('plan_services').delete().eq('plan_id', selectedPlanId);
+    const inserts = Array.from(linkedServiceIds).map(service_id => ({
+      plan_id: selectedPlanId,
+      service_id,
+    }));
+    if (inserts.length > 0) {
+      await supabase.from('plan_services').insert(inserts);
+    }
+    toast({ title: t('serviceLinksUpdated') || 'Servicios del plan actualizados' });
+    setShowServiceLinker(false);
+    fetchPlans();
+  };
+
+  // Filter services compatible with plan payment type
+  const compatibleServices = services.filter(s => s.payment_type === selectedPlanPaymentType);
+  const incompatibleServices = services.filter(s => s.payment_type !== selectedPlanPaymentType);
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -233,6 +300,9 @@ const AdminPlans: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => openCourseLinker(plan.id)} title={t('linkCourses') || 'Vincular cursos'}>
                     <BookOpen className="w-4 h-4" />
                   </Button>
+                  <Button variant="ghost" size="sm" onClick={() => openServiceLinker(plan.id)} title={t('linkServices') || 'Vincular servicios'}>
+                    <Wrench className="w-4 h-4" />
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => openEdit(plan)}>
                     <Edit className="w-4 h-4" />
                   </Button>
@@ -261,6 +331,7 @@ const AdminPlans: React.FC = () => {
               <div className="flex items-center gap-3 text-xs text-muted-foreground mb-4">
                 <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {plan.subscriber_count} {t('subscribers')}</span>
                 <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {(plan.linked_courses || []).length} {t('courses')}</span>
+                <span className="flex items-center gap-1"><Wrench className="w-3 h-3" /> {(plan.linked_services || []).length} {t('servicesLabel') || 'Servicios'}</span>
               </div>
 
               {plan.stripe_price_id && (
@@ -276,6 +347,20 @@ const AdminPlans: React.FC = () => {
                   <div className="flex flex-wrap gap-1">
                     {(plan.linked_courses || []).map(c => (
                       <Badge key={c.id} variant="secondary" className="text-xs">{c.title}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Linked services */}
+              {(plan.linked_services || []).length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">{t('includedServices') || 'Servicios incluidos'}:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(plan.linked_services || []).map(s => (
+                      <Badge key={s.id} variant="secondary" className="text-xs flex items-center gap-1">
+                        <Wrench className="w-3 h-3" /> {s.title}
+                      </Badge>
                     ))}
                   </div>
                 </div>
@@ -401,6 +486,43 @@ const AdminPlans: React.FC = () => {
             </div>
           )}
           <Button onClick={saveCourseLinks} className="w-full mt-4">{t('save')}</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Service Linker */}
+      <Dialog open={showServiceLinker} onOpenChange={setShowServiceLinker}>
+        <DialogContent className="bg-card border-border max-w-md max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display">{t('linkServices') || 'Vincular Servicios al Plan'}</DialogTitle>
+          </DialogHeader>
+
+          {incompatibleServices.length > 0 && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-600 dark:text-yellow-400">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                {t('paymentTypeMismatchWarning') || 'Solo se muestran servicios con el mismo tipo de pago del plan. No se pueden mezclar servicios de pago único con mensuales.'}
+              </span>
+            </div>
+          )}
+
+          {compatibleServices.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {t('noCompatibleServices') || 'No hay servicios compatibles con este tipo de pago.'}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {compatibleServices.map(service => (
+                <label key={service.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 border border-border cursor-pointer hover:bg-secondary">
+                  <Checkbox checked={linkedServiceIds.has(service.id)} onCheckedChange={() => toggleServiceLink(service.id)} />
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-sm font-medium text-foreground">{service.title}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+          <Button onClick={saveServiceLinks} className="w-full mt-4">{t('save')}</Button>
         </DialogContent>
       </Dialog>
     </div>
