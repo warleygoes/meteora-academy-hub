@@ -397,12 +397,12 @@ const AdminPackages: React.FC = () => {
       <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('deletePackageConfirm') || '¿Eliminar este paquete?'}</AlertDialogTitle>
-            <AlertDialogDescription>{t('deletePackageDesc') || 'Se eliminarán todas sus ofertas y vinculaciones. Esta acción es irreversible.'}</AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar el paquete "{deleteId ? packages.find(p => p.id === deleteId)?.name : ''}"?</AlertDialogTitle>
+            <AlertDialogDescription>Se eliminarán todas las ofertas y vinculaciones de productos asociadas. Esta acción no se puede deshacer.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('back') || 'Cancelar'}</AlertDialogCancel>
-            <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('deleteUser') || 'Eliminar'}</AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-4 h-4 mr-2" /> Eliminar Paquete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -411,12 +411,12 @@ const AdminPackages: React.FC = () => {
       <AlertDialog open={showDeleteOffer} onOpenChange={setShowDeleteOffer}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('deleteOfferConfirm') || '¿Eliminar esta oferta?'}</AlertDialogTitle>
-            <AlertDialogDescription>{t('deleteOfferDesc') || 'Esta acción es irreversible.'}</AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar esta oferta?</AlertDialogTitle>
+            <AlertDialogDescription>Los links de pago asociados dejarán de funcionar. Esta acción no se puede deshacer.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('back') || 'Cancelar'}</AlertDialogCancel>
-            <AlertDialogAction onClick={executeDeleteOffer} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('deleteUser') || 'Eliminar'}</AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDeleteOffer} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-4 h-4 mr-2" /> Eliminar Oferta</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
