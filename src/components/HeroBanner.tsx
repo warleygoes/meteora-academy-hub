@@ -29,9 +29,6 @@ export const HeroBanner: React.FC = () => {
           <p className="text-lg md:text-xl text-muted-foreground mb-2 font-display font-medium">
             {t('heroTitle')}
           </p>
-          <p className="text-lg md:text-xl text-muted-foreground mb-2 font-display font-medium">
-            {t('heroTitle')}
-          </p>
           <p className="text-sm md:text-base text-muted-foreground mb-8 max-w-lg leading-relaxed">
             {t('heroSubtitle')}
           </p>
