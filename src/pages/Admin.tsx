@@ -24,7 +24,7 @@ const AdminPage: React.FC = () => {
     { id: 'packages', label: t('managePackages'), icon: Package, desc: t('adminPackagesDesc') },
     { id: 'courses', label: t('manageCourses'), icon: BookOpen, desc: t('adminCoursesDesc') },
     { id: 'users', label: t('manageUsers'), icon: Users, desc: t('adminUsersDesc') },
-    { id: 'diagnostics', label: t('adminDiagnostics') || 'Diagnósticos', icon: ClipboardList, desc: t('adminDiagnosticsDesc') || 'Diagnósticos recibidos' },
+    { id: 'diagnostics', label: t('adminDiagnostics'), icon: ClipboardList, desc: t('adminDiagnosticsDesc') },
     { id: 'analytics', label: t('analytics'), icon: TrendingUp, desc: t('analyticsDesc') },
     { id: 'settings', label: t('settingsTitle'), icon: Settings, desc: t('settingsDesc') },
   ];

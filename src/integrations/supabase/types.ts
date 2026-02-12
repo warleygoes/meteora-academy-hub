@@ -638,6 +638,7 @@ export type Database = {
           course_id: string | null
           created_at: string
           description: string | null
+          has_content: boolean
           id: string
           name: string
           payment_type: string
@@ -652,6 +653,7 @@ export type Database = {
           course_id?: string | null
           created_at?: string
           description?: string | null
+          has_content?: boolean
           id?: string
           name: string
           payment_type?: string
@@ -666,6 +668,7 @@ export type Database = {
           course_id?: string | null
           created_at?: string
           description?: string | null
+          has_content?: boolean
           id?: string
           name?: string
           payment_type?: string
