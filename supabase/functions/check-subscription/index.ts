@@ -44,7 +44,7 @@ serve(async (req) => {
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found");
-      return new Response(JSON.stringify({ subscribed: false, plans: [] }), {
+      return new Response(JSON.stringify({ subscribed: false, packages: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -53,22 +53,11 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found customer", { customerId });
 
-    // Check active subscriptions
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 10,
-    });
-
-    // Also check one-time payments
-    const sessions = await stripe.checkout.sessions.list({
-      customer: customerId,
-      limit: 50,
-    });
-
+    // Collect active Stripe price IDs
     const activePriceIds: string[] = [];
-    
-    // From subscriptions
+
+    // From active subscriptions
+    const subscriptions = await stripe.subscriptions.list({ customer: customerId, status: "active", limit: 10 });
     for (const sub of subscriptions.data) {
       for (const item of sub.items.data) {
         activePriceIds.push(item.price.id);
@@ -76,9 +65,9 @@ serve(async (req) => {
     }
 
     // From completed one-time payments
+    const sessions = await stripe.checkout.sessions.list({ customer: customerId, limit: 50 });
     for (const session of sessions.data) {
       if (session.payment_status === "paid" && session.mode === "payment") {
-        // Get line items
         const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
         for (const item of lineItems.data) {
           if (item.price?.id) activePriceIds.push(item.price.id);
@@ -88,40 +77,45 @@ serve(async (req) => {
 
     logStep("Active price IDs", { activePriceIds });
 
-    // Match with our plans
-    const { data: matchingPlans } = await supabaseClient
-      .from("plans")
-      .select("id, name, stripe_price_id, payment_type, duration_days")
+    // Match with offers
+    const { data: matchingOffers } = await supabaseClient
+      .from("offers")
+      .select("id, name, stripe_price_id, package_id, product_id")
       .in("stripe_price_id", activePriceIds.length > 0 ? activePriceIds : ["none"]);
 
-    // Sync to user_plans table
-    for (const plan of (matchingPlans || [])) {
+    // Get package IDs from matching offers
+    const packageIds = [...new Set((matchingOffers || []).filter(o => o.package_id).map(o => o.package_id!))];
+
+    // Sync to user_plans for packages
+    for (const packageId of packageIds) {
       const { data: existingUp } = await supabaseClient
         .from("user_plans")
         .select("id")
         .eq("user_id", user.id)
-        .eq("plan_id", plan.id)
+        .eq("package_id", packageId)
         .eq("status", "active")
         .maybeSingle();
 
       if (!existingUp) {
-        const expiresAt = plan.payment_type === "one_time" && plan.duration_days
-          ? new Date(Date.now() + plan.duration_days * 86400000).toISOString()
-          : null;
-
         await supabaseClient.from("user_plans").insert({
           user_id: user.id,
-          plan_id: plan.id,
+          package_id: packageId,
           status: "active",
-          expires_at: expiresAt,
         });
-        logStep("Created user_plan", { planId: plan.id });
+        logStep("Created user_plan", { packageId });
       }
     }
 
+    // Get package names
+    const { data: packageNames } = await supabaseClient
+      .from("packages")
+      .select("id, name")
+      .in("id", packageIds.length > 0 ? packageIds : ["none"]);
+
     return new Response(JSON.stringify({
-      subscribed: (matchingPlans || []).length > 0,
-      plans: (matchingPlans || []).map(p => ({ id: p.id, name: p.name })),
+      subscribed: (matchingOffers || []).length > 0,
+      packages: (packageNames || []).map(p => ({ id: p.id, name: p.name })),
+      active_offer_ids: (matchingOffers || []).map(o => o.id),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

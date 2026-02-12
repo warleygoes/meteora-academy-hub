@@ -268,6 +268,135 @@ export type Database = {
         }
         Relationships: []
       }
+      offers: {
+        Row: {
+          active: boolean
+          created_at: string
+          currency: string
+          id: string
+          is_default: boolean
+          name: string
+          package_id: string | null
+          price: number
+          product_id: string | null
+          stripe_price_id: string | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          package_id?: string | null
+          price?: number
+          product_id?: string | null
+          stripe_price_id?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          package_id?: string | null
+          price?: number
+          product_id?: string | null
+          stripe_price_id?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offers_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      package_products: {
+        Row: {
+          created_at: string
+          id: string
+          package_id: string
+          product_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          package_id: string
+          product_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          package_id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_products_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packages: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          features: string[] | null
+          id: string
+          name: string
+          payment_type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          features?: string[] | null
+          id?: string
+          name: string
+          payment_type?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          features?: string[] | null
+          id?: string
+          name?: string
+          payment_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       plan_courses: {
         Row: {
           course_id: string
@@ -311,7 +440,7 @@ export type Database = {
           id: string
           meeting_date: string
           meeting_link: string
-          plan_id: string
+          package_id: string
           title: string
         }
         Insert: {
@@ -320,7 +449,7 @@ export type Database = {
           id?: string
           meeting_date: string
           meeting_link: string
-          plan_id: string
+          package_id: string
           title: string
         }
         Update: {
@@ -329,15 +458,15 @@ export type Database = {
           id?: string
           meeting_date?: string
           meeting_link?: string
-          plan_id?: string
+          package_id?: string
           title?: string
         }
         Relationships: [
           {
-            foreignKeyName: "plan_meetings_plan_id_fkey"
-            columns: ["plan_id"]
+            foreignKeyName: "plan_meetings_package_id_fkey"
+            columns: ["package_id"]
             isOneToOne: false
-            referencedRelation: "plans"
+            referencedRelation: "packages"
             referencedColumns: ["id"]
           },
         ]
@@ -422,6 +551,59 @@ export type Database = {
           stripe_product_id?: string | null
         }
         Relationships: []
+      }
+      products: {
+        Row: {
+          active: boolean
+          course_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          payment_type: string
+          sort_order: number
+          thumbnail_url: string | null
+          thumbnail_vertical_url: string | null
+          type: Database["public"]["Enums"]["product_type"]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          payment_type?: string
+          sort_order?: number
+          thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
+          type: Database["public"]["Enums"]["product_type"]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          payment_type?: string
+          sort_order?: number
+          thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
+          type?: Database["public"]["Enums"]["product_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -527,7 +709,7 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
-          plan_id: string
+          package_id: string
           starts_at: string
           status: string
           user_id: string
@@ -536,7 +718,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          plan_id: string
+          package_id: string
           starts_at?: string
           status?: string
           user_id: string
@@ -545,17 +727,17 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          plan_id?: string
+          package_id?: string
           starts_at?: string
           status?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "user_plans_plan_id_fkey"
-            columns: ["plan_id"]
+            foreignKeyName: "user_plans_package_id_fkey"
+            columns: ["package_id"]
             isOneToOne: false
-            referencedRelation: "plans"
+            referencedRelation: "packages"
             referencedColumns: ["id"]
           },
         ]
@@ -593,6 +775,13 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      product_type:
+        | "course"
+        | "service"
+        | "consultation"
+        | "implementation"
+        | "virtual_event"
+        | "in_person_event"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -721,6 +910,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      product_type: [
+        "course",
+        "service",
+        "consultation",
+        "implementation",
+        "virtual_event",
+        "in_person_event",
+      ],
     },
   },
 } as const
