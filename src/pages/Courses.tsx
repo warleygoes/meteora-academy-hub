@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { useContentProducts } from '@/hooks/useContentProducts';
+import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { BookOpen, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -11,15 +12,16 @@ const CoursesPage: React.FC = () => {
   const navigate = useNavigate();
   const { products, loading } = useContentProducts();
   const [activeCategory, setActiveCategory] = useState('all');
+  const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([]);
 
-  // Extract unique categories
-  const categories = Array.from(
-    new Map(
-      products
-        .filter(p => p.category_name)
-        .map(p => [p.category_name!, p.category_name!])
-    ).entries()
-  ).map(([name]) => name);
+  // Fetch all categories from DB, not just from products
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data } = await supabase.from('course_categories').select('id, name').order('name');
+      if (data) setAllCategories(data);
+    };
+    fetchCategories();
+  }, []);
 
   const filtered = activeCategory === 'all'
     ? products
@@ -36,10 +38,10 @@ const CoursesPage: React.FC = () => {
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeCategory === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
           {t('allCategories')}
         </button>
-        {categories.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
-            {cat}
+        {allCategories.map(cat => (
+          <button key={cat.id} onClick={() => setActiveCategory(cat.name)}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeCategory === cat.name ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
+            {cat.name}
           </button>
         ))}
       </div>

@@ -433,7 +433,7 @@ const AdminPackages: React.FC = () => {
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="bg-secondary border-border" />
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">{t('planDescription')}</label>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('packageDescription') || 'Descripción del paquete'}</label>
               <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" />
             </div>
             <div>
@@ -447,8 +447,8 @@ const AdminPackages: React.FC = () => {
               </Select>
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">{t('planFeatures')}</label>
-              <Textarea value={form.features} onChange={e => setForm(f => ({ ...f, features: e.target.value }))} className="bg-secondary border-border" rows={4} placeholder={t('planFeaturesPlaceholder')} />
+              <label className="text-sm text-muted-foreground mb-1 block">{t('packageFeatures') || 'Características (una por línea)'}</label>
+              <Textarea value={form.features} onChange={e => setForm(f => ({ ...f, features: e.target.value }))} className="bg-secondary border-border" rows={4} placeholder={t('packageFeaturesPlaceholder') || 'Acceso a la comunidad\nSoporte prioritario\nCursos incluidos'} />
             </div>
             <Button onClick={savePackage} className="w-full">{t('save')}</Button>
           </div>
