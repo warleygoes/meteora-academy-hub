@@ -20,9 +20,9 @@ const AdminPage: React.FC = () => {
   }, []);
 
   const sections = [
+    { id: 'products', label: t('manageProducts'), icon: ShoppingBag, desc: t('adminProductsDesc') },
+    { id: 'packages', label: t('managePackages'), icon: Package, desc: t('adminPackagesDesc') },
     { id: 'courses', label: t('manageCourses'), icon: BookOpen, desc: t('adminCoursesDesc') },
-    { id: 'products', label: t('manageProducts') || 'Productos', icon: ShoppingBag, desc: t('adminProductsDesc') || 'Gestionar productos' },
-    { id: 'packages', label: t('managePackages') || 'Paquetes', icon: Package, desc: t('adminPackagesDesc') || 'Gestionar paquetes' },
     { id: 'users', label: t('manageUsers'), icon: Users, desc: t('adminUsersDesc') },
     { id: 'diagnostics', label: t('adminDiagnostics') || 'Diagnósticos', icon: ClipboardList, desc: t('adminDiagnosticsDesc') || 'Diagnósticos recibidos' },
     { id: 'analytics', label: t('analytics'), icon: TrendingUp, desc: t('analyticsDesc') },
