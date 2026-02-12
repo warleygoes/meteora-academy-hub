@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { Users, BookOpen, DollarSign, TrendingUp, Settings, Shield, ClipboardList } from 'lucide-react';
+import { Users, BookOpen, DollarSign, TrendingUp, Settings, Shield, ClipboardList, Wrench } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AdminUsers from '@/components/admin/AdminUsers';
 import AdminCourses from '@/components/admin/AdminCourses';
 import AdminPlans from '@/components/admin/AdminPlans';
+import AdminServices from '@/components/admin/AdminServices';
 import AdminAnalytics from '@/components/admin/AdminAnalytics';
 import AdminSettings from '@/components/admin/AdminSettings';
 import AdminDiagnostics from '@/components/admin/AdminDiagnostics';
@@ -21,6 +22,7 @@ const AdminPage: React.FC = () => {
   const sections = [
     { id: 'courses', label: t('manageCourses'), icon: BookOpen, desc: t('adminCoursesDesc') },
     { id: 'plans', label: t('managePlans'), icon: DollarSign, desc: t('adminPlansDesc') },
+    { id: 'services', label: t('manageServices') || 'Servicios', icon: Wrench, desc: t('adminServicesDesc') || 'Gestionar servicios' },
     { id: 'users', label: t('manageUsers'), icon: Users, desc: t('adminUsersDesc') },
     { id: 'diagnostics', label: t('adminDiagnostics') || 'Diagnósticos', icon: ClipboardList, desc: t('adminDiagnosticsDesc') || 'Diagnósticos recibidos' },
     { id: 'analytics', label: t('analytics'), icon: TrendingUp, desc: t('analyticsDesc') },
@@ -54,6 +56,7 @@ const AdminPage: React.FC = () => {
       {activeSection === 'users' && <AdminUsers stats={stats} onStatsUpdate={handleStatsUpdate} />}
       {activeSection === 'courses' && <AdminCourses />}
       {activeSection === 'plans' && <AdminPlans />}
+      {activeSection === 'services' && <AdminServices />}
       {activeSection === 'analytics' && <AdminAnalytics stats={stats} />}
       {activeSection === 'settings' && <AdminSettings />}
       {activeSection === 'diagnostics' && <AdminDiagnostics />}

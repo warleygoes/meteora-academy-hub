@@ -342,6 +342,42 @@ export type Database = {
           },
         ]
       }
+      plan_services: {
+        Row: {
+          created_at: string
+          id: string
+          plan_id: string
+          service_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_id: string
+          service_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_services_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           active: boolean
@@ -450,6 +486,39 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          active: boolean
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          payment_type: string
+          price: number
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          payment_type?: string
+          price?: number
+          title: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          payment_type?: string
+          price?: number
+          title?: string
         }
         Relationships: []
       }
