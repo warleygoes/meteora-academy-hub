@@ -76,8 +76,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
 
   const [pendingUsers, setPendingUsers] = useState<ProfileUser[]>([]);
   const [rejectedUsers, setRejectedUsers] = useState<ProfileUser[]>([]);
+  const [approvedUsers, setApprovedUsers] = useState<ProfileUser[]>([]);
   const [loadingPending, setLoadingPending] = useState(true);
   const [loadingRejected, setLoadingRejected] = useState(true);
+  const [loadingApproved, setLoadingApproved] = useState(true);
   const [selectedUser, setSelectedUser] = useState<ProfileUser | null>(null);
 
   const [allUsers, setAllUsers] = useState<ProfileUser[]>([]);
@@ -114,6 +116,13 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setLoadingRejected(false);
   }, []);
 
+  const fetchApprovedUsers = useCallback(async () => {
+    setLoadingApproved(true);
+    const { data } = await supabase.from('profiles').select('*').eq('status', 'approved').order('created_at', { ascending: false });
+    setApprovedUsers(data || []);
+    setLoadingApproved(false);
+  }, []);
+
   const fetchAllUsers = useCallback(async () => {
     setLoadingAll(true);
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
@@ -125,8 +134,9 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   useEffect(() => {
     fetchPendingUsers();
     fetchRejectedUsers();
+    fetchApprovedUsers();
     fetchAllUsers();
-  }, [fetchPendingUsers, fetchRejectedUsers, fetchAllUsers]);
+  }, [fetchPendingUsers, fetchRejectedUsers, fetchApprovedUsers, fetchAllUsers]);
 
   const approveUser = async (userId: string) => {
     setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
@@ -137,10 +147,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     const { error } = await supabase.from('profiles').update({ approved: true, status: 'approved' }).eq('user_id', userId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
-      fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
+      fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers();
     } else {
       toast({ title: t('userApproved') });
-      fetchAllUsers();
+      fetchApprovedUsers(); fetchAllUsers();
     }
   };
 
@@ -156,24 +166,25 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', userId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
-      fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
+      fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers();
     } else {
       toast({ title: t('userRejected') });
-      fetchAllUsers();
+      fetchApprovedUsers(); fetchAllUsers();
     }
   };
 
   const suspendUser = async (userId: string) => {
+    setApprovedUsers(prev => prev.filter(u => u.user_id !== userId));
     setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: false, status: 'rejected' } : u));
     setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false, status: 'rejected' } : prev);
 
     const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', userId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
-      fetchAllUsers();
+      fetchApprovedUsers(); fetchAllUsers();
     } else {
       toast({ title: t('userSuspended') });
-      fetchAllUsers(); fetchRejectedUsers();
+      fetchAllUsers(); fetchRejectedUsers(); fetchApprovedUsers();
     }
   };
 
@@ -275,6 +286,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
             <Clock className="w-4 h-4" /> {t('pendingUsers')}
             {stats.pending > 0 && <Badge variant="destructive" className="ml-1 text-xs h-5 min-w-[20px] px-1.5">{stats.pending}</Badge>}
           </TabsTrigger>
+          <TabsTrigger value="approved" className="gap-2">
+            <UserCheck className="w-4 h-4" /> {t('approvedUsers')}
+            {stats.approved > 0 && <Badge variant="secondary" className="ml-1 text-xs h-5 min-w-[20px] px-1.5 bg-green-500/10 text-green-500 border-green-500/20">{stats.approved}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="rejected" className="gap-2">
             <UserX className="w-4 h-4" /> {t('rejectedUsers')}
             {stats.rejected > 0 && <Badge variant="secondary" className="ml-1 text-xs h-5 min-w-[20px] px-1.5">{stats.rejected}</Badge>}
@@ -327,6 +342,59 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                   </div>
                 </motion.div>
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="approved">
+          {loadingApproved ? (
+            <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
+          ) : approvedUsers.length === 0 ? (
+            <div className="text-center py-16">
+              <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-lg font-display font-semibold text-foreground">{t('noApprovedUsers') || 'No hay clientes aprobados'}</p>
+              <p className="text-sm text-muted-foreground">{t('noApprovedUsersDesc') || 'Aún no se han aprobado clientes.'}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="pb-3 font-medium">{t('displayName')}</th>
+                    <th className="pb-3 font-medium">{t('phone') || 'Teléfono'}</th>
+                    <th className="pb-3 font-medium">Email</th>
+                    <th className="pb-3 font-medium">{t('clientCount')}</th>
+                    <th className="pb-3 font-medium">{t('activePlans') || 'Planes Activos'}</th>
+                    <th className="pb-3 font-medium text-right">{t('actions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvedUsers.map((user) => (
+                    <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
+                          {user.country && <FlagImg country={user.country} size={14} />}
+                        </div>
+                      </td>
+                      <td className="py-3 text-muted-foreground">{user.phone || '—'}</td>
+                      <td className="py-3 text-muted-foreground">{user.email || '—'}</td>
+                      <td className="py-3 text-muted-foreground">{user.client_count || '—'}</td>
+                      <td className="py-3 text-muted-foreground">{user.cheapest_plan_usd ? `$${user.cheapest_plan_usd}` : '—'}</td>
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="text-muted-foreground">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => suspendUser(user.user_id)} className="text-yellow-500 hover:text-yellow-400">
+                            <Ban className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </TabsContent>
