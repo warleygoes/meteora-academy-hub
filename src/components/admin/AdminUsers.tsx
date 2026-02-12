@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -94,10 +95,13 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [adding, setAdding] = useState(false);
 
-  // Admin user IDs set for quick lookup
   const [adminUserIds, setAdminUserIds] = useState<Set<string>>(new Set());
-  // Active plans count per user_id
   const [activePlansCounts, setActivePlansCounts] = useState<Record<string, number>>({});
+
+  // Delete/Suspend confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
+  const [actionUserId, setActionUserId] = useState<string | null>(null);
 
   const computeStats = useCallback((users: ProfileUser[]) => {
     onStatsUpdate({
@@ -195,12 +199,18 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     }
   };
 
-  const suspendUser = async (userId: string) => {
-    setApprovedUsers(prev => prev.filter(u => u.user_id !== userId));
-    setAllUsers(prev => prev.map(u => u.user_id === userId ? { ...u, approved: false, status: 'rejected' } : u));
-    setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false, status: 'rejected' } : prev);
+  const confirmSuspend = (userId: string) => {
+    setActionUserId(userId);
+    setShowSuspendConfirm(true);
+  };
 
-    const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', userId);
+  const executeSuspend = async () => {
+    if (!actionUserId) return;
+    setApprovedUsers(prev => prev.filter(u => u.user_id !== actionUserId));
+    setAllUsers(prev => prev.map(u => u.user_id === actionUserId ? { ...u, approved: false, status: 'rejected' } : u));
+    setSelectedUser(prev => prev && prev.user_id === actionUserId ? { ...prev, approved: false, status: 'rejected' } : prev);
+
+    const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', actionUserId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
       fetchApprovedUsers(); fetchAllUsers();
@@ -208,15 +218,23 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       toast({ title: t('userSuspended') });
       fetchAllUsers(); fetchRejectedUsers(); fetchApprovedUsers();
     }
+    setShowSuspendConfirm(false);
+    setActionUserId(null);
   };
 
-  const deleteUser = async (userId: string) => {
-    setAllUsers(prev => prev.filter(u => u.user_id !== userId));
-    setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
-    setRejectedUsers(prev => prev.filter(u => u.user_id !== userId));
+  const confirmDelete = (userId: string) => {
+    setActionUserId(userId);
+    setShowDeleteConfirm(true);
+  };
+
+  const executeDelete = async () => {
+    if (!actionUserId) return;
+    setAllUsers(prev => prev.filter(u => u.user_id !== actionUserId));
+    setPendingUsers(prev => prev.filter(u => u.user_id !== actionUserId));
+    setRejectedUsers(prev => prev.filter(u => u.user_id !== actionUserId));
     setSelectedUser(null);
 
-    const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
+    const { error } = await supabase.from('profiles').delete().eq('user_id', actionUserId);
     if (error) {
       toast({ title: error.message, variant: 'destructive' });
       fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
@@ -224,6 +242,8 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
       fetchAllUsers();
     }
+    setShowDeleteConfirm(false);
+    setActionUserId(null);
   };
 
   const resetUserPassword = async (email: string) => {
@@ -313,6 +333,91 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     if (user.status === 'rejected') return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">{t('rejected')}</Badge>;
     return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">{t('pending')}</Badge>;
   };
+
+  // Unified user table row
+  const renderUserTableRow = (user: ProfileUser, showActions: 'approved' | 'rejected' | 'all') => {
+    const isAdmin = adminUserIds.has(user.user_id);
+    return (
+      <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
+        <td className="py-3">
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
+            {user.country && <FlagImg country={user.country} size={14} />}
+            {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{t('adminBadge')}</Badge>}
+          </div>
+          <p className="text-xs text-muted-foreground">{user.email || '—'}</p>
+        </td>
+        <td className="py-3 text-muted-foreground hidden md:table-cell">{user.company_name || '—'}</td>
+        <td className="py-3 text-muted-foreground hidden md:table-cell">{user.phone || '—'}</td>
+        <td className="py-3 text-muted-foreground hidden lg:table-cell">{user.client_count || '—'}</td>
+        <td className="py-3 text-muted-foreground hidden lg:table-cell">{user.network_type || '—'}</td>
+        <td className="py-3 text-muted-foreground hidden lg:table-cell">{activePlansCounts[user.user_id] || 0}</td>
+        {showActions === 'all' && <td className="py-3">{getStatusBadge(user)}</td>}
+        <td className="py-3 text-right">
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="text-muted-foreground" title={t('viewDetails')}>
+              <Eye className="w-4 h-4" />
+            </Button>
+            {showActions === 'approved' && (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => user.email && resetUserPassword(user.email)} className="text-blue-500 hover:text-blue-400" title={t('resetPassword')}>
+                  <KeyRound className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => toggleAdmin(user.user_id, isAdmin)} className={isAdmin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"} title={isAdmin ? t('removeAdminRole') : t('makeAdmin')}>
+                  <Shield className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => confirmSuspend(user.user_id)} className="text-yellow-500 hover:text-yellow-400" title={t('suspendUser') + ' — ' + (t('suspendUserDesc') || 'Revoca acceso, el usuario pasa a rechazado')}>
+                  <Ban className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+            {showActions === 'rejected' && (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-500" title={t('approveUser')}>
+                  <CheckCircle2 className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title={t('deleteUser') + ' — ' + (t('deleteUserDesc') || 'Elimina permanentemente el perfil')}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+            {showActions === 'all' && (
+              <>
+                {user.status === 'approved' ? (
+                  <Button variant="ghost" size="sm" onClick={() => confirmSuspend(user.user_id)} className="text-yellow-500 hover:text-yellow-400" title={t('suspendUser')}>
+                    <Ban className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-500" title={t('approveUser')}>
+                    <CheckCircle2 className="w-4 h-4" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title={t('deleteUser')}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  // Unified table columns
+  const renderTableHeader = (showStatus: boolean) => (
+    <thead>
+      <tr className="border-b border-border text-left text-muted-foreground">
+        <th className="pb-3 font-medium">{t('displayName')}</th>
+        <th className="pb-3 font-medium hidden md:table-cell">{t('companyName')}</th>
+        <th className="pb-3 font-medium hidden md:table-cell">{t('phone')}</th>
+        <th className="pb-3 font-medium hidden lg:table-cell">{t('clientCount')}</th>
+        <th className="pb-3 font-medium hidden lg:table-cell">{t('networkType')}</th>
+        <th className="pb-3 font-medium hidden lg:table-cell">{t('activePlans')}</th>
+        {showStatus && <th className="pb-3 font-medium">Status</th>}
+        <th className="pb-3 font-medium text-right">{t('actions')}</th>
+      </tr>
+    </thead>
+  );
 
   return (
     <div>
@@ -407,7 +512,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           )}
         </TabsContent>
 
-        {/* Approved Tab */}
+        {/* Approved Tab - Unified table */}
         <TabsContent value="approved">
           {loadingApproved ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
@@ -420,58 +525,16 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">{t('displayName')}</th>
-                    <th className="pb-3 font-medium">{t('phone')}</th>
-                    <th className="pb-3 font-medium">Email</th>
-                    <th className="pb-3 font-medium">{t('clientCount')}</th>
-                    <th className="pb-3 font-medium">{t('activePlans')}</th>
-                    <th className="pb-3 font-medium text-right">{t('actions')}</th>
-                  </tr>
-                </thead>
+                {renderTableHeader(false)}
                 <tbody>
-                  {approvedUsers.map((user) => {
-                    const isAdmin = adminUserIds.has(user.user_id);
-                    return (
-                      <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
-                            {user.country && <FlagImg country={user.country} size={14} />}
-                            {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{t('adminBadge')}</Badge>}
-                          </div>
-                        </td>
-                        <td className="py-3 text-muted-foreground">{user.phone || '—'}</td>
-                        <td className="py-3 text-muted-foreground">{user.email || '—'}</td>
-                        <td className="py-3 text-muted-foreground">{user.client_count || '—'}</td>
-                        <td className="py-3 text-muted-foreground">{activePlansCounts[user.user_id] || 0}</td>
-                        <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="text-muted-foreground" title={t('viewDetails')}>
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => user.email && resetUserPassword(user.email)} className="text-blue-500 hover:text-blue-400" title={t('resetPassword')}>
-                              <KeyRound className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => toggleAdmin(user.user_id, isAdmin)} className={isAdmin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"} title={isAdmin ? t('removeAdminRole') : t('makeAdmin')}>
-                              <Shield className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => suspendUser(user.user_id)} className="text-yellow-500 hover:text-yellow-400" title={t('suspendUser')}>
-                              <Ban className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {approvedUsers.map(user => renderUserTableRow(user, 'approved'))}
                 </tbody>
               </table>
             </div>
           )}
         </TabsContent>
 
-        {/* Rejected Tab */}
+        {/* Rejected Tab - Unified table */}
         <TabsContent value="rejected">
           {loadingRejected ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
@@ -482,35 +545,13 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <p className="text-sm text-muted-foreground">{t('noRejectedUsersDesc')}</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {rejectedUsers.map((user) => (
-                <motion.div key={user.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="bg-card rounded-xl border border-border p-5 flex flex-col md:flex-row md:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-display font-semibold text-foreground truncate">{user.display_name || 'Sin nombre'}</p>
-                      <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-xs shrink-0">{t('rejected')}</Badge>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      {user.company_name && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{user.company_name}</span>}
-                      {user.country && <span className="flex items-center gap-1"><FlagImg country={user.country} size={14} />{user.country}</span>}
-                      {user.email && <span>{user.email}</span>}
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDate(user.created_at)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="gap-1 text-muted-foreground">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" onClick={() => approveUser(user.user_id)} className="gap-1 bg-green-600 hover:bg-green-700 text-white">
-                      <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { if (confirm('¿Eliminar permanentemente?')) deleteUser(user.user_id); }} className="text-destructive hover:text-destructive">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                {renderTableHeader(false)}
+                <tbody>
+                  {rejectedUsers.map(user => renderUserTableRow(user, 'rejected'))}
+                </tbody>
+              </table>
             </div>
           )}
         </TabsContent>
@@ -538,46 +579,51 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">{t('displayName')}</th>
-                    <th className="pb-3 font-medium hidden md:table-cell">{t('companyName')}</th>
-                    <th className="pb-3 font-medium hidden lg:table-cell">{t('country')}</th>
-                    <th className="pb-3 font-medium hidden lg:table-cell">{t('clientCount')}</th>
-                    <th className="pb-3 font-medium">Status</th>
-                    <th className="pb-3 font-medium text-right">{t('actions')}</th>
-                  </tr>
-                </thead>
+                {renderTableHeader(true)}
                 <tbody>
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                      <td className="py-3">
-                        <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
-                        <p className="text-xs text-muted-foreground">{user.role_type === 'owner' ? t('ispOwner') : t('ispEmployee')}</p>
-                      </td>
-                      <td className="py-3 hidden md:table-cell text-muted-foreground">{user.company_name || '—'}</td>
-                      <td className="py-3 hidden lg:table-cell text-muted-foreground">{user.country || '—'}</td>
-                      <td className="py-3 hidden lg:table-cell text-muted-foreground">{user.client_count || '—'}</td>
-                      <td className="py-3">{getStatusBadge(user)}</td>
-                      <td className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)}><Eye className="w-4 h-4" /></Button>
-                          {user.status === 'approved' ? (
-                            <Button variant="ghost" size="sm" onClick={() => suspendUser(user.user_id)} className="text-destructive hover:text-destructive"><Ban className="w-4 h-4" /></Button>
-                          ) : (
-                            <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-500"><CheckCircle2 className="w-4 h-4" /></Button>
-                          )}
-                          <Button variant="ghost" size="sm" onClick={() => { if (confirm('¿Eliminar este usuario permanentemente?')) deleteUser(user.user_id); }} className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredUsers.map(user => renderUserTableRow(user, 'all'))}
                 </tbody>
               </table>
             </div>
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Delete User Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteUserConfirm') || '¿Eliminar este usuario permanentemente?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('deleteUserConfirmDesc') || 'Se eliminará el perfil del usuario de forma permanente. Esta acción no se puede deshacer.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('back') || 'Cancelar'}</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <Trash2 className="w-4 h-4 mr-2" /> {t('deleteUser') || 'Eliminar permanentemente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Suspend User Confirmation */}
+      <AlertDialog open={showSuspendConfirm} onOpenChange={setShowSuspendConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('suspendUserConfirm') || '¿Suspender este usuario?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('suspendUserConfirmDesc') || 'El usuario perderá acceso a la plataforma y pasará a estado rechazado. Puede ser reaprobado después.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('back') || 'Cancelar'}</AlertDialogCancel>
+            <AlertDialogAction onClick={executeSuspend} className="bg-yellow-600 text-white hover:bg-yellow-700">
+              <Ban className="w-4 h-4 mr-2" /> {t('suspendUser') || 'Suspender'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* User Detail Dialog */}
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
@@ -618,16 +664,16 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                       <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
                     </Button>
                   </div>
-                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive w-full" onClick={() => { if (confirm('¿Eliminar este usuario permanentemente?')) deleteUser(selectedUser.user_id); }}>
+                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive w-full" onClick={() => confirmDelete(selectedUser.user_id)}>
                     <Trash2 className="w-4 h-4" /> {t('deleteUser') || 'Eliminar permanentemente'}
                   </Button>
                 </div>
               ) : (
                 <div className="flex gap-2 pt-2">
-                  <Button variant="destructive" className="flex-1 gap-2" onClick={() => suspendUser(selectedUser.user_id)}>
+                  <Button variant="outline" className="flex-1 gap-2 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10" onClick={() => confirmSuspend(selectedUser.user_id)}>
                     <Ban className="w-4 h-4" /> {t('suspendUser')}
                   </Button>
-                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este usuario permanentemente?')) deleteUser(selectedUser.user_id); }}>
+                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive" onClick={() => confirmDelete(selectedUser.user_id)}>
                     <Trash2 className="w-4 h-4" /> {t('deleteUser') || 'Eliminar'}
                   </Button>
                 </div>
@@ -645,31 +691,31 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <Shield className="w-5 h-5 text-primary" /> {t('manageAdmins')}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex gap-2 mt-2">
-            <Input placeholder={t('adminEmailPlaceholder')} value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} className="bg-secondary border-border" />
-            <Button onClick={addAdmin} disabled={adding} size="sm" className="gap-1 shrink-0">
+          <div className="flex gap-2 mb-4">
+            <Input placeholder={t('adminEmailPlaceholder')} value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="bg-secondary border-border flex-1" />
+            <Button onClick={addAdmin} disabled={adding} className="gap-1">
               <Plus className="w-4 h-4" /> {t('add')}
             </Button>
           </div>
-          <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-            {loadingAdmins ? (
-              <p className="text-sm text-muted-foreground text-center py-4">{t('loading')}...</p>
-            ) : admins.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">{t('noAdmins')}</p>
-            ) : (
-              admins.map((admin) => (
-                <div key={admin.user_id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{admin.display_name || 'Sin nombre'}</p>
-                    {admin.email && <p className="text-xs text-muted-foreground">{admin.email}</p>}
+          {loadingAdmins ? (
+            <p className="text-center text-muted-foreground py-4">{t('loading')}...</p>
+          ) : admins.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">{t('noAdmins')}</p>
+          ) : (
+            <div className="space-y-2">
+              {admins.map(admin => (
+                <div key={admin.user_id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 border border-border">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{admin.display_name || admin.email}</p>
+                    <p className="text-xs text-muted-foreground">{admin.email}</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => removeAdmin(admin.user_id)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                  <Button variant="ghost" size="sm" onClick={() => removeAdmin(admin.user_id)} className="text-destructive hover:text-destructive">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

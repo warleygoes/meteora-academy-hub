@@ -152,6 +152,7 @@ export type Database = {
           sort_order: number
           status: string
           thumbnail_url: string | null
+          thumbnail_vertical_url: string | null
           title: string
           updated_at: string
         }
@@ -163,6 +164,7 @@ export type Database = {
           sort_order?: number
           status?: string
           thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
           title: string
           updated_at?: string
         }
@@ -174,6 +176,7 @@ export type Database = {
           sort_order?: number
           status?: string
           thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
           title?: string
           updated_at?: string
         }

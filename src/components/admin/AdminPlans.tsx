@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -44,6 +45,8 @@ const AdminPlans: React.FC = () => {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [linkedCourseIds, setLinkedCourseIds] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: '', description: '', price: '', payment_type: 'monthly',
@@ -147,9 +150,17 @@ const AdminPlans: React.FC = () => {
     fetchPlans();
   };
 
-  const deletePlan = async (id: string) => {
-    await supabase.from('plans').delete().eq('id', id);
+  const confirmDeletePlan = (id: string) => {
+    setDeletePlanId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const executeDeletePlan = async () => {
+    if (!deletePlanId) return;
+    await supabase.from('plans').delete().eq('id', deletePlanId);
     toast({ title: t('planDeleted') || 'Plan eliminado' });
+    setShowDeleteConfirm(false);
+    setDeletePlanId(null);
     fetchPlans();
   };
 
@@ -225,7 +236,7 @@ const AdminPlans: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => openEdit(plan)}>
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => deletePlan(plan.id)} className="text-destructive hover:text-destructive">
+                  <Button variant="ghost" size="sm" onClick={() => confirmDeletePlan(plan.id)} className="text-destructive hover:text-destructive">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -286,6 +297,24 @@ const AdminPlans: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Delete Plan Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deletePlanConfirm') || '¿Eliminar este plan?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('deletePlanDesc') || 'Esta acción es irreversible. Se eliminará el plan y sus vinculaciones con cursos.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('back') || 'Cancelar'}</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDeletePlan} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {t('deleteUser') || 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Plan Editor */}
       <Dialog open={showEditor} onOpenChange={setShowEditor}>
