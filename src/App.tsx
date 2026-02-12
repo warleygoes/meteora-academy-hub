@@ -14,6 +14,9 @@ import AdminPage from "./pages/Admin";
 import Login from "./pages/Login";
 import AdminLogin from "./pages/AdminLogin";
 import Diagnostico from "./pages/Diagnostico";
+import Profile from "./pages/Profile";
+import NetworkTopology from "./pages/NetworkTopology";
+import Meetings from "./pages/Meetings";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +70,9 @@ const App = () => (
                 <Route path="/app" element={<Index />} />
                 <Route path="/app/courses" element={<CoursesPage />} />
                 <Route path="/app/community" element={<CommunityPage />} />
+                <Route path="/app/profile" element={<Profile />} />
+                <Route path="/app/topology" element={<NetworkTopology />} />
+                <Route path="/app/meetings" element={<Meetings />} />
                 <Route path="/app/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
               </Route>
 

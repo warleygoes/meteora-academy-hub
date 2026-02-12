@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X } from 'lucide-react';
+import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Network, Video } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/lib/i18n';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +19,8 @@ export const AppSidebar: React.FC = () => {
     { to: '/app', icon: Home, label: t('home') },
     { to: '/app/courses', icon: BookOpen, label: t('courses') },
     { to: '/app/community', icon: Users, label: t('community') },
+    { to: '/app/topology', icon: Network, label: t('networkTopology') },
+    { to: '/app/meetings', icon: Video, label: t('meetings') },
     ...(isAdmin ? [{ to: '/app/admin', icon: Shield, label: t('admin') }] : []),
   ];
 
@@ -90,7 +92,13 @@ export const AppSidebar: React.FC = () => {
           </div>
         )}
 
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer">
+        <NavLink
+          to="/app/profile"
+          onClick={() => setMobileOpen(false)}
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors ${
+            isActive('/app/profile') ? 'bg-primary/10' : ''
+          }`}
+        >
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
             <User className="w-4 h-4 text-primary" />
           </div>
@@ -100,7 +108,7 @@ export const AppSidebar: React.FC = () => {
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
           )}
-        </div>
+        </NavLink>
         <button
           onClick={() => signOut()}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors w-full text-sm"
