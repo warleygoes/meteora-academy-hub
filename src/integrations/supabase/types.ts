@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      diagnostics: {
+        Row: {
+          cheapest_plan: number | null
+          client_count: string | null
+          company_name: string | null
+          country: string | null
+          created_at: string
+          email: string
+          id: string
+          main_goals: string | null
+          main_problems: string | null
+          name: string
+          network_type: string | null
+          phone: string | null
+          role_type: string | null
+          tech_knowledge: string | null
+        }
+        Insert: {
+          cheapest_plan?: number | null
+          client_count?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          main_goals?: string | null
+          main_problems?: string | null
+          name: string
+          network_type?: string | null
+          phone?: string | null
+          role_type?: string | null
+          tech_knowledge?: string | null
+        }
+        Update: {
+          cheapest_plan?: number | null
+          client_count?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          main_goals?: string | null
+          main_problems?: string | null
+          name?: string
+          network_type?: string | null
+          phone?: string | null
+          role_type?: string | null
+          tech_knowledge?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           approved: boolean
