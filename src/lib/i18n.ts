@@ -282,6 +282,8 @@ export const translations: Record<Language, Record<string, string>> = {
     maintenanceModeDesc: 'La plataforma mostrará un aviso de mantenimiento.',
     saveSettings: 'Guardar Configuración',
     settingsSaved: 'Configuración guardada exitosamente.',
+    adminDiagnostics: 'Diagnósticos',
+    adminDiagnosticsDesc: 'Diagnósticos de ISP recibidos',
     // Landing v2 - Sales page
     lpHeroHeadline: 'Aceleramos el crecimiento de tu ISP con calidad — sin comprometer tu estructura.',
     lpHeroSub: 'Si quieres crecer de forma organizada, rentable y técnicamente sólida, estás en el lugar correcto.',
@@ -643,6 +645,8 @@ export const translations: Record<Language, Record<string, string>> = {
     maintenanceModeDesc: 'A plataforma mostrará um aviso de manutenção.',
     saveSettings: 'Salvar Configurações',
     settingsSaved: 'Configurações salvas com sucesso.',
+    adminDiagnostics: 'Diagnósticos',
+    adminDiagnosticsDesc: 'Diagnósticos de ISP recebidos',
     // Landing v2
     lpHeroHeadline: 'Nós aceleramos o crescimento do seu ISP com qualidade — sem comprometer sua estrutura.',
     lpHeroSub: 'Se você quer crescer de forma organizada, lucrativa e tecnicamente sólida, você está no lugar certo.',
@@ -998,6 +1002,8 @@ export const translations: Record<Language, Record<string, string>> = {
     maintenanceModeDesc: 'The platform will show a maintenance notice.',
     saveSettings: 'Save Settings',
     settingsSaved: 'Settings saved successfully.',
+    adminDiagnostics: 'Diagnostics',
+    adminDiagnosticsDesc: 'Received ISP diagnostics',
     // Landing v2
     lpHeroHeadline: 'We accelerate the growth of your ISP with quality — without compromising your structure.',
     lpHeroSub: 'If you want to grow in an organized, profitable and technically solid way, you are in the right place.',
