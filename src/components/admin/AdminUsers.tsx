@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Trash2, CheckCircle2, XCircle, Search, Eye, Ban, UserCheck,
-  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX
+  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,6 +62,7 @@ interface ProfileUser {
 interface AdminUser {
   user_id: string;
   display_name: string | null;
+  email: string | null;
 }
 
 interface AdminUsersProps {
@@ -92,6 +93,11 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [adding, setAdding] = useState(false);
+
+  // Admin user IDs set for quick lookup
+  const [adminUserIds, setAdminUserIds] = useState<Set<string>>(new Set());
+  // Active plans count per user_id
+  const [activePlansCounts, setActivePlansCounts] = useState<Record<string, number>>({});
 
   const computeStats = useCallback((users: ProfileUser[]) => {
     onStatsUpdate({
@@ -131,12 +137,28 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setLoadingAll(false);
   }, [computeStats]);
 
+  const fetchAdminUserIds = useCallback(async () => {
+    const { data } = await supabase.from('user_roles').select('user_id').eq('role', 'admin' as any);
+    setAdminUserIds(new Set((data || []).map(r => r.user_id)));
+  }, []);
+
+  const fetchActivePlansCounts = useCallback(async () => {
+    const { data } = await supabase.from('user_plans' as any).select('user_id').eq('status', 'active');
+    const counts: Record<string, number> = {};
+    (data || []).forEach((row: any) => {
+      counts[row.user_id] = (counts[row.user_id] || 0) + 1;
+    });
+    setActivePlansCounts(counts);
+  }, []);
+
   useEffect(() => {
     fetchPendingUsers();
     fetchRejectedUsers();
     fetchApprovedUsers();
     fetchAllUsers();
-  }, [fetchPendingUsers, fetchRejectedUsers, fetchApprovedUsers, fetchAllUsers]);
+    fetchAdminUserIds();
+    fetchActivePlansCounts();
+  }, [fetchPendingUsers, fetchRejectedUsers, fetchApprovedUsers, fetchAllUsers, fetchAdminUserIds, fetchActivePlansCounts]);
 
   const approveUser = async (userId: string) => {
     setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
@@ -204,13 +226,51 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     }
   };
 
+  const resetUserPassword = async (email: string) => {
+    if (!confirm(t('resetPasswordConfirm'))) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ email }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error');
+      toast({ title: t('resetPasswordSuccess') });
+    } catch (err: any) {
+      toast({ title: t('resetPasswordError'), description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const toggleAdmin = async (userId: string, isCurrentlyAdmin: boolean) => {
+    const confirmMsg = isCurrentlyAdmin ? t('removeAdminConfirm') : t('makeAdminConfirm');
+    if (!confirm(confirmMsg)) return;
+
+    if (isCurrentlyAdmin) {
+      const { error } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'admin' as any);
+      if (error) { toast({ title: error.message, variant: 'destructive' }); }
+      else { toast({ title: t('removeAdminRole') }); fetchAdminUserIds(); fetchAdmins(); }
+    } else {
+      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: 'admin' as any });
+      if (error) { toast({ title: error.code === '23505' ? 'Ya es administrador.' : error.message, variant: 'destructive' }); }
+      else { toast({ title: t('makeAdmin') }); fetchAdminUserIds(); fetchAdmins(); }
+    }
+  };
+
   const fetchAdmins = async () => {
     setLoadingAdmins(true);
-    const { data: roles } = await supabase.from('user_roles').select('user_id').eq('role', 'admin');
+    const { data: roles } = await supabase.from('user_roles').select('user_id').eq('role', 'admin' as any);
     if (roles && roles.length > 0) {
       const userIds = roles.map(r => r.user_id);
-      const { data: profiles } = await supabase.from('profiles').select('user_id, display_name').in('user_id', userIds);
-      setAdmins((profiles || []).map(p => ({ user_id: p.user_id, display_name: p.display_name })));
+      const { data: profiles } = await supabase.from('profiles').select('user_id, display_name, email').in('user_id', userIds);
+      setAdmins((profiles || []).map(p => ({ user_id: p.user_id, display_name: p.display_name, email: p.email })));
     } else { setAdmins([]); }
     setLoadingAdmins(false);
   };
@@ -220,18 +280,18 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const addAdmin = async () => {
     if (!newAdminEmail.trim()) return;
     setAdding(true);
-    const { data: profiles } = await supabase.from('profiles').select('user_id, display_name').ilike('display_name', newAdminEmail.trim());
+    const { data: profiles } = await supabase.from('profiles').select('user_id, display_name').ilike('email', newAdminEmail.trim());
     if (!profiles || profiles.length === 0) { toast({ title: 'Usuário não encontrado.', variant: 'destructive' }); setAdding(false); return; }
     const { error } = await supabase.from('user_roles').insert({ user_id: profiles[0].user_id, role: 'admin' as any });
     if (error) { toast({ title: error.code === '23505' ? 'Ya es administrador.' : error.message, variant: 'destructive' }); }
-    else { toast({ title: 'Administrador adicionado!' }); setNewAdminEmail(''); fetchAdmins(); }
+    else { toast({ title: 'Administrador adicionado!' }); setNewAdminEmail(''); fetchAdmins(); fetchAdminUserIds(); }
     setAdding(false);
   };
 
   const removeAdmin = async (userId: string) => {
     const { error } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'admin' as any);
     if (error) { toast({ title: error.message, variant: 'destructive' }); }
-    else { toast({ title: 'Administrador removido.' }); fetchAdmins(); }
+    else { toast({ title: 'Administrador removido.' }); fetchAdmins(); fetchAdminUserIds(); }
   };
 
   const filteredUsers = allUsers.filter(u => {
@@ -299,6 +359,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           </TabsTrigger>
         </TabsList>
 
+        {/* Pending Tab */}
         <TabsContent value="pending">
           {loadingPending ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
@@ -346,14 +407,15 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           )}
         </TabsContent>
 
+        {/* Approved Tab */}
         <TabsContent value="approved">
           {loadingApproved ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
           ) : approvedUsers.length === 0 ? (
             <div className="text-center py-16">
               <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg font-display font-semibold text-foreground">{t('noApprovedUsers') || 'No hay clientes aprobados'}</p>
-              <p className="text-sm text-muted-foreground">{t('noApprovedUsersDesc') || 'Aún no se han aprobado clientes.'}</p>
+              <p className="text-lg font-display font-semibold text-foreground">{t('noApprovedUsers')}</p>
+              <p className="text-sm text-muted-foreground">{t('noApprovedUsersDesc')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -361,44 +423,55 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">
                     <th className="pb-3 font-medium">{t('displayName')}</th>
-                    <th className="pb-3 font-medium">{t('phone') || 'Teléfono'}</th>
+                    <th className="pb-3 font-medium">{t('phone')}</th>
                     <th className="pb-3 font-medium">Email</th>
                     <th className="pb-3 font-medium">{t('clientCount')}</th>
-                    <th className="pb-3 font-medium">{t('activePlans') || 'Planes Activos'}</th>
+                    <th className="pb-3 font-medium">{t('activePlans')}</th>
                     <th className="pb-3 font-medium text-right">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {approvedUsers.map((user) => (
-                    <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
-                          {user.country && <FlagImg country={user.country} size={14} />}
-                        </div>
-                      </td>
-                      <td className="py-3 text-muted-foreground">{user.phone || '—'}</td>
-                      <td className="py-3 text-muted-foreground">{user.email || '—'}</td>
-                      <td className="py-3 text-muted-foreground">{user.client_count || '—'}</td>
-                      <td className="py-3 text-muted-foreground">{user.cheapest_plan_usd ? `$${user.cheapest_plan_usd}` : '—'}</td>
-                      <td className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="text-muted-foreground">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => suspendUser(user.user_id)} className="text-yellow-500 hover:text-yellow-400">
-                            <Ban className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {approvedUsers.map((user) => {
+                    const isAdmin = adminUserIds.has(user.user_id);
+                    return (
+                      <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
+                        <td className="py-3">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
+                            {user.country && <FlagImg country={user.country} size={14} />}
+                            {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{t('adminBadge')}</Badge>}
+                          </div>
+                        </td>
+                        <td className="py-3 text-muted-foreground">{user.phone || '—'}</td>
+                        <td className="py-3 text-muted-foreground">{user.email || '—'}</td>
+                        <td className="py-3 text-muted-foreground">{user.client_count || '—'}</td>
+                        <td className="py-3 text-muted-foreground">{activePlansCounts[user.user_id] || 0}</td>
+                        <td className="py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="text-muted-foreground" title={t('viewDetails')}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => user.email && resetUserPassword(user.email)} className="text-blue-500 hover:text-blue-400" title={t('resetPassword')}>
+                              <KeyRound className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => toggleAdmin(user.user_id, isAdmin)} className={isAdmin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"} title={isAdmin ? t('removeAdminRole') : t('makeAdmin')}>
+                              <Shield className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => suspendUser(user.user_id)} className="text-yellow-500 hover:text-yellow-400" title={t('suspendUser')}>
+                              <Ban className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </TabsContent>
 
+        {/* Rejected Tab */}
         <TabsContent value="rejected">
           {loadingRejected ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
@@ -442,6 +515,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           )}
         </TabsContent>
 
+        {/* All Users Tab */}
         <TabsContent value="all">
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
             <div className="relative flex-1">
@@ -572,7 +646,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
             </DialogTitle>
           </DialogHeader>
           <div className="flex gap-2 mt-2">
-            <Input placeholder={t('adminNamePlaceholder')} value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} className="bg-secondary border-border" />
+            <Input placeholder={t('adminEmailPlaceholder')} value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} className="bg-secondary border-border" />
             <Button onClick={addAdmin} disabled={adding} size="sm" className="gap-1 shrink-0">
               <Plus className="w-4 h-4" /> {t('add')}
             </Button>
@@ -585,7 +659,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
             ) : (
               admins.map((admin) => (
                 <div key={admin.user_id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
-                  <p className="text-sm font-medium text-foreground">{admin.display_name || 'Sin nombre'}</p>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{admin.display_name || 'Sin nombre'}</p>
+                    {admin.email && <p className="text-xs text-muted-foreground">{admin.email}</p>}
+                  </div>
                   <Button variant="ghost" size="sm" onClick={() => removeAdmin(admin.user_id)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
                     <Trash2 className="w-4 h-4" />
                   </Button>
