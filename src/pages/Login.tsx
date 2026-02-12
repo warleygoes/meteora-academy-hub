@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
+import PhoneInput from '@/components/PhoneInput';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -176,7 +177,7 @@ const Login: React.FC = () => {
   };
 
   const isPhoneValid = phone && validatePhone(phone);
-  const canProceedStep1 = displayName && email && password.length >= 6 && roleType;
+  const canProceedStep1 = displayName && email && password.length >= 8 && roleType;
   const canProceedStep2 = companyName && country && isPhoneValid;
 
   // Signup success screen
@@ -250,8 +251,9 @@ const Login: React.FC = () => {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={6} />
+                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={8} />
                 </div>
+                <p className="text-[11px] text-muted-foreground -mt-2">{t('passwordMinLength')}</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -296,8 +298,9 @@ const Login: React.FC = () => {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={6} />
+                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={8} />
                 </div>
+                <p className="text-[11px] text-muted-foreground -mt-2">{t('passwordMinLength')}</p>
 
                 {/* Role selection */}
                 <div>
@@ -336,41 +339,35 @@ const Login: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder={t('phonePlaceholder')}
-                      value={phone}
-                      onChange={(e) => {
-                        setPhoneVal(e.target.value);
-                        if (phoneTouched) {
-                          if (!e.target.value) setPhoneError(t('phoneRequired'));
-                          else if (!validatePhone(e.target.value)) setPhoneError(t('phoneInvalid'));
-                          else setPhoneError('');
-                        }
-                      }}
-                      onBlur={handlePhoneBlur}
-                      className={`pl-10 bg-secondary border-border ${phoneTouched && phoneError ? 'border-destructive' : phoneTouched && !phoneError && phone ? 'border-green-500' : ''}`}
-                      required
-                    />
-                    {phoneTouched && !phoneError && phone && (
-                      <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
-                    )}
-                    {phoneTouched && phoneError && (
-                      <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-destructive" />
-                    )}
-                  </div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('phone')}</label>
+                  <PhoneInput
+                    value={phone}
+                    onChange={(val) => {
+                      setPhoneVal(val);
+                      if (phoneTouched) {
+                        if (!val) setPhoneError(t('phoneRequired'));
+                        else if (!validatePhone(val)) setPhoneError(t('phoneInvalid'));
+                        else setPhoneError('');
+                      }
+                    }}
+                    onBlur={handlePhoneBlur}
+                    error={phoneTouched && !!phoneError}
+                    success={phoneTouched && !phoneError && !!phone}
+                    defaultCountry={country}
+                  />
                   {phoneTouched && phoneError && (
                     <p className="text-xs text-destructive mt-1.5 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" /> {phoneError}
                     </p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-1">{t('phoneHint')}</p>
                 </div>
 
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder={t('clientCountPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('clientCount')}</label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input placeholder={t('clientCountPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
+                  </div>
                 </div>
 
                 {roleType === 'owner' && (

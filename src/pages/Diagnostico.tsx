@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, User, Mail, Phone, Globe, Building2, Users, Wifi, DollarSign, MessageSquare, Target, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
+import PhoneInput from '@/components/PhoneInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -187,29 +188,25 @@ const Diagnostico: React.FC = () => {
                   <Input type="email" placeholder={t('diagEmail')} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-secondary border-border" />
                 </div>
                 <div>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder={t('phonePlaceholder')}
-                      value={phone}
-                      onChange={(e) => {
-                        setPhone(e.target.value);
-                        if (phoneTouched) {
-                          if (!e.target.value) setPhoneError(t('phoneRequired'));
-                          else if (!validatePhone(e.target.value)) setPhoneError(t('phoneInvalid'));
-                          else setPhoneError('');
-                        }
-                      }}
-                      onBlur={handlePhoneBlur}
-                      className={`pl-10 bg-secondary border-border ${phoneTouched && phoneError ? 'border-destructive' : phoneTouched && !phoneError && phone ? 'border-green-500' : ''}`}
-                    />
-                    {phoneTouched && !phoneError && phone && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />}
-                    {phoneTouched && phoneError && <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-destructive" />}
-                  </div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagPhone')}</label>
+                  <PhoneInput
+                    value={phone}
+                    onChange={(val) => {
+                      setPhone(val);
+                      if (phoneTouched) {
+                        if (!val) setPhoneError(t('phoneRequired'));
+                        else if (!validatePhone(val)) setPhoneError(t('phoneInvalid'));
+                        else setPhoneError('');
+                      }
+                    }}
+                    onBlur={handlePhoneBlur}
+                    error={phoneTouched && !!phoneError}
+                    success={phoneTouched && !phoneError && !!phone}
+                    defaultCountry={country}
+                  />
                   {phoneTouched && phoneError && (
                     <p className="text-xs text-destructive mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {phoneError}</p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-1">{t('phoneHint')}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">{t('diagCountry')}</label>
@@ -242,9 +239,12 @@ const Diagnostico: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder={t('diagClientsPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagClients')}</label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input placeholder={t('diagClientsPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">{t('diagNetwork')}</label>

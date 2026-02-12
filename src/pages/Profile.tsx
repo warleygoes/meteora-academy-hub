@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import PhoneInput from '@/components/PhoneInput';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -165,10 +166,10 @@ const Profile: React.FC = () => {
 
           <div className="space-y-2">
             <Label>{t('phone')}</Label>
-            <Input
+            <PhoneInput
               value={profile.phone}
-              onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))}
-              placeholder={t('phonePlaceholder')}
+              onChange={val => setProfile(p => ({ ...p, phone: val }))}
+              defaultCountry={profile.country}
             />
           </div>
 
