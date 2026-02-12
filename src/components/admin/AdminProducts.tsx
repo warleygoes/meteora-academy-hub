@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon, BookOpen } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,15 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
-const PRODUCT_TYPES = [
-  { value: 'course', label: 'Curso' },
-  { value: 'service', label: 'Servicio' },
-  { value: 'consultation', label: 'Consultoría' },
-  { value: 'implementation', label: 'Implementación' },
-  { value: 'virtual_event', label: 'Evento Virtual' },
-  { value: 'in_person_event', label: 'Evento Presencial' },
-] as const;
-
 interface Offer {
   id: string; name: string; price: number; currency: string;
   stripe_price_id: string | null; is_default: boolean; active: boolean;
@@ -31,7 +22,7 @@ interface Product {
   id: string; type: string; name: string; description: string | null;
   payment_type: string; active: boolean; course_id: string | null;
   thumbnail_url: string | null; thumbnail_vertical_url: string | null;
-  sort_order: number; offers: Offer[];
+  sort_order: number; offers: Offer[]; has_content: boolean;
 }
 
 const AdminProducts: React.FC = () => {
@@ -54,13 +45,22 @@ const AdminProducts: React.FC = () => {
   const fileRefH = useRef<HTMLInputElement>(null);
   const fileRefV = useRef<HTMLInputElement>(null);
 
+  const PRODUCT_TYPES = [
+    { value: 'course', label: t('typeCourse') },
+    { value: 'service', label: t('typeService') },
+    { value: 'consultation', label: t('typeConsultation') },
+    { value: 'implementation', label: t('typeImplementation') },
+    { value: 'virtual_event', label: t('typeVirtualEvent') },
+    { value: 'in_person_event', label: t('typeInPersonEvent') },
+  ];
+
   const [form, setForm] = useState({
     name: '', description: '', type: 'service' as string, payment_type: 'one_time',
-    thumbnail_url: '', thumbnail_vertical_url: '',
+    thumbnail_url: '', thumbnail_vertical_url: '', has_content: false,
   });
 
   const [offerForm, setOfferForm] = useState({
-    name: 'Oferta Padrão', price: '', currency: 'USD', stripe_price_id: '',
+    name: t('defaultOffer'), price: '', currency: 'USD', stripe_price_id: '',
     is_default: false, active: true, valid_from: '', valid_until: '',
   });
 
@@ -86,7 +86,7 @@ const AdminProducts: React.FC = () => {
     const path = `${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from('product-images').upload(path, file);
     if (error) {
-      toast({ title: 'Error al subir imagen', description: error.message, variant: 'destructive' });
+      toast({ title: t('imageUploadError'), description: error.message, variant: 'destructive' });
       setter(false);
       return;
     }
@@ -97,12 +97,12 @@ const AdminProducts: React.FC = () => {
       setForm(f => ({ ...f, thumbnail_vertical_url: publicUrl }));
     }
     setter(false);
-    toast({ title: 'Imagen subida correctamente' });
+    toast({ title: t('imageUploaded') });
   };
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '' });
+    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false });
     setShowEditor(true);
   };
 
@@ -112,6 +112,7 @@ const AdminProducts: React.FC = () => {
       name: p.name, description: p.description || '', type: p.type,
       payment_type: p.payment_type,
       thumbnail_url: p.thumbnail_url || '', thumbnail_vertical_url: p.thumbnail_vertical_url || '',
+      has_content: p.has_content,
     });
     setShowEditor(true);
   };
@@ -122,20 +123,32 @@ const AdminProducts: React.FC = () => {
       name: form.name, description: form.description || null, type: form.type,
       payment_type: form.payment_type, thumbnail_url: form.thumbnail_url || null,
       thumbnail_vertical_url: form.thumbnail_vertical_url || null,
+      has_content: form.has_content,
     };
 
     if (editing) {
       await supabase.from('products').update(payload).eq('id', editing.id);
-      if (form.type === 'course' && editing.course_id) {
+      // Sync course record if has_content
+      if (form.has_content && editing.course_id) {
         await supabase.from('courses').update({
           title: form.name, description: form.description || null,
           thumbnail_url: form.thumbnail_url || null, thumbnail_vertical_url: form.thumbnail_vertical_url || null,
         }).eq('id', editing.course_id);
       }
-      toast({ title: 'Producto actualizado' });
+      // Create course record if toggling has_content on
+      if (form.has_content && !editing.course_id) {
+        const { data: newCourse } = await supabase.from('courses').insert({
+          title: form.name, description: form.description || null,
+          thumbnail_url: form.thumbnail_url || null, thumbnail_vertical_url: form.thumbnail_vertical_url || null,
+        }).select().single();
+        if (newCourse) {
+          await supabase.from('products').update({ course_id: newCourse.id }).eq('id', editing.id);
+        }
+      }
+      toast({ title: t('productUpdated') });
     } else {
       let courseId: string | null = null;
-      if (form.type === 'course') {
+      if (form.has_content) {
         const { data: newCourse } = await supabase.from('courses').insert({
           title: form.name, description: form.description || null,
           thumbnail_url: form.thumbnail_url || null, thumbnail_vertical_url: form.thumbnail_vertical_url || null,
@@ -144,9 +157,9 @@ const AdminProducts: React.FC = () => {
       }
       const { data: newProduct } = await supabase.from('products').insert({ ...payload, active: true, course_id: courseId }).select().single();
       if (newProduct) {
-        await supabase.from('offers').insert({ product_id: newProduct.id, name: 'Oferta Padrão', price: 0, currency: 'USD', is_default: true, active: true });
+        await supabase.from('offers').insert({ product_id: newProduct.id, name: t('defaultOffer'), price: 0, currency: 'USD', is_default: true, active: true });
       }
-      toast({ title: 'Producto creado' });
+      toast({ title: t('productCreated') });
     }
     setShowEditor(false);
     fetchProducts();
@@ -155,9 +168,8 @@ const AdminProducts: React.FC = () => {
   const confirmDelete = (id: string) => { setDeleteId(id); setShowDelete(true); };
   const executeDelete = async () => {
     if (!deleteId) return;
-    const product = products.find(p => p.id === deleteId);
     await supabase.from('products').delete().eq('id', deleteId);
-    toast({ title: 'Producto eliminado' });
+    toast({ title: t('productDeleted') });
     setShowDelete(false); setDeleteId(null); fetchProducts();
   };
 
@@ -194,10 +206,10 @@ const AdminProducts: React.FC = () => {
     };
     if (editingOffer) {
       await supabase.from('offers').update(payload).eq('id', editingOffer.id);
-      toast({ title: 'Oferta actualizada' });
+      toast({ title: t('editOffer') });
     } else {
       await supabase.from('offers').insert({ ...payload, product_id: offerProductId });
-      toast({ title: 'Oferta creada' });
+      toast({ title: t('newOffer') });
     }
     setShowOfferEditor(false); fetchProducts();
   };
@@ -206,7 +218,7 @@ const AdminProducts: React.FC = () => {
   const executeDeleteOffer = async () => {
     if (!deleteOfferId) return;
     await supabase.from('offers').delete().eq('id', deleteOfferId);
-    toast({ title: 'Oferta eliminada' });
+    toast({ title: t('delete') });
     setShowDeleteOffer(false); setDeleteOfferId(null); fetchProducts();
   };
 
@@ -218,16 +230,16 @@ const AdminProducts: React.FC = () => {
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-display font-bold text-foreground">{t('manageProducts') || 'Gestionar Productos'}</h2>
-          <p className="text-sm text-muted-foreground">{t('adminProductsDesc') || 'Cursos, servicios, consultorías y más'}</p>
+          <h2 className="text-xl font-display font-bold text-foreground">{t('manageProducts')}</h2>
+          <p className="text-sm text-muted-foreground">{t('adminProductsDesc')}</p>
         </div>
-        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Agregar Producto</Button>
+        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> {t('addProduct')}</Button>
       </div>
 
       {loading ? (
         <p className="text-center py-12 text-muted-foreground">{t('loading')}...</p>
       ) : products.length === 0 ? (
-        <p className="text-center py-12 text-muted-foreground">No se encontraron productos.</p>
+        <p className="text-center py-12 text-muted-foreground">{t('noProductsFound')}</p>
       ) : (
         <div className="space-y-3">
           {products.map(p => {
@@ -240,7 +252,6 @@ const AdminProducts: React.FC = () => {
                     {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                   </button>
 
-                  {/* Thumbnail preview */}
                   {p.thumbnail_url ? (
                     <img src={p.thumbnail_url} alt="" className="w-16 h-10 rounded object-cover shrink-0 hidden sm:block" />
                   ) : (
@@ -255,9 +266,14 @@ const AdminProducts: React.FC = () => {
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="outline" className="text-xs">{getTypeLabel(p.type)}</Badge>
                         <Badge variant="outline" className="text-xs">
-                          {p.payment_type === 'monthly' ? 'Mensual' : 'Único'}
+                          {p.payment_type === 'monthly' ? t('monthly') : t('oneTime')}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">{p.offers.length} ofertas</span>
+                        {p.has_content && (
+                          <Badge variant="secondary" className="text-xs gap-1">
+                            <BookOpen className="w-3 h-3" /> {t('hasContent')}
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">{p.offers.length} {t('offers').toLowerCase()}</span>
                       </div>
                     </div>
                   </div>
@@ -278,11 +294,11 @@ const AdminProducts: React.FC = () => {
                 {isExpanded && (
                   <div className="border-t border-border bg-secondary/30 p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-foreground flex items-center gap-1"><Tag className="w-4 h-4" /> Ofertas</h4>
-                      <Button variant="outline" size="sm" onClick={() => openNewOffer(p.id)} className="gap-1"><Plus className="w-3 h-3" /> Nueva Oferta</Button>
+                      <h4 className="text-sm font-semibold text-foreground flex items-center gap-1"><Tag className="w-4 h-4" /> {t('offers')}</h4>
+                      <Button variant="outline" size="sm" onClick={() => openNewOffer(p.id)} className="gap-1"><Plus className="w-3 h-3" /> {t('newOffer')}</Button>
                     </div>
                     {p.offers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">Sin ofertas</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">{t('noOffers')}</p>
                     ) : (
                       <div className="space-y-2">
                         {p.offers.map(offer => (
@@ -290,7 +306,7 @@ const AdminProducts: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-foreground">{offer.name}</span>
-                                {offer.is_default && <Badge className="text-xs bg-primary/10 text-primary border-primary/20">Default</Badge>}
+                                {offer.is_default && <Badge className="text-xs bg-primary/10 text-primary border-primary/20">{t('defaultOffer')}</Badge>}
                                 {!offer.active && <Badge variant="secondary" className="text-xs">{t('inactive')}</Badge>}
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
@@ -326,15 +342,13 @@ const AdminProducts: React.FC = () => {
       <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar el producto "{deleteProductName}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se eliminarán todas las ofertas asociadas a este producto. Si es un curso, también se eliminará todo su contenido (módulos y aulas). Esta acción no se puede deshacer.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('deleteProductConfirm')} "{deleteProductName}"?</AlertDialogTitle>
+            <AlertDialogDescription>{t('deleteProductDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              <Trash2 className="w-4 h-4 mr-2" /> Eliminar Producto
+              <Trash2 className="w-4 h-4 mr-2" /> {t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -344,15 +358,13 @@ const AdminProducts: React.FC = () => {
       <AlertDialog open={showDeleteOffer} onOpenChange={setShowDeleteOffer}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar la oferta "{deleteOfferName}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se eliminará esta oferta de forma permanente. Los links de pago asociados dejarán de funcionar. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('deleteOfferConfirm')} "{deleteOfferName}"?</AlertDialogTitle>
+            <AlertDialogDescription>{t('deleteOfferDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={executeDeleteOffer} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              <Trash2 className="w-4 h-4 mr-2" /> Eliminar Oferta
+              <Trash2 className="w-4 h-4 mr-2" /> {t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -362,20 +374,20 @@ const AdminProducts: React.FC = () => {
       <Dialog open={showEditor} onOpenChange={setShowEditor}>
         <DialogContent className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-display">{editing ? 'Editar Producto' : 'Agregar Producto'}</DialogTitle>
+            <DialogTitle className="font-display">{editing ? t('editProduct') : t('addProduct')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Nombre del producto</label>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('productName')}</label>
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="bg-secondary border-border" />
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Descripción</label>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('productDescription')}</label>
               <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Tipo de producto</label>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('productType')}</label>
                 <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                   <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -384,36 +396,45 @@ const AdminProducts: React.FC = () => {
                 </Select>
               </div>
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Tipo de cobro</label>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('chargeType')}</label>
                 <Select value={form.payment_type} onValueChange={v => setForm(f => ({ ...f, payment_type: v }))}>
                   <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="monthly">Mensual</SelectItem>
-                    <SelectItem value="one_time">Pago Único</SelectItem>
+                    <SelectItem value="monthly">{t('monthly')}</SelectItem>
+                    <SelectItem value="one_time">{t('oneTime')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
+            {/* Has content toggle */}
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
+              <Switch checked={form.has_content} onCheckedChange={v => setForm(f => ({ ...f, has_content: v }))} />
+              <div>
+                <p className="text-sm font-medium text-foreground">{t('hasContent')}</p>
+                <p className="text-xs text-muted-foreground">{t('hasContentDesc')}</p>
+              </div>
+            </div>
+
             {/* Image uploads */}
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Imagen Horizontal (16:9)</label>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('horizontalImage')}</label>
               <div className="flex gap-2 items-center">
-                <Input value={form.thumbnail_url} onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))} className="bg-secondary border-border flex-1" placeholder="URL o sube un archivo" />
+                <Input value={form.thumbnail_url} onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))} className="bg-secondary border-border flex-1" placeholder={t('imageUrlPlaceholder')} />
                 <input ref={fileRefH} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0], 'horizontal')} />
                 <Button variant="outline" size="sm" onClick={() => fileRefH.current?.click()} disabled={uploadingH} className="gap-1 shrink-0">
-                  <Upload className="w-4 h-4" /> {uploadingH ? '...' : 'Subir'}
+                  <Upload className="w-4 h-4" /> {uploadingH ? '...' : t('uploadImage')}
                 </Button>
               </div>
               {form.thumbnail_url && <img src={form.thumbnail_url} alt="" className="mt-2 h-20 rounded object-cover" />}
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Imagen Vertical (2:3 estilo poster)</label>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('verticalImage')}</label>
               <div className="flex gap-2 items-center">
-                <Input value={form.thumbnail_vertical_url} onChange={e => setForm(f => ({ ...f, thumbnail_vertical_url: e.target.value }))} className="bg-secondary border-border flex-1" placeholder="URL o sube un archivo" />
+                <Input value={form.thumbnail_vertical_url} onChange={e => setForm(f => ({ ...f, thumbnail_vertical_url: e.target.value }))} className="bg-secondary border-border flex-1" placeholder={t('imageUrlPlaceholder')} />
                 <input ref={fileRefV} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0], 'vertical')} />
                 <Button variant="outline" size="sm" onClick={() => fileRefV.current?.click()} disabled={uploadingV} className="gap-1 shrink-0">
-                  <Upload className="w-4 h-4" /> {uploadingV ? '...' : 'Subir'}
+                  <Upload className="w-4 h-4" /> {uploadingV ? '...' : t('uploadImage')}
                 </Button>
               </div>
               {form.thumbnail_vertical_url && <img src={form.thumbnail_vertical_url} alt="" className="mt-2 h-28 rounded object-cover" />}
@@ -428,16 +449,16 @@ const AdminProducts: React.FC = () => {
       <Dialog open={showOfferEditor} onOpenChange={setShowOfferEditor}>
         <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-display">{editingOffer ? 'Editar Oferta' : 'Nueva Oferta'}</DialogTitle>
+            <DialogTitle className="font-display">{editingOffer ? t('editOffer') : t('newOffer')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Nombre de la oferta</label>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('offerName')}</label>
               <Input value={offerForm.name} onChange={e => setOfferForm(f => ({ ...f, name: e.target.value }))} className="bg-secondary border-border" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Precio (USD)</label>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('planPrice')} (USD)</label>
                 <Input type="number" value={offerForm.price} onChange={e => setOfferForm(f => ({ ...f, price: e.target.value }))} className="bg-secondary border-border" />
               </div>
               <div>
@@ -447,18 +468,18 @@ const AdminProducts: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Válido desde</label>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('validFrom')}</label>
                 <Input type="datetime-local" value={offerForm.valid_from} onChange={e => setOfferForm(f => ({ ...f, valid_from: e.target.value }))} className="bg-secondary border-border" />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Válido hasta</label>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('validUntil')}</label>
                 <Input type="datetime-local" value={offerForm.valid_until} onChange={e => setOfferForm(f => ({ ...f, valid_until: e.target.value }))} className="bg-secondary border-border" />
               </div>
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={offerForm.is_default} onCheckedChange={v => setOfferForm(f => ({ ...f, is_default: v }))} />
-                Oferta padrão
+                {t('defaultOffer')}
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={offerForm.active} onCheckedChange={v => setOfferForm(f => ({ ...f, active: v }))} />

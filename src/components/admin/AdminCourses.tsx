@@ -224,9 +224,9 @@ const AdminCourses: React.FC = () => {
   const addContent = async (lessonId: string, courseId: string) => {
     const { data: existing } = await supabase.from('lesson_contents').select('sort_order').eq('lesson_id', lessonId).order('sort_order', { ascending: false }).limit(1);
     const nextOrder = (existing && existing.length > 0 ? existing[0].sort_order : -1) + 1;
-    await supabase.from('lesson_contents').insert({ lesson_id: lessonId, type: 'video', title: 'Nuevo contenido', sort_order: nextOrder } as any);
+    await supabase.from('lesson_contents').insert({ lesson_id: lessonId, type: 'video', title: t('addContent'), sort_order: nextOrder } as any);
     fetchCourseModules(courseId);
-    toast({ title: 'Contenido agregado' });
+    toast({ title: t('contentAdded') });
   };
 
   const startEditContent = (c: LessonContent) => {
@@ -238,13 +238,13 @@ const AdminCourses: React.FC = () => {
     await supabase.from('lesson_contents').update({ title: contentForm.title, type: contentForm.type, content: contentForm.content || null } as any).eq('id', contentId);
     setEditingContent(null);
     fetchCourseModules(courseId);
-    toast({ title: 'Contenido guardado' });
+    toast({ title: t('contentSaved') });
   };
 
   const deleteContent = async (contentId: string, courseId: string) => {
     await supabase.from('lesson_contents').delete().eq('id', contentId);
     fetchCourseModules(courseId);
-    toast({ title: 'Contenido eliminado' });
+    toast({ title: t('contentDeleted') });
   };
 
   // Students
@@ -282,7 +282,7 @@ const AdminCourses: React.FC = () => {
         <div>
           <h2 className="text-xl font-display font-bold text-foreground">{t('manageCourses')}</h2>
           <p className="text-sm text-muted-foreground">{t('adminCoursesDesc')}</p>
-          <p className="text-xs text-muted-foreground mt-1">{t('coursesCreatedViaProducts') || 'Los cursos se crean desde Productos. Aquí se gestionan módulos, aulas y contenido.'}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('contentCreatedViaProducts')}</p>
         </div>
         <Button variant="outline" onClick={openNewCategory} className="gap-2">
           <Tag className="w-4 h-4" /> {t('manageCategories') || 'Categorías'}
@@ -437,7 +437,7 @@ const AdminCourses: React.FC = () => {
                                             {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
                                             {lesson.contents && lesson.contents.length > 0 && (
                                               <span className="flex items-center gap-1">
-                                                {lesson.contents.length} {lesson.contents.length === 1 ? 'contenido' : 'contenidos'}
+                                                {lesson.contents.length} {lesson.contents.length === 1 ? t('contentCount') : t('contentsCount')}
                                               </span>
                                             )}
                                           </div>
@@ -451,13 +451,13 @@ const AdminCourses: React.FC = () => {
                                   {/* Lesson contents */}
                                   {expandedLessons.has(lesson.id) && (
                                     <div className="border-t border-border/50 px-3 py-2 space-y-2 bg-secondary/20">
-                                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contenidos de la aula</p>
+                                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('lessonContents')}</p>
                                       {(lesson.contents || []).map(cont => (
                                         <div key={cont.id} className="flex items-start gap-2 p-2 rounded-md bg-background border border-border/30">
                                           {editingContent === cont.id ? (
                                             <div className="flex-1 space-y-2">
                                               <Input value={contentForm.title} onChange={e => setContentForm(f => ({ ...f, title: e.target.value }))}
-                                                className="bg-secondary border-border h-7 text-sm" placeholder="Título del contenido" />
+                                                className="bg-secondary border-border h-7 text-sm" placeholder={t('contentTitle')} />
                                               <Select value={contentForm.type} onValueChange={(v: any) => setContentForm(f => ({ ...f, type: v }))}>
                                                 <SelectTrigger className="h-7 text-sm bg-secondary border-border w-32"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
@@ -492,7 +492,7 @@ const AdminCourses: React.FC = () => {
                                         </div>
                                       ))}
                                       <Button size="sm" variant="ghost" onClick={() => addContent(lesson.id, course.id)} className="gap-1 w-full text-primary text-xs">
-                                        <Plus className="w-3.5 h-3.5" /> Agregar Contenido
+                                        <Plus className="w-3.5 h-3.5" /> {t('addContent')}
                                       </Button>
                                     </div>
                                   )}
