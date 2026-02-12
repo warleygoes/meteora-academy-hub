@@ -17,6 +17,7 @@ import Diagnostico from "./pages/Diagnostico";
 import Profile from "./pages/Profile";
 import NetworkTopology from "./pages/NetworkTopology";
 import Meetings from "./pages/Meetings";
+import CoursePage from "./pages/CoursePage";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,6 +70,7 @@ const App = () => (
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 <Route path="/app" element={<Index />} />
                 <Route path="/app/courses" element={<CoursesPage />} />
+                <Route path="/app/courses/:courseId" element={<CoursePage />} />
                 <Route path="/app/community" element={<CommunityPage />} />
                 <Route path="/app/profile" element={<Profile />} />
                 <Route path="/app/topology" element={<NetworkTopology />} />

@@ -241,6 +241,86 @@ export type Database = {
         }
         Relationships: []
       }
+      lesson_contents: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          lesson_id: string
+          sort_order: number
+          title: string
+          type: Database["public"]["Enums"]["lesson_content_type"]
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          lesson_id: string
+          sort_order?: number
+          title: string
+          type: Database["public"]["Enums"]["lesson_content_type"]
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          lesson_id?: string
+          sort_order?: number
+          title?: string
+          type?: Database["public"]["Enums"]["lesson_content_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_contents_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_progress: {
+        Row: {
+          completed: boolean
+          course_id: string
+          id: string
+          lesson_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          course_id: string
+          id?: string
+          lesson_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          course_id?: string
+          id?: string
+          lesson_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_progress_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       network_topologies: {
         Row: {
           created_at: string
@@ -775,6 +855,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      lesson_content_type: "video" | "text" | "image" | "audio" | "link" | "pdf"
       product_type:
         | "course"
         | "service"
@@ -910,6 +991,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      lesson_content_type: ["video", "text", "image", "audio", "link", "pdf"],
       product_type: [
         "course",
         "service",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image } from 'lucide-react';
+import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,53 +8,52 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-interface Category {
+interface Category { id: string; name: string; description: string | null; }
+
+interface LessonContent {
   id: string;
-  name: string;
-  description: string | null;
+  lesson_id: string;
+  type: 'video' | 'text' | 'image' | 'audio' | 'link' | 'pdf';
+  title: string;
+  content: string | null;
+  sort_order: number;
 }
 
 interface Lesson {
-  id: string;
-  module_id: string;
-  title: string;
-  description: string | null;
-  video_url: string | null;
-  duration_minutes: number | null;
-  sort_order: number;
-  is_free: boolean;
+  id: string; module_id: string; title: string; description: string | null;
+  video_url: string | null; duration_minutes: number | null; sort_order: number; is_free: boolean;
+  contents?: LessonContent[];
 }
 
-interface Module {
-  id: string;
-  course_id: string;
-  title: string;
-  description: string | null;
-  sort_order: number;
-  lessons: Lesson[];
-}
+interface Module { id: string; course_id: string; title: string; description: string | null; sort_order: number; lessons: Lesson[]; }
 
 interface Course {
-  id: string;
-  title: string;
-  description: string | null;
-  thumbnail_url: string | null;
-  category_id: string | null;
-  status: string;
-  sort_order: number;
-  category?: Category | null;
-  enrollment_count?: number;
+  id: string; title: string; description: string | null; thumbnail_url: string | null;
+  category_id: string | null; status: string; sort_order: number;
+  category?: Category | null; enrollment_count?: number;
 }
 
 interface Enrollment {
-  id: string;
-  user_id: string;
-  enrolled_at: string;
+  id: string; user_id: string; enrolled_at: string;
   profile?: { display_name: string | null; email: string | null; company_name: string | null };
 }
+
+const CONTENT_TYPE_ICONS: Record<string, React.ReactNode> = {
+  video: <Video className="w-3.5 h-3.5" />,
+  text: <FileText className="w-3.5 h-3.5" />,
+  image: <Image className="w-3.5 h-3.5" />,
+  audio: <Music className="w-3.5 h-3.5" />,
+  link: <LinkIcon className="w-3.5 h-3.5" />,
+  pdf: <FileDown className="w-3.5 h-3.5" />,
+};
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  video: 'Video', text: 'Texto', image: 'Imagen', audio: 'Audio', link: 'Link', pdf: 'PDF',
+};
 
 const AdminCourses: React.FC = () => {
   const { t } = useLanguage();
@@ -78,6 +77,7 @@ const AdminCourses: React.FC = () => {
   const [students, setStudents] = useState<Enrollment[]>([]);
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
   const [courseModules, setCourseModules] = useState<Record<string, Module[]>>({});
   const [loadingModules, setLoadingModules] = useState<Set<string>>(new Set());
 
@@ -86,28 +86,19 @@ const AdminCourses: React.FC = () => {
   const [inlineModuleForm, setInlineModuleForm] = useState({ title: '', description: '' });
   const [inlineLessonForm, setInlineLessonForm] = useState({ title: '', description: '', video_url: '', duration_minutes: 0, is_free: false });
 
+  const [editingContent, setEditingContent] = useState<string | null>(null);
+  const [contentForm, setContentForm] = useState({ title: '', type: 'video' as LessonContent['type'], content: '' });
+
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
 
   const fetchCourses = useCallback(async () => {
     setLoading(true);
-    const { data: coursesData } = await supabase
-      .from('courses')
-      .select('*, course_categories(*)')
-      .order('sort_order', { ascending: true });
-
+    const { data: coursesData } = await supabase.from('courses').select('*, course_categories(*)').order('sort_order', { ascending: true });
     if (coursesData) {
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select('course_id');
-
+      const { data: enrollments } = await supabase.from('course_enrollments').select('course_id');
       const countMap: Record<string, number> = {};
       enrollments?.forEach(e => { countMap[e.course_id] = (countMap[e.course_id] || 0) + 1; });
-
-      setCourses(coursesData.map((c: any) => ({
-        ...c,
-        category: c.course_categories,
-        enrollment_count: countMap[c.id] || 0,
-      })));
+      setCourses(coursesData.map((c: any) => ({ ...c, category: c.course_categories, enrollment_count: countMap[c.id] || 0 })));
     }
     setLoading(false);
   }, []);
@@ -122,10 +113,25 @@ const AdminCourses: React.FC = () => {
   const fetchCourseModules = async (courseId: string) => {
     setLoadingModules(prev => new Set(prev).add(courseId));
     const { data: modules } = await supabase.from('course_modules').select('*').eq('course_id', courseId).order('sort_order');
-    const { data: lessons } = await supabase.from('course_lessons').select('*').in('module_id', (modules || []).map(m => m.id)).order('sort_order');
+    const moduleIds = (modules || []).map(m => m.id);
+    const { data: lessons } = moduleIds.length > 0
+      ? await supabase.from('course_lessons').select('*').in('module_id', moduleIds).order('sort_order')
+      : { data: [] };
+    
+    const lessonIds = (lessons || []).map(l => l.id);
+    const { data: contents } = lessonIds.length > 0
+      ? await supabase.from('lesson_contents').select('*').in('lesson_id', lessonIds).order('sort_order')
+      : { data: [] };
+
     setCourseModules(prev => ({
       ...prev,
-      [courseId]: (modules || []).map(m => ({ ...m, lessons: (lessons || []).filter(l => l.module_id === m.id) })),
+      [courseId]: (modules || []).map(m => ({
+        ...m,
+        lessons: (lessons || []).filter(l => l.module_id === m.id).map(l => ({
+          ...l,
+          contents: ((contents || []) as LessonContent[]).filter(c => c.lesson_id === l.id),
+        })),
+      })),
     }));
     setLoadingModules(prev => { const next = new Set(prev); next.delete(courseId); return next; });
   };
@@ -138,19 +144,17 @@ const AdminCourses: React.FC = () => {
     });
   };
 
-  // Status toggle
-  const confirmToggleStatus = (id: string, currentStatus: string) => {
-    setPublishCourseId(id);
-    setPublishAction(currentStatus === 'published' ? 'draft' : 'published');
-    setShowPublishConfirm(true);
+  const toggleLessonExpand = (lessonId: string) => {
+    setExpandedLessons(prev => { const next = new Set(prev); next.has(lessonId) ? next.delete(lessonId) : next.add(lessonId); return next; });
   };
+
+  // Status toggle
+  const confirmToggleStatus = (id: string, currentStatus: string) => { setPublishCourseId(id); setPublishAction(currentStatus === 'published' ? 'draft' : 'published'); setShowPublishConfirm(true); };
   const executeToggleStatus = async () => {
     if (!publishCourseId) return;
     await supabase.from('courses').update({ status: publishAction }).eq('id', publishCourseId);
     toast({ title: publishAction === 'published' ? (t('coursePublished') || 'Curso publicado') : (t('courseDrafted') || 'Curso movido a borrador') });
-    setShowPublishConfirm(false);
-    setPublishCourseId(null);
-    fetchCourses();
+    setShowPublishConfirm(false); setPublishCourseId(null); fetchCourses();
   };
 
   // Category CRUD
@@ -158,13 +162,9 @@ const AdminCourses: React.FC = () => {
   const openEditCategory = (cat: Category) => { setEditingCategory(cat); setCategoryForm({ name: cat.name, description: cat.description || '' }); setShowCategoryEditor(true); };
   const saveCategory = async () => {
     if (!categoryForm.name.trim()) return;
-    if (editingCategory) {
-      await supabase.from('course_categories').update(categoryForm).eq('id', editingCategory.id);
-    } else {
-      await supabase.from('course_categories').insert(categoryForm);
-    }
-    setShowCategoryEditor(false);
-    fetchCategories(); fetchCourses();
+    if (editingCategory) { await supabase.from('course_categories').update(categoryForm).eq('id', editingCategory.id); }
+    else { await supabase.from('course_categories').insert(categoryForm); }
+    setShowCategoryEditor(false); fetchCategories(); fetchCourses();
     toast({ title: t('categorySaved') || 'Categoría guardada' });
   };
   const confirmDeleteCategory = (id: string) => { setDeleteCategoryId(id); setShowDeleteCategoryConfirm(true); };
@@ -220,6 +220,33 @@ const AdminCourses: React.FC = () => {
     toast({ title: t('lessonDeleted') || 'Aula eliminada' });
   };
 
+  // Lesson Content CRUD
+  const addContent = async (lessonId: string, courseId: string) => {
+    const { data: existing } = await supabase.from('lesson_contents').select('sort_order').eq('lesson_id', lessonId).order('sort_order', { ascending: false }).limit(1);
+    const nextOrder = (existing && existing.length > 0 ? existing[0].sort_order : -1) + 1;
+    await supabase.from('lesson_contents').insert({ lesson_id: lessonId, type: 'video', title: 'Nuevo contenido', sort_order: nextOrder } as any);
+    fetchCourseModules(courseId);
+    toast({ title: 'Contenido agregado' });
+  };
+
+  const startEditContent = (c: LessonContent) => {
+    setEditingContent(c.id);
+    setContentForm({ title: c.title, type: c.type, content: c.content || '' });
+  };
+
+  const saveContent = async (contentId: string, courseId: string) => {
+    await supabase.from('lesson_contents').update({ title: contentForm.title, type: contentForm.type, content: contentForm.content || null } as any).eq('id', contentId);
+    setEditingContent(null);
+    fetchCourseModules(courseId);
+    toast({ title: 'Contenido guardado' });
+  };
+
+  const deleteContent = async (contentId: string, courseId: string) => {
+    await supabase.from('lesson_contents').delete().eq('id', contentId);
+    fetchCourseModules(courseId);
+    toast({ title: 'Contenido eliminado' });
+  };
+
   // Students
   const openStudentList = async (courseId: string) => {
     const { data } = await supabase.from('course_enrollments').select('*').eq('course_id', courseId);
@@ -269,9 +296,7 @@ const AdminCourses: React.FC = () => {
           <Input placeholder={t('searchCourses')} value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-secondary border-border" />
         </div>
         <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
-          <SelectTrigger className="w-[140px] bg-secondary border-border">
-            <Filter className="w-4 h-4 mr-2" /><SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-[140px] bg-secondary border-border"><Filter className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('allFilter') || 'Todos'}</SelectItem>
             <SelectItem value="published">{t('published')}</SelectItem>
@@ -279,9 +304,7 @@ const AdminCourses: React.FC = () => {
           </SelectContent>
         </Select>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[180px] bg-secondary border-border">
-            <Tag className="w-4 h-4 mr-2" /><SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-[180px] bg-secondary border-border"><Tag className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('allCategories')}</SelectItem>
             {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -335,8 +358,7 @@ const AdminCourses: React.FC = () => {
                     <span className="text-xs text-muted-foreground">{t('published')}</span>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => openStudentList(course.id)} title={t('students')}>
-                    <Users className="w-4 h-4" />
-                    <span className="ml-1 text-xs">{course.enrollment_count}</span>
+                    <Users className="w-4 h-4" /><span className="ml-1 text-xs">{course.enrollment_count}</span>
                   </Button>
                 </div>
               </div>
@@ -380,39 +402,98 @@ const AdminCourses: React.FC = () => {
                           {expandedModules.has(mod.id) && (
                             <div className="p-3 space-y-2">
                               {mod.lessons.map((lesson, li) => (
-                                <div key={lesson.id} className="px-3 py-2 rounded-lg bg-background border border-border/50">
-                                  {inlineEditingLesson === lesson.id ? (
-                                    <div className="space-y-2">
-                                      <Input value={inlineLessonForm.title} onChange={e => setInlineLessonForm(f => ({ ...f, title: e.target.value }))}
-                                        className="bg-secondary border-border h-8 text-sm" placeholder={t('lessonTitle') || 'Título'} />
-                                      <Input value={inlineLessonForm.video_url} onChange={e => setInlineLessonForm(f => ({ ...f, video_url: e.target.value }))}
-                                        className="bg-secondary border-border h-8 text-sm" placeholder={t('videoUrl') || 'URL del video'} />
-                                      <div className="flex gap-2 items-center">
-                                        <Input type="number" value={inlineLessonForm.duration_minutes}
-                                          onChange={e => setInlineLessonForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 0 }))}
-                                          className="bg-secondary border-border h-8 text-sm w-24" placeholder="min" />
-                                        <div className="flex items-center gap-1">
-                                          <Switch checked={inlineLessonForm.is_free} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_free: v }))} />
-                                          <span className="text-xs text-muted-foreground">{t('free') || 'Gratis'}</span>
-                                        </div>
-                                        <div className="flex gap-1 ml-auto">
-                                          <Button size="sm" variant="ghost" onClick={() => saveInlineLesson(lesson, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
-                                          <Button size="sm" variant="ghost" onClick={() => setInlineEditingLesson(null)} className="h-7"><X className="w-3 h-3" /></Button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-3">
-                                      <Video className="w-4 h-4 text-muted-foreground shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-foreground truncate">{li + 1}. {lesson.title}</p>
-                                        <div className="flex gap-2 text-xs text-muted-foreground">
-                                          {lesson.duration_minutes ? <span>{lesson.duration_minutes} min</span> : null}
-                                          {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
+                                <div key={lesson.id} className="rounded-lg bg-background border border-border/50">
+                                  <div className="px-3 py-2">
+                                    {inlineEditingLesson === lesson.id ? (
+                                      <div className="space-y-2">
+                                        <Input value={inlineLessonForm.title} onChange={e => setInlineLessonForm(f => ({ ...f, title: e.target.value }))}
+                                          className="bg-secondary border-border h-8 text-sm" placeholder={t('lessonTitle') || 'Título'} />
+                                        <Input value={inlineLessonForm.video_url} onChange={e => setInlineLessonForm(f => ({ ...f, video_url: e.target.value }))}
+                                          className="bg-secondary border-border h-8 text-sm" placeholder={t('videoUrl') || 'URL del video'} />
+                                        <div className="flex gap-2 items-center">
+                                          <Input type="number" value={inlineLessonForm.duration_minutes}
+                                            onChange={e => setInlineLessonForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 0 }))}
+                                            className="bg-secondary border-border h-8 text-sm w-24" placeholder="min" />
+                                          <div className="flex items-center gap-1">
+                                            <Switch checked={inlineLessonForm.is_free} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_free: v }))} />
+                                            <span className="text-xs text-muted-foreground">{t('free') || 'Gratis'}</span>
+                                          </div>
+                                          <div className="flex gap-1 ml-auto">
+                                            <Button size="sm" variant="ghost" onClick={() => saveInlineLesson(lesson, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                            <Button size="sm" variant="ghost" onClick={() => setInlineEditingLesson(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                          </div>
                                         </div>
                                       </div>
-                                      <Button variant="ghost" size="sm" onClick={() => startEditLesson(lesson)} className="h-7"><Edit className="w-3 h-3" /></Button>
-                                      <Button variant="ghost" size="sm" onClick={() => deleteLessonInline(lesson.id, course.id)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
+                                    ) : (
+                                      <div className="flex items-center gap-3">
+                                        <button onClick={() => toggleLessonExpand(lesson.id)} className="text-muted-foreground hover:text-foreground shrink-0">
+                                          {expandedLessons.has(lesson.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                        </button>
+                                        <Video className="w-4 h-4 text-muted-foreground shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-medium text-foreground truncate">{li + 1}. {lesson.title}</p>
+                                          <div className="flex gap-2 text-xs text-muted-foreground">
+                                            {lesson.duration_minutes ? <span>{lesson.duration_minutes} min</span> : null}
+                                            {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
+                                            {lesson.contents && lesson.contents.length > 0 && (
+                                              <span className="flex items-center gap-1">
+                                                {lesson.contents.length} {lesson.contents.length === 1 ? 'contenido' : 'contenidos'}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => startEditLesson(lesson)} className="h-7"><Edit className="w-3 h-3" /></Button>
+                                        <Button variant="ghost" size="sm" onClick={() => deleteLessonInline(lesson.id, course.id)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Lesson contents */}
+                                  {expandedLessons.has(lesson.id) && (
+                                    <div className="border-t border-border/50 px-3 py-2 space-y-2 bg-secondary/20">
+                                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contenidos de la aula</p>
+                                      {(lesson.contents || []).map(cont => (
+                                        <div key={cont.id} className="flex items-start gap-2 p-2 rounded-md bg-background border border-border/30">
+                                          {editingContent === cont.id ? (
+                                            <div className="flex-1 space-y-2">
+                                              <Input value={contentForm.title} onChange={e => setContentForm(f => ({ ...f, title: e.target.value }))}
+                                                className="bg-secondary border-border h-7 text-sm" placeholder="Título del contenido" />
+                                              <Select value={contentForm.type} onValueChange={(v: any) => setContentForm(f => ({ ...f, type: v }))}>
+                                                <SelectTrigger className="h-7 text-sm bg-secondary border-border w-32"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                  {Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => (
+                                                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                              {contentForm.type === 'text' ? (
+                                                <Textarea value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
+                                                  className="bg-secondary border-border text-sm min-h-[60px]" placeholder="Texto / Markdown" />
+                                              ) : (
+                                                <Input value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
+                                                  className="bg-secondary border-border h-7 text-sm" placeholder="URL" />
+                                              )}
+                                              <div className="flex gap-1">
+                                                <Button size="sm" variant="ghost" onClick={() => saveContent(cont.id, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                                <Button size="sm" variant="ghost" onClick={() => setEditingContent(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <>
+                                              <span className="text-muted-foreground mt-0.5">{CONTENT_TYPE_ICONS[cont.type]}</span>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-foreground truncate">{cont.title}</p>
+                                                <p className="text-xs text-muted-foreground">{CONTENT_TYPE_LABELS[cont.type]}</p>
+                                              </div>
+                                              <Button variant="ghost" size="sm" onClick={() => startEditContent(cont)} className="h-6"><Edit className="w-3 h-3" /></Button>
+                                              <Button variant="ghost" size="sm" onClick={() => deleteContent(cont.id, course.id)} className="text-destructive h-6"><Trash2 className="w-3 h-3" /></Button>
+                                            </>
+                                          )}
+                                        </div>
+                                      ))}
+                                      <Button size="sm" variant="ghost" onClick={() => addContent(lesson.id, course.id)} className="gap-1 w-full text-primary text-xs">
+                                        <Plus className="w-3.5 h-3.5" /> Agregar Contenido
+                                      </Button>
                                     </div>
                                   )}
                                 </div>
