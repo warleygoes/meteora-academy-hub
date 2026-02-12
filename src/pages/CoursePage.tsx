@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ChevronDown, ChevronRight, Video, FileText, Image, Music, Link as LinkIcon, FileDown, CheckCircle2, Circle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import VideoPlayer from '@/components/VideoPlayer';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
 
@@ -153,20 +154,7 @@ const CoursePage: React.FC = () => {
     switch (content.type) {
       case 'video':
         if (!content.content) return null;
-        // Support YouTube embeds
-        const ytMatch = content.content.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-        if (ytMatch) {
-          return (
-            <div className="aspect-video rounded-lg overflow-hidden bg-black">
-              <iframe src={`https://www.youtube.com/embed/${ytMatch[1]}`} className="w-full h-full" allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
-            </div>
-          );
-        }
-        return (
-          <div className="aspect-video rounded-lg overflow-hidden bg-black">
-            <video src={content.content} controls className="w-full h-full" />
-          </div>
-        );
+        return <VideoPlayer url={content.content} />;
       case 'text':
         return <div className="prose prose-invert max-w-none text-foreground text-sm leading-relaxed whitespace-pre-wrap">{content.content}</div>;
       case 'image':
@@ -269,13 +257,7 @@ const CoursePage: React.FC = () => {
 
             {/* Legacy video_url fallback */}
             {activeLesson.video_url && activeLesson.contents.length === 0 && (
-              <div className="aspect-video rounded-lg overflow-hidden bg-black">
-                {(() => {
-                  const ytMatch = activeLesson.video_url!.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-                  if (ytMatch) return <iframe src={`https://www.youtube.com/embed/${ytMatch[1]}`} className="w-full h-full" allowFullScreen />;
-                  return <video src={activeLesson.video_url!} controls className="w-full h-full" />;
-                })()}
-              </div>
+              <VideoPlayer url={activeLesson.video_url} />
             )}
 
             {/* Render all contents */}
