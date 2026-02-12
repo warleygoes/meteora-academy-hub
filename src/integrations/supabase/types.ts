@@ -693,17 +693,21 @@ export type Database = {
           approved: boolean
           avatar_url: string | null
           bio: string | null
+          birth_date: string | null
           cheapest_plan_usd: number | null
           client_count: string | null
           company_name: string | null
           country: string | null
+          cpf: string | null
           created_at: string
           display_name: string | null
           email: string | null
+          gender: string | null
           id: string
           main_desires: string | null
           main_problems: string | null
           network_type: string | null
+          observations: string | null
           phone: string | null
           role_type: string | null
           status: string
@@ -714,17 +718,21 @@ export type Database = {
           approved?: boolean
           avatar_url?: string | null
           bio?: string | null
+          birth_date?: string | null
           cheapest_plan_usd?: number | null
           client_count?: string | null
           company_name?: string | null
           country?: string | null
+          cpf?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          gender?: string | null
           id?: string
           main_desires?: string | null
           main_problems?: string | null
           network_type?: string | null
+          observations?: string | null
           phone?: string | null
           role_type?: string | null
           status?: string
@@ -735,17 +743,21 @@ export type Database = {
           approved?: boolean
           avatar_url?: string | null
           bio?: string | null
+          birth_date?: string | null
           cheapest_plan_usd?: number | null
           client_count?: string | null
           company_name?: string | null
           country?: string | null
+          cpf?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          gender?: string | null
           id?: string
           main_desires?: string | null
           main_problems?: string | null
           network_type?: string | null
+          observations?: string | null
           phone?: string | null
           role_type?: string | null
           status?: string

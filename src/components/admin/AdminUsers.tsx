@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Trash2, CheckCircle2, XCircle, Search, Eye, Ban, UserCheck,
-  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound, Package
+  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound, Package, Upload
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import UserPackagesManager from './UserPackagesManager';
+import ImportUsersDialog from './ImportUsersDialog';
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -80,6 +81,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
 
   const computeStats = useCallback((users: ProfileUser[]) => {
@@ -383,7 +385,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
         ))}
       </div>
 
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end gap-2 mb-4">
+        <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowImportDialog(true)}>
+          <Upload className="w-4 h-4" /> {t('importUsers')}
+        </Button>
         <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowAdminManager(true)}>
           <Shield className="w-4 h-4" /> {t('manageAdmins')}
         </Button>
@@ -637,6 +642,13 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Import Users Dialog */}
+      <ImportUsersDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        onImportComplete={() => { fetchAllUsers(); fetchPendingUsers(); fetchApprovedUsers(); fetchRejectedUsers(); }}
+      />
     </div>
   );
 };
