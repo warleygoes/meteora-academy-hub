@@ -251,9 +251,8 @@ const Login: React.FC = () => {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={8} />
+                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required />
                 </div>
-                <p className="text-[11px] text-muted-foreground -mt-2">{t('passwordMinLength')}</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
