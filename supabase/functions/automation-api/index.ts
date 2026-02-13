@@ -277,7 +277,7 @@ Deno.serve(async (req) => {
   try {
     // Auth: API key check
     const apiKey = req.headers.get("x-api-key") || req.headers.get("authorization")?.replace("Bearer ", "");
-    const expectedKey = Deno.env.get("LOVABLE_API_KEY");
+    const expectedKey = Deno.env.get("AUTOMATION_API_KEY");
 
     if (!apiKey || apiKey !== expectedKey) {
       return json({ error: "Unauthorized. Provide x-api-key header." }, 401);
