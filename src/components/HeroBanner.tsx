@@ -1,10 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Info } from 'lucide-react';
 import heroBanner from '@/assets/hero-banner.jpg';
 import meteoraLogo from '@/assets/logo-white-pink.png';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Button } from '@/components/ui/button';
 
 export const HeroBanner: React.FC = () => {
   const { t } = useLanguage();
@@ -34,14 +32,6 @@ export const HeroBanner: React.FC = () => {
           </p>
 
           <div className="flex gap-3">
-            <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-2 glow-primary">
-              <Play className="w-5 h-5" />
-              {t('startNow')}
-            </Button>
-            <Button size="lg" variant="secondary" className="font-semibold gap-2">
-              <Info className="w-5 h-5" />
-              {t('moreInfo')}
-            </Button>
           </div>
         </motion.div>
       </div>

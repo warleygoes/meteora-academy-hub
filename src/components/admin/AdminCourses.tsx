@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus, Upload } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,7 @@ interface Module { id: string; course_id: string; title: string; description: st
 
 interface Course {
   id: string; title: string; description: string | null; thumbnail_url: string | null;
+  thumbnail_vertical_url: string | null;
   category_id: string | null; status: string; sort_order: number;
   category?: Category | null; enrollment_count?: number;
 }
@@ -90,6 +91,61 @@ const AdminCourses: React.FC = () => {
   const [contentForm, setContentForm] = useState({ title: '', type: 'video' as LessonContent['type'], content: '' });
 
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
+
+  // Course image editor
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageEditorCourseId, setImageEditorCourseId] = useState<string | null>(null);
+  const [imageForm, setImageForm] = useState({ thumbnail_url: '', thumbnail_vertical_url: '' });
+  const [uploadingH, setUploadingH] = useState(false);
+  const [uploadingV, setUploadingV] = useState(false);
+  const fileRefH = useRef<HTMLInputElement>(null);
+  const fileRefV = useRef<HTMLInputElement>(null);
+
+  const uploadCourseImage = async (file: File, orientation: 'horizontal' | 'vertical') => {
+    const setter = orientation === 'horizontal' ? setUploadingH : setUploadingV;
+    setter(true);
+    const ext = file.name.split('.').pop();
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from('product-images').upload(path, file);
+    if (error) {
+      toast({ title: t('imageUploadError') || 'Error al subir imagen', description: error.message, variant: 'destructive' });
+      setter(false);
+      return;
+    }
+    const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path);
+    if (orientation === 'horizontal') {
+      setImageForm(f => ({ ...f, thumbnail_url: publicUrl }));
+    } else {
+      setImageForm(f => ({ ...f, thumbnail_vertical_url: publicUrl }));
+    }
+    setter(false);
+    toast({ title: t('imageUploaded') || 'Imagen subida' });
+  };
+
+  const openImageEditor = (course: Course) => {
+    setImageEditorCourseId(course.id);
+    setImageForm({
+      thumbnail_url: course.thumbnail_url || '',
+      thumbnail_vertical_url: course.thumbnail_vertical_url || '',
+    });
+    setShowImageEditor(true);
+  };
+
+  const saveCourseImages = async () => {
+    if (!imageEditorCourseId) return;
+    await supabase.from('courses').update({
+      thumbnail_url: imageForm.thumbnail_url || null,
+      thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null,
+    }).eq('id', imageEditorCourseId);
+    // Also sync product if linked
+    await supabase.from('products').update({
+      thumbnail_url: imageForm.thumbnail_url || null,
+      thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null,
+    }).eq('course_id', imageEditorCourseId);
+    toast({ title: t('courseUpdated') || 'Contenido actualizado' });
+    setShowImageEditor(false);
+    fetchCourses();
+  };
 
   const fetchCourses = useCallback(async () => {
     setLoading(true);
@@ -357,6 +413,9 @@ const AdminCourses: React.FC = () => {
                     <Switch checked={course.status === 'published'} onCheckedChange={() => confirmToggleStatus(course.id, course.status)} />
                     <span className="text-xs text-muted-foreground">{t('published')}</span>
                   </div>
+                  <Button variant="ghost" size="sm" onClick={() => openImageEditor(course)} title={t('horizontalImage')}>
+                    <Image className="w-4 h-4" />
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => openStudentList(course.id)} title={t('students')}>
                     <Users className="w-4 h-4" /><span className="ml-1 text-xs">{course.enrollment_count}</span>
                   </Button>
@@ -598,6 +657,38 @@ const AdminCourses: React.FC = () => {
               ))}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Course Image Editor */}
+      <Dialog open={showImageEditor} onOpenChange={setShowImageEditor}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">{t('horizontalImage')} & {t('verticalImage')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('horizontalImage')}</label>
+              <div className="flex gap-2 items-center">
+                <input ref={fileRefH} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadCourseImage(e.target.files[0], 'horizontal')} />
+                <Button variant="outline" size="sm" onClick={() => fileRefH.current?.click()} disabled={uploadingH} className="gap-1 w-full">
+                  <Upload className="w-4 h-4" /> {uploadingH ? '...' : (t('uploadImage') || 'Subir')}
+                </Button>
+              </div>
+              {imageForm.thumbnail_url && <img src={imageForm.thumbnail_url} alt="" className="mt-2 h-20 rounded object-cover" />}
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('verticalImage')}</label>
+              <div className="flex gap-2 items-center">
+                <input ref={fileRefV} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadCourseImage(e.target.files[0], 'vertical')} />
+                <Button variant="outline" size="sm" onClick={() => fileRefV.current?.click()} disabled={uploadingV} className="gap-1 w-full">
+                  <Upload className="w-4 h-4" /> {uploadingV ? '...' : (t('uploadImage') || 'Subir')}
+                </Button>
+              </div>
+              {imageForm.thumbnail_vertical_url && <img src={imageForm.thumbnail_vertical_url} alt="" className="mt-2 h-28 rounded object-cover" />}
+            </div>
+            <Button onClick={saveCourseImages} className="w-full">{t('save')}</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
