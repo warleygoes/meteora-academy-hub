@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, Save, User } from 'lucide-react';
+import { Camera, Save, User, Network } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const countries = [
@@ -20,8 +21,9 @@ const countries = [
 ];
 
 const Profile: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -199,6 +201,23 @@ const Profile: React.FC = () => {
           </Button>
         </CardContent>
       </Card>
+
+      {isAdmin && (
+        <Card
+          className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors"
+          onClick={() => navigate('/app/topology')}
+        >
+          <CardContent className="flex items-center gap-4 py-5">
+            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+              <Network className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">{t('networkTopology')}</p>
+              <p className="text-sm text-muted-foreground">Gerencie topologias de rede</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
