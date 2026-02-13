@@ -564,6 +564,7 @@ export type Database = {
           active: boolean
           created_at: string
           description: string | null
+          duration_days: number | null
           features: string[] | null
           id: string
           name: string
@@ -574,6 +575,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           description?: string | null
+          duration_days?: number | null
           features?: string[] | null
           id?: string
           name: string
@@ -584,6 +586,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           description?: string | null
+          duration_days?: number | null
           features?: string[] | null
           id?: string
           name?: string
