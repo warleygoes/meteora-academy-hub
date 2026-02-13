@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag } from 'lucide-react';
+import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag, ScrollText } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AdminUsers from '@/components/admin/AdminUsers';
 import AdminCourses from '@/components/admin/AdminCourses';
@@ -8,6 +8,7 @@ import AdminProducts from '@/components/admin/AdminProducts';
 import AdminAnalytics from '@/components/admin/AdminAnalytics';
 import AdminSettings from '@/components/admin/AdminSettings';
 import AdminDiagnostics from '@/components/admin/AdminDiagnostics';
+import AdminLogs from '@/components/admin/AdminLogs';
 import { cn } from '@/lib/utils';
 
 const AdminPage: React.FC = () => {
@@ -27,6 +28,7 @@ const AdminPage: React.FC = () => {
     { id: 'diagnostics', label: t('adminDiagnostics'), icon: ClipboardList, desc: t('adminDiagnosticsDesc') },
     { id: 'analytics', label: t('analytics'), icon: TrendingUp, desc: t('analyticsDesc') },
     { id: 'settings', label: t('settingsTitle'), icon: Settings, desc: t('settingsDesc') },
+    { id: 'logs', label: t('systemLogs'), icon: ScrollText, desc: t('systemLogsDesc') },
   ];
 
   return (
@@ -60,6 +62,7 @@ const AdminPage: React.FC = () => {
       {activeSection === 'analytics' && <AdminAnalytics stats={stats} />}
       {activeSection === 'settings' && <AdminSettings />}
       {activeSection === 'diagnostics' && <AdminDiagnostics />}
+      {activeSection === 'logs' && <AdminLogs />}
     </div>
   );
 };

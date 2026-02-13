@@ -914,6 +914,42 @@ export type Database = {
         }
         Relationships: []
       }
+      system_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          level: string
+          performed_by: string | null
+          performer_email: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          level?: string
+          performed_by?: string | null
+          performer_email?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          level?: string
+          performed_by?: string | null
+          performer_email?: string | null
+        }
+        Relationships: []
+      }
       user_plans: {
         Row: {
           created_at: string
