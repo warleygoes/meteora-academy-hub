@@ -9,8 +9,21 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+const getSavedLanguage = (): Language => {
+  try {
+    const saved = localStorage.getItem('meteora-language');
+    if (saved === 'es' || saved === 'pt' || saved === 'en') return saved;
+  } catch {}
+  return 'es';
+};
+
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('es');
+  const [language, setLanguageState] = useState<Language>(getSavedLanguage);
+
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang);
+    try { localStorage.setItem('meteora-language', lang); } catch {}
+  }, []);
 
   const t = useCallback((key: string) => {
     return translations[language][key] || key;

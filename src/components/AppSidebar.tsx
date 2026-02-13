@@ -19,9 +19,11 @@ export const AppSidebar: React.FC = () => {
     { to: '/app', icon: Home, label: t('home') },
     { to: '/app/courses', icon: BookOpen, label: t('courses') },
     { to: '/app/community', icon: Users, label: t('community') },
-    { to: '/app/topology', icon: Network, label: t('networkTopology') },
-    { to: '/app/meetings', icon: Video, label: t('meetings') },
-    ...(isAdmin ? [{ to: '/app/admin', icon: Shield, label: t('admin') }] : []),
+    { to: '/app/meetings', icon: Video, label: t('liveMeetings') },
+    ...(isAdmin ? [
+      { to: '/app/admin', icon: Shield, label: t('admin') },
+      { to: '/app/topology', icon: Network, label: t('networkTopology') },
+    ] : []),
   ];
 
   const isActive = (path: string) => location.pathname === path;
