@@ -168,7 +168,44 @@ const AdminProducts: React.FC = () => {
   const confirmDelete = (id: string) => { setDeleteId(id); setShowDelete(true); };
   const executeDelete = async () => {
     if (!deleteId) return;
+    const product = products.find(p => p.id === deleteId);
+    
+    // Cascade delete: course content → course → offers → user_products → product
+    if (product?.course_id) {
+      // Get modules for this course
+      const { data: modules } = await supabase.from('course_modules').select('id').eq('course_id', product.course_id);
+      const moduleIds = (modules || []).map(m => m.id);
+      
+      if (moduleIds.length > 0) {
+        // Get lessons for these modules
+        const { data: lessons } = await supabase.from('course_lessons').select('id').in('module_id', moduleIds);
+        const lessonIds = (lessons || []).map(l => l.id);
+        
+        // Delete lesson contents
+        if (lessonIds.length > 0) {
+          await supabase.from('lesson_contents').delete().in('lesson_id', lessonIds);
+          await supabase.from('lesson_progress').delete().eq('course_id', product.course_id);
+        }
+        // Delete lessons
+        await supabase.from('course_lessons').delete().in('module_id', moduleIds);
+      }
+      // Delete modules
+      await supabase.from('course_modules').delete().eq('course_id', product.course_id);
+      // Delete enrollments
+      await supabase.from('course_enrollments').delete().eq('course_id', product.course_id);
+    }
+    
+    // Delete offers linked to this product
+    await supabase.from('offers').delete().eq('product_id', deleteId);
+    // Delete user_products assignments
+    await supabase.from('user_products').delete().eq('product_id', deleteId);
+    // Delete the product itself
     await supabase.from('products').delete().eq('id', deleteId);
+    // Delete the course record last
+    if (product?.course_id) {
+      await supabase.from('courses').delete().eq('id', product.course_id);
+    }
+    
     toast({ title: t('productDeleted') });
     setShowDelete(false); setDeleteId(null); fetchProducts();
   };
