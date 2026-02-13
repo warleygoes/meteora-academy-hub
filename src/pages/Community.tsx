@@ -1,109 +1,154 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Share2, Send, Image } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { communityPosts, CommunityPost } from '@/lib/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import { ArrowLeft, Users, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { motion } from 'framer-motion';
+import CourseCommunityFeed from '@/components/community/CourseCommunityFeed';
+
+interface CourseInfo {
+  id: string;
+  title: string;
+  thumbnail_url: string | null;
+  description: string | null;
+  post_count?: number;
+}
 
 const CommunityPage: React.FC = () => {
+  const { courseId } = useParams<{ courseId: string }>();
   const { t } = useLanguage();
-  const [posts, setPosts] = useState<CommunityPost[]>(communityPosts);
-  const [newPost, setNewPost] = useState('');
+  const navigate = useNavigate();
+  const [courses, setCourses] = useState<CourseInfo[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<CourseInfo | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handlePost = () => {
-    if (!newPost.trim()) return;
-    const post: CommunityPost = {
-      id: String(Date.now()),
-      author: 'Você',
-      avatar: 'VC',
-      content: newPost,
-      timestamp: 'Agora',
-      likes: 0,
-      comments: 0,
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from('courses')
+        .select('id, title, thumbnail_url, description')
+        .eq('status', 'published')
+        .order('sort_order');
+
+      if (data && data.length > 0) {
+        // Get post counts per course
+        const courseIds = data.map(c => c.id);
+        const { data: postCounts } = await supabase
+          .from('community_posts')
+          .select('course_id')
+          .in('course_id', courseIds);
+
+        const countMap: Record<string, number> = {};
+        (postCounts || []).forEach(p => {
+          countMap[p.course_id] = (countMap[p.course_id] || 0) + 1;
+        });
+
+        const enriched = data.map(c => ({ ...c, post_count: countMap[c.id] || 0 }));
+        setCourses(enriched);
+
+        // If courseId param, select that course
+        if (courseId) {
+          const found = enriched.find(c => c.id === courseId);
+          if (found) setSelectedCourse(found);
+        }
+      }
+      setLoading(false);
     };
-    setPosts([post, ...posts]);
-    setNewPost('');
+    fetchCourses();
+  }, [courseId]);
+
+  // When navigating to a course community via param
+  useEffect(() => {
+    if (courseId && courses.length > 0) {
+      const found = courses.find(c => c.id === courseId);
+      if (found) setSelectedCourse(found);
+    }
+  }, [courseId, courses]);
+
+  const handleSelectCourse = (course: CourseInfo) => {
+    setSelectedCourse(course);
+    navigate(`/app/community/${course.id}`, { replace: true });
   };
 
-  const toggleLike = (id: string) => {
-    setPosts(posts.map(p =>
-      p.id === id ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 } : p
-    ));
+  const handleBack = () => {
+    setSelectedCourse(null);
+    navigate('/app/community', { replace: true });
   };
 
-  return (
-    <div className="px-6 md:px-12 py-8 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-display font-bold mb-2">{t('communityTitle')}</h1>
-      <p className="text-muted-foreground mb-8">{t('communitySubtitle')}</p>
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-[40vh] text-muted-foreground">{t('loading')}...</div>;
+  }
 
-      {/* Create post */}
-      <div className="bg-card rounded-xl p-5 mb-8 card-shadow border border-border">
-        <div className="flex gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
-            VC
-          </div>
-          <div className="flex-1">
-            <textarea
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              placeholder={t('writePost')}
-              className="w-full bg-transparent text-foreground placeholder:text-muted-foreground outline-none resize-none text-sm min-h-[80px]"
-            />
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-              <button className="text-muted-foreground hover:text-foreground transition-colors">
-                <Image className="w-5 h-5" />
-              </button>
-              <Button size="sm" onClick={handlePost} className="gap-2">
-                <Send className="w-4 h-4" />
-                {t('publish')}
-              </Button>
+  // Show course community feed
+  if (selectedCourse) {
+    return (
+      <div className="px-6 md:px-12 py-8">
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="sm" onClick={handleBack} className="h-8 px-2">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div className="flex items-center gap-3">
+            {selectedCourse.thumbnail_url && (
+              <img src={selectedCourse.thumbnail_url} alt="" className="w-10 h-10 rounded-lg object-cover" />
+            )}
+            <div>
+              <h1 className="text-xl font-display font-bold text-foreground">{selectedCourse.title}</h1>
+              <p className="text-xs text-muted-foreground">{t('community')}</p>
             </div>
           </div>
         </div>
+        <CourseCommunityFeed courseId={selectedCourse.id} courseTitle={selectedCourse.title} />
       </div>
+    );
+  }
 
-      {/* Posts */}
-      <div className="space-y-4">
-        {posts.map((post, i) => (
-          <motion.div
-            key={post.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="bg-card rounded-xl p-5 card-shadow border border-border"
-          >
-            <div className="flex gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
-                {post.avatar}
+  // Show course selector
+  return (
+    <div className="px-6 md:px-12 py-8">
+      <h1 className="text-3xl font-display font-bold mb-2">{t('communityTitle')}</h1>
+      <p className="text-muted-foreground mb-8">{t('communitySubtitle')}</p>
+
+      {courses.length === 0 ? (
+        <p className="text-center py-12 text-muted-foreground">No hay comunidades disponibles</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {courses.map((course, i) => (
+            <motion.div
+              key={course.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => handleSelectCourse(course)}
+              className="cursor-pointer group bg-card rounded-xl border border-border overflow-hidden hover:border-primary/40 transition-colors"
+            >
+              {course.thumbnail_url ? (
+                <div className="aspect-video bg-secondary overflow-hidden">
+                  <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                </div>
+              ) : (
+                <div className="aspect-video bg-secondary flex items-center justify-center">
+                  <Users className="w-10 h-10 text-muted-foreground" />
+                </div>
+              )}
+              <div className="p-4 space-y-2">
+                <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors">{course.title}</h3>
+                {course.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{course.description}</p>
+                )}
+                <div className="flex gap-3 text-xs text-muted-foreground pt-1">
+                  <span className="flex items-center gap-1">
+                    <BookOpen className="w-3 h-3" />
+                    {course.post_count} publicaciones
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-sm text-foreground">{post.author}</p>
-                <p className="text-xs text-muted-foreground">{post.timestamp}</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-foreground/90 mb-4 leading-relaxed">{post.content}</p>
-
-            <div className="flex items-center gap-6 text-muted-foreground">
-              <button
-                onClick={() => toggleLike(post.id)}
-                className={`flex items-center gap-1.5 text-sm transition-colors hover:text-primary ${post.liked ? 'text-primary' : ''}`}
-              >
-                <Heart className={`w-4 h-4 ${post.liked ? 'fill-primary' : ''}`} />
-                {post.likes}
-              </button>
-              <button className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors">
-                <MessageCircle className="w-4 h-4" />
-                {post.comments}
-              </button>
-              <button className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors">
-                <Share2 className="w-4 h-4" />
-                {t('share')}
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
