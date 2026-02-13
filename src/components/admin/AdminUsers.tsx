@@ -81,8 +81,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
+  const [showApproveAllConfirm, setShowApproveAllConfirm] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [globalSearch, setGlobalSearch] = useState('');
 
   const computeStats = useCallback((users: ProfileUser[]) => {
     onStatsUpdate({
@@ -142,6 +144,18 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     const { error } = await supabase.from('profiles').update({ approved: true, status: 'approved' }).eq('user_id', userId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers(); }
     else { toast({ title: t('userApproved') }); fetchApprovedUsers(); fetchAllUsers(); }
+  };
+
+  
+  const approveAllPending = async () => {
+    const userIds = pendingUsers.map(u => u.user_id);
+    if (userIds.length === 0) return;
+    setPendingUsers([]);
+    setAllUsers(prev => prev.map(u => userIds.includes(u.user_id) ? { ...u, approved: true, status: 'approved' } : u));
+    const { error } = await supabase.from('profiles').update({ approved: true, status: 'approved' }).in('user_id', userIds);
+    if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchApprovedUsers(); fetchAllUsers(); }
+    else { toast({ title: `${userIds.length} usuarios aprobados` }); fetchApprovedUsers(); fetchAllUsers(); }
+    setShowApproveAllConfirm(false);
   };
 
   const rejectUser = async (userId: string) => {
@@ -242,16 +256,33 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     else { toast({ title: 'Administrador removido.' }); fetchAdmins(); fetchAdminUserIds(); }
   };
 
+  // Global search filter function - searches across all fields
+  const matchesGlobalSearch = (u: ProfileUser) => {
+    if (!globalSearch) return true;
+    const s = globalSearch.toLowerCase();
+    return (
+      (u.display_name?.toLowerCase().includes(s)) ||
+      (u.email?.toLowerCase().includes(s)) ||
+      (u.company_name?.toLowerCase().includes(s)) ||
+      (u.country?.toLowerCase().includes(s)) ||
+      (u.phone?.toLowerCase().includes(s)) ||
+      (u.client_count?.toLowerCase().includes(s)) ||
+      (u.network_type?.toLowerCase().includes(s)) ||
+      (u.role_type?.toLowerCase().includes(s))
+    );
+  };
+
+  const filteredPending = pendingUsers.filter(matchesGlobalSearch);
+  const filteredApproved = approvedUsers.filter(matchesGlobalSearch);
+  const filteredRejected = rejectedUsers.filter(matchesGlobalSearch);
+
   const filteredUsers = allUsers.filter(u => {
-    const matchesSearch = !userSearch ||
-      (u.display_name?.toLowerCase().includes(userSearch.toLowerCase())) ||
-      (u.company_name?.toLowerCase().includes(userSearch.toLowerCase())) ||
-      (u.country?.toLowerCase().includes(userSearch.toLowerCase()));
+    if (!matchesGlobalSearch(u)) return false;
     const matchesFilter = userFilter === 'all' ||
       (userFilter === 'approved' && u.status === 'approved') ||
       (userFilter === 'pending' && u.status === 'pending') ||
       (userFilter === 'rejected' && u.status === 'rejected');
-    return matchesSearch && matchesFilter;
+    return matchesFilter;
   });
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-LA', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -385,13 +416,25 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
         ))}
       </div>
 
-      <div className="flex justify-end gap-2 mb-4">
-        <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowImportDialog(true)}>
-          <Upload className="w-4 h-4" /> {t('importUsers')}
-        </Button>
-        <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowAdminManager(true)}>
-          <Shield className="w-4 h-4" /> {t('manageAdmins')}
-        </Button>
+      {/* Global search + actions */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre, email, empresa, país, teléfono, red..."
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            className="pl-10 bg-secondary border-border"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowImportDialog(true)}>
+            <Upload className="w-4 h-4" /> {t('importUsers')}
+          </Button>
+          <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowAdminManager(true)}>
+            <Shield className="w-4 h-4" /> {t('manageAdmins')}
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -411,11 +454,18 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Pending Tab - NOW using table format like approved */}
+        {/* Pending Tab */}
         <TabsContent value="pending">
+          {pendingUsers.length > 0 && (
+            <div className="flex justify-end mb-4">
+              <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => setShowApproveAllConfirm(true)}>
+                <CheckCircle2 className="w-4 h-4" /> Aprobar Todos ({pendingUsers.length})
+              </Button>
+            </div>
+          )}
           {loadingPending ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
-          ) : pendingUsers.length === 0 ? (
+          ) : filteredPending.length === 0 ? (
             <div className="text-center py-16">
               <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
               <p className="text-lg font-display font-semibold text-foreground">{t('noPendingUsers')}</p>
@@ -426,7 +476,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <table className="w-full text-sm">
                 {renderTableHeader(false)}
                 <tbody>
-                  {pendingUsers.map(user => renderUserTableRow(user, 'pending'))}
+                  {filteredPending.map(user => renderUserTableRow(user, 'pending'))}
                 </tbody>
               </table>
             </div>
@@ -437,7 +487,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
         <TabsContent value="approved">
           {loadingApproved ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
-          ) : approvedUsers.length === 0 ? (
+          ) : filteredApproved.length === 0 ? (
             <div className="text-center py-16">
               <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-lg font-display font-semibold text-foreground">{t('noApprovedUsers')}</p>
@@ -448,7 +498,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <table className="w-full text-sm">
                 {renderTableHeader(false)}
                 <tbody>
-                  {approvedUsers.map(user => renderUserTableRow(user, 'approved'))}
+                  {filteredApproved.map(user => renderUserTableRow(user, 'approved'))}
                 </tbody>
               </table>
             </div>
@@ -459,7 +509,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
         <TabsContent value="rejected">
           {loadingRejected ? (
             <div className="text-center py-12 text-muted-foreground">{t('loading')}...</div>
-          ) : rejectedUsers.length === 0 ? (
+          ) : filteredRejected.length === 0 ? (
             <div className="text-center py-16">
               <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
               <p className="text-lg font-display font-semibold text-foreground">{t('noRejectedUsers')}</p>
@@ -470,7 +520,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <table className="w-full text-sm">
                 {renderTableHeader(false)}
                 <tbody>
-                  {rejectedUsers.map(user => renderUserTableRow(user, 'rejected'))}
+                  {filteredRejected.map(user => renderUserTableRow(user, 'rejected'))}
                 </tbody>
               </table>
             </div>
@@ -479,11 +529,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
 
         {/* All Users Tab */}
         <TabsContent value="all">
-          <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder={t('searchUsers')} value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-10 bg-secondary border-border" />
-            </div>
+          <div className="flex gap-3 mb-6">
             <select value={userFilter} onChange={(e) => setUserFilter(e.target.value as any)}
               className="bg-secondary text-foreground border border-border rounded-md px-3 py-2 text-sm">
               <option value="all">{t('allFilter')}</option>
@@ -509,6 +555,24 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Approve All Confirmation */}
+      <AlertDialog open={showApproveAllConfirm} onOpenChange={setShowApproveAllConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Aprobar todos los usuarios pendientes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se aprobarán {pendingUsers.length} usuario(s) pendiente(s). Todos podrán acceder a la plataforma inmediatamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={approveAllPending} className="bg-green-600 text-white hover:bg-green-700">
+              <CheckCircle2 className="w-4 h-4 mr-2" /> Aprobar Todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete User Confirmation */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
