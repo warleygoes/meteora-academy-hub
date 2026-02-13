@@ -28,7 +28,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify caller is admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No authorization" }), {
@@ -72,86 +71,19 @@ Deno.serve(async (req) => {
 
     const results: { email: string; status: "created" | "exists" | "error"; message?: string }[] = [];
 
-    for (const row of users) {
-      if (!row.email || !row.email.includes("@")) {
-        results.push({ email: row.email || "empty", status: "error", message: "Invalid email" });
-        continue;
-      }
-
-      const email = row.email.trim().toLowerCase();
-
-      // Build observations from extra data
-      const obsLines: string[] = [];
-      if (row.registered_at) obsLines.push(`Data de Cadastro: ${row.registered_at}`);
-      if (row.last_login) obsLines.push(`Último Login: ${row.last_login}`);
-      if (row.completion_pct) obsLines.push(`Percentual de Conclusão: ${row.completion_pct}`);
-      const observations = obsLines.length > 0 ? obsLines.join("\n") : null;
-
-      // Parse birth_date from "DD/MM/YYYY - HH:mm" format
-      let birthDate: string | null = null;
-      if (row.birth_date) {
-        const match = row.birth_date.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-        if (match) {
-          birthDate = `${match[3]}-${match[2]}-${match[1]}`;
+    // Process users in parallel batches of 5
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < users.length; i += BATCH_SIZE) {
+      const batch = users.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(row => processUser(supabaseAdmin, row, defaultPassword))
+      );
+      for (const result of batchResults) {
+        if (result.status === "fulfilled") {
+          results.push(result.value);
+        } else {
+          results.push({ email: "unknown", status: "error", message: result.reason?.message || "Unknown error" });
         }
-      }
-
-      try {
-        // Try to create the user
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email,
-          password: defaultPassword,
-          email_confirm: true,
-          user_metadata: { display_name: row.name },
-        });
-
-        if (authError) {
-          if (authError.message?.includes("already been registered") || authError.message?.includes("already exists")) {
-            // User exists, update profile
-            const { data: existingProfile } = await supabaseAdmin
-              .from("profiles")
-              .select("user_id")
-              .eq("email", email)
-              .maybeSingle();
-
-            if (existingProfile) {
-              await supabaseAdmin.from("profiles").update({
-                cpf: row.cpf || null,
-                gender: row.gender || null,
-                birth_date: birthDate,
-                observations,
-                phone: row.phone || undefined,
-              }).eq("user_id", existingProfile.user_id);
-            }
-
-            results.push({ email, status: "exists", message: "User already exists, profile updated" });
-          } else {
-            results.push({ email, status: "error", message: authError.message });
-          }
-          continue;
-        }
-
-        // Update the profile with extra data (trigger should have created it)
-        if (authData.user) {
-          // Small delay for trigger to fire
-          await new Promise(r => setTimeout(r, 200));
-
-          await supabaseAdmin.from("profiles").update({
-            display_name: row.name,
-            email,
-            phone: row.phone || null,
-            cpf: row.cpf || null,
-            gender: row.gender || null,
-            birth_date: birthDate,
-            observations,
-            approved: true,
-            status: "approved",
-          }).eq("user_id", authData.user.id);
-        }
-
-        results.push({ email, status: "created" });
-      } catch (err: any) {
-        results.push({ email, status: "error", message: err.message });
       }
     }
 
@@ -163,8 +95,88 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
+    console.error("Import error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
+
+async function processUser(
+  supabaseAdmin: any,
+  row: ImportRow,
+  defaultPassword: string
+): Promise<{ email: string; status: "created" | "exists" | "error"; message?: string }> {
+  if (!row.email || !row.email.includes("@")) {
+    return { email: row.email || "empty", status: "error", message: "Invalid email" };
+  }
+
+  const email = row.email.trim().toLowerCase();
+
+  const obsLines: string[] = [];
+  if (row.registered_at) obsLines.push(`Data de Cadastro: ${row.registered_at}`);
+  if (row.last_login) obsLines.push(`Último Login: ${row.last_login}`);
+  if (row.completion_pct) obsLines.push(`Percentual de Conclusão: ${row.completion_pct}`);
+  const observations = obsLines.length > 0 ? obsLines.join("\n") : null;
+
+  let birthDate: string | null = null;
+  if (row.birth_date) {
+    const match = row.birth_date.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (match) {
+      birthDate = `${match[3]}-${match[2]}-${match[1]}`;
+    }
+  }
+
+  try {
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: defaultPassword,
+      email_confirm: true,
+      user_metadata: { display_name: row.name },
+    });
+
+    if (authError) {
+      if (authError.message?.includes("already been registered") || authError.message?.includes("already exists")) {
+        const { data: existingProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id")
+          .eq("email", email)
+          .maybeSingle();
+
+        if (existingProfile) {
+          await supabaseAdmin.from("profiles").update({
+            cpf: row.cpf || null,
+            gender: row.gender || null,
+            birth_date: birthDate,
+            observations,
+            phone: row.phone || undefined,
+          }).eq("user_id", existingProfile.user_id);
+        }
+
+        return { email, status: "exists", message: "User already exists, profile updated" };
+      }
+      return { email, status: "error", message: authError.message };
+    }
+
+    if (authData.user) {
+      // Wait briefly for the trigger to create the profile
+      await new Promise(r => setTimeout(r, 100));
+
+      await supabaseAdmin.from("profiles").update({
+        display_name: row.name,
+        email,
+        phone: row.phone || null,
+        cpf: row.cpf || null,
+        gender: row.gender || null,
+        birth_date: birthDate,
+        observations,
+        approved: true,
+        status: "approved",
+      }).eq("user_id", authData.user.id);
+    }
+
+    return { email, status: "created" };
+  } catch (err: any) {
+    return { email, status: "error", message: err.message };
+  }
+}
