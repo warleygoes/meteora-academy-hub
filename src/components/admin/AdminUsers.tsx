@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Trash2, CheckCircle2, XCircle, Search, Eye, Ban, UserCheck,
-  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound, Package, Upload
+  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound, Package, Upload, ScrollText, ClipboardList, Link2
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,8 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import UserPackagesManager from './UserPackagesManager';
+import UserDetailContent from './UserDetailContent';
 import ImportUsersDialog from './ImportUsersDialog';
 
 const countryCodes: Record<string, string> = {
@@ -612,63 +614,21 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
 
       {/* User Detail Dialog */}
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
-        <DialogContent className="bg-card border-border max-w-lg">
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display">{selectedUser?.display_name || 'Usuario'}</DialogTitle>
           </DialogHeader>
           {selectedUser && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="col-span-2"><span className="text-muted-foreground">Email</span><p className="font-medium text-foreground">{selectedUser.email || '—'}</p></div>
-                <div><span className="text-muted-foreground">{t('roleType')}</span><p className="font-medium text-foreground">{selectedUser.role_type === 'owner' ? t('ispOwner') : t('ispEmployee')}</p></div>
-                <div><span className="text-muted-foreground">{t('country')}</span><p className="font-medium text-foreground flex items-center gap-1.5">{selectedUser.country ? <><FlagImg country={selectedUser.country} size={18} /> {selectedUser.country}</> : '—'}</p></div>
-                <div><span className="text-muted-foreground">{t('companyName')}</span><p className="font-medium text-foreground">{selectedUser.company_name || '—'}</p></div>
-                <div><span className="text-muted-foreground">{t('phone')}</span><p className="font-medium text-foreground">{selectedUser.phone || '—'}</p></div>
-                <div><span className="text-muted-foreground">{t('clientCount')}</span><p className="font-medium text-foreground">{selectedUser.client_count || '—'}</p></div>
-                <div><span className="text-muted-foreground">{t('networkType')}</span><p className="font-medium text-foreground">{selectedUser.network_type || '—'}</p></div>
-                {selectedUser.cheapest_plan_usd && (
-                  <div><span className="text-muted-foreground">{t('cheapestPlan')}</span><p className="font-medium text-foreground">U$ {selectedUser.cheapest_plan_usd}</p></div>
-                )}
-                <div><span className="text-muted-foreground">Status</span><p className="font-medium">{getStatusBadge(selectedUser)}</p></div>
-              </div>
-              {selectedUser.main_problems && (
-                <div><p className="text-sm text-muted-foreground mb-1">{t('mainProblems')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{selectedUser.main_problems}</p></div>
-              )}
-              {selectedUser.main_desires && (
-                <div><p className="text-sm text-muted-foreground mb-1">{t('mainDesires')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{selectedUser.main_desires}</p></div>
-              )}
-              {/* Packages & Products Manager */}
-              <div className="border-t border-border pt-4">
-                <UserPackagesManager userId={selectedUser.user_id} onUpdate={() => fetchActivePlansCounts()} />
-              </div>
-
-              {selectedUser.status !== 'approved' ? (
-                <div className="flex flex-col gap-2 pt-2">
-                  <div className="flex gap-2">
-                    {selectedUser.status !== 'rejected' && (
-                      <Button variant="destructive" className="flex-1 gap-2" onClick={() => rejectUser(selectedUser.user_id)}>
-                        <XCircle className="w-4 h-4" /> {t('rejectUser')}
-                      </Button>
-                    )}
-                    <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => approveUser(selectedUser.user_id)}>
-                      <CheckCircle2 className="w-4 h-4" /> {t('approveUser')}
-                    </Button>
-                  </div>
-                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive w-full" onClick={() => confirmDelete(selectedUser.user_id)}>
-                    <Trash2 className="w-4 h-4" /> Eliminar Permanentemente
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1 gap-2 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10" onClick={() => confirmSuspend(selectedUser.user_id)}>
-                    <Ban className="w-4 h-4" /> Suspender
-                  </Button>
-                  <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive" onClick={() => confirmDelete(selectedUser.user_id)}>
-                    <Trash2 className="w-4 h-4" /> Eliminar
-                  </Button>
-                </div>
-              )}
-            </div>
+            <UserDetailContent
+              user={selectedUser}
+              t={t}
+              getStatusBadge={getStatusBadge}
+              approveUser={approveUser}
+              rejectUser={rejectUser}
+              confirmSuspend={confirmSuspend}
+              confirmDelete={confirmDelete}
+              fetchActivePlansCounts={fetchActivePlansCounts}
+            />
           )}
         </DialogContent>
       </Dialog>

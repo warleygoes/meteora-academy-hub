@@ -71,7 +71,7 @@ const AdminPackages: React.FC = () => {
   const [deleteOfferId, setDeleteOfferId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    name: '', description: '', payment_type: 'one_time', features: '',
+    name: '', description: '', payment_type: 'one_time', features: '', duration_days: '',
   });
 
   const [offerForm, setOfferForm] = useState({
@@ -123,7 +123,7 @@ const AdminPackages: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', payment_type: 'one_time', features: '' });
+    setForm({ name: '', description: '', payment_type: 'one_time', features: '', duration_days: '' });
     setShowEditor(true);
   };
 
@@ -132,17 +132,19 @@ const AdminPackages: React.FC = () => {
     setForm({
       name: pkg.name, description: pkg.description || '',
       payment_type: pkg.payment_type, features: (pkg.features || []).join('\n'),
+      duration_days: (pkg as any).duration_days?.toString() || '',
     });
     setShowEditor(true);
   };
 
   const savePackage = async () => {
     if (!form.name.trim()) return;
-    const payload = {
+    const payload: any = {
       name: form.name,
       description: form.description || null,
       payment_type: form.payment_type,
       features: form.features.split('\n').filter(f => f.trim()),
+      duration_days: form.duration_days ? parseInt(form.duration_days) : null,
     };
 
     if (editing) {
@@ -445,6 +447,11 @@ const AdminPackages: React.FC = () => {
                   <SelectItem value="one_time">{t('oneTime') || 'Pago Único'}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Duración (días)</label>
+              <Input type="number" value={form.duration_days} onChange={e => setForm(f => ({ ...f, duration_days: e.target.value }))} className="bg-secondary border-border" placeholder="Ej: 30, 90, 365 (vacío = sin expiración)" />
+              <p className="text-xs text-muted-foreground mt-1">Define la duración del acceso en días. Déjelo vacío para acceso sin expiración.</p>
             </div>
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">{t('packageFeatures') || 'Características (una por línea)'}</label>
