@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Trash2, CheckCircle2, XCircle, Search, Eye, Ban, UserCheck,
-  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound, Package, Upload, ScrollText, ClipboardList, Link2
+  Clock, Globe, Building2, Phone, Wifi, Shield, Plus, UserX, KeyRound, Package, Upload, ScrollText, ClipboardList, Link2,
+  ArrowUpDown, ArrowUp, ArrowDown, Columns3, GripVertical
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import UserPackagesManager from './UserPackagesManager';
 import UserDetailContent from './UserDetailContent';
 import ImportUsersDialog from './ImportUsersDialog';
@@ -87,6 +90,82 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
+
+  // Flexible column configuration
+  type SortDir = 'asc' | 'desc' | null;
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
+    name: true, company: true, country: true, phone: true, clients: true, network: true, plans: true,
+  });
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
+
+  const columnDefs = [
+    { id: 'name', label: t('displayName'), minWidth: 140 },
+    { id: 'company', label: t('companyName'), minWidth: 100 },
+    { id: 'country', label: t('country'), minWidth: 80 },
+    { id: 'phone', label: t('phone'), minWidth: 100 },
+    { id: 'clients', label: t('clientCount'), minWidth: 80 },
+    { id: 'network', label: t('networkType'), minWidth: 80 },
+    { id: 'plans', label: t('activePlans'), minWidth: 60 },
+  ];
+
+  const getColumnValue = (user: ProfileUser, colId: string): string | number => {
+    switch (colId) {
+      case 'name': return user.display_name || '';
+      case 'company': return user.company_name || '';
+      case 'country': return user.country || '';
+      case 'phone': return user.phone || '';
+      case 'clients': return user.client_count || '';
+      case 'network': return user.network_type || '';
+      case 'plans': return activePlansCounts[user.user_id] || 0;
+      default: return '';
+    }
+  };
+
+  const handleSort = (colId: string) => {
+    if (sortColumn === colId) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortColumn(null); setSortDir(null); }
+    } else {
+      setSortColumn(colId); setSortDir('asc');
+    }
+  };
+
+  const sortUsers = (users: ProfileUser[]) => {
+    if (!sortColumn || !sortDir) return users;
+    return [...users].sort((a, b) => {
+      const va = getColumnValue(a, sortColumn);
+      const vb = getColumnValue(b, sortColumn);
+      const cmp = typeof va === 'number' && typeof vb === 'number'
+        ? va - vb
+        : String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  };
+
+  const handleResizeStart = (colId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = columnWidths[colId] || columnDefs.find(c => c.id === colId)?.minWidth || 120;
+    resizingRef.current = { col: colId, startX, startW };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const diff = ev.clientX - resizingRef.current.startX;
+      const minW = columnDefs.find(c => c.id === colId)?.minWidth || 60;
+      setColumnWidths(prev => ({ ...prev, [colId]: Math.max(minW, resizingRef.current!.startW + diff) }));
+    };
+    const onUp = () => { resizingRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const toggleColumn = (colId: string) => {
+    setColumnVisibility(prev => ({ ...prev, [colId]: !prev[colId] }));
+  };
+
+  const visibleColumns = columnDefs.filter(c => columnVisibility[c.id]);
 
   const computeStats = useCallback((users: ProfileUser[]) => {
     onStatsUpdate({
@@ -274,18 +353,18 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     );
   };
 
-  const filteredPending = pendingUsers.filter(matchesGlobalSearch);
-  const filteredApproved = approvedUsers.filter(matchesGlobalSearch);
-  const filteredRejected = rejectedUsers.filter(matchesGlobalSearch);
+  const filteredPending = sortUsers(pendingUsers.filter(matchesGlobalSearch));
+  const filteredApproved = sortUsers(approvedUsers.filter(matchesGlobalSearch));
+  const filteredRejected = sortUsers(rejectedUsers.filter(matchesGlobalSearch));
 
-  const filteredUsers = allUsers.filter(u => {
+  const filteredUsers = sortUsers(allUsers.filter(u => {
     if (!matchesGlobalSearch(u)) return false;
     const matchesFilter = userFilter === 'all' ||
       (userFilter === 'approved' && u.status === 'approved') ||
       (userFilter === 'pending' && u.status === 'pending') ||
       (userFilter === 'rejected' && u.status === 'rejected');
     return matchesFilter;
-  });
+  }));
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-LA', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -300,62 +379,84 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     ? (allUsers.find(u => u.user_id === actionUserId)?.display_name || allUsers.find(u => u.user_id === actionUserId)?.email || 'este usuario')
     : 'este usuario';
 
-  // Unified user table row - standardized across ALL tabs
+  // Render cell content based on column id
+  const renderCellContent = (user: ProfileUser, colId: string) => {
+    const isAdmin = adminUserIds.has(user.user_id);
+    switch (colId) {
+      case 'name':
+        return (
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
+              {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{t('adminBadge')}</Badge>}
+            </div>
+            <p className="text-xs text-muted-foreground">{user.email || '—'}</p>
+          </div>
+        );
+      case 'country':
+        return (
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <FlagImg country={user.country} size={14} />
+            <span>{user.country || '—'}</span>
+          </div>
+        );
+      case 'company': return <span className="text-muted-foreground">{user.company_name || '—'}</span>;
+      case 'phone': return <span className="text-muted-foreground">{user.phone || '—'}</span>;
+      case 'clients': return <span className="text-muted-foreground">{user.client_count || '—'}</span>;
+      case 'network': return <span className="text-muted-foreground">{user.network_type || '—'}</span>;
+      case 'plans': return <span className="text-muted-foreground">{activePlansCounts[user.user_id] || 0}</span>;
+      default: return null;
+    }
+  };
+
+  // Unified user table row
   const renderUserTableRow = (user: ProfileUser, showActions: 'pending' | 'approved' | 'rejected' | 'all') => {
     const isAdmin = adminUserIds.has(user.user_id);
     return (
       <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-        <td className="py-3">
-          <div className="flex items-center gap-2">
-            <p className="font-medium text-foreground">{user.display_name || 'Sin nombre'}</p>
-            {user.country && <FlagImg country={user.country} size={14} />}
-            {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{t('adminBadge')}</Badge>}
-          </div>
-          <p className="text-xs text-muted-foreground">{user.email || '—'}</p>
-        </td>
-        <td className="py-3 text-muted-foreground hidden md:table-cell">{user.company_name || '—'}</td>
-        <td className="py-3 text-muted-foreground hidden md:table-cell">{user.phone || '—'}</td>
-        <td className="py-3 text-muted-foreground hidden lg:table-cell">{user.client_count || '—'}</td>
-        <td className="py-3 text-muted-foreground hidden lg:table-cell">{user.network_type || '—'}</td>
-        <td className="py-3 text-muted-foreground hidden lg:table-cell">{activePlansCounts[user.user_id] || 0}</td>
-        {showActions === 'all' && <td className="py-3">{getStatusBadge(user)}</td>}
-        <td className="py-3 text-right">
+        {visibleColumns.map(col => (
+          <td key={col.id} className="py-3 px-2" style={columnWidths[col.id] ? { width: columnWidths[col.id], minWidth: col.minWidth } : { minWidth: col.minWidth }}>
+            {renderCellContent(user, col.id)}
+          </td>
+        ))}
+        {showActions === 'all' && <td className="py-3 px-2">{getStatusBadge(user)}</td>}
+        <td className="py-3 px-2 text-right">
           <div className="flex items-center justify-end gap-1">
             <Button variant="ghost" size="sm" onClick={() => setSelectedUser(user)} className="text-muted-foreground" title={t('viewDetails')}>
               <Eye className="w-4 h-4" />
             </Button>
             {showActions === 'pending' && (
               <>
-                <Button variant="ghost" size="sm" onClick={() => rejectUser(user.user_id)} className="text-red-500 hover:text-red-400" title="Rechazar — El usuario no será aprobado">
+                <Button variant="ghost" size="sm" onClick={() => rejectUser(user.user_id)} className="text-red-500 hover:text-red-400" title="Rechazar">
                   <XCircle className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-400" title="Aprobar — El usuario podrá acceder a la plataforma">
+                <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-400" title="Aprobar">
                   <CheckCircle2 className="w-4 h-4" />
                 </Button>
               </>
             )}
             {showActions === 'approved' && (
               <>
-                <Button variant="ghost" size="sm" onClick={() => user.email && resetUserPassword(user.email)} className="text-blue-500 hover:text-blue-400" title="Redefinir Contraseña — Envía email de recuperación">
+                <Button variant="ghost" size="sm" onClick={() => user.email && resetUserPassword(user.email)} className="text-blue-500 hover:text-blue-400" title="Redefinir Contraseña">
                   <KeyRound className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => toggleAdmin(user.user_id, isAdmin)} className={isAdmin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"} title={isAdmin ? "Quitar Admin — Revoca permisos administrativos" : "Hacer Admin — Otorga permisos administrativos"}>
+                <Button variant="ghost" size="sm" onClick={() => toggleAdmin(user.user_id, isAdmin)} className={isAdmin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"} title={isAdmin ? "Quitar Admin" : "Hacer Admin"}>
                   <Shield className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => confirmSuspend(user.user_id)} className="text-yellow-500 hover:text-yellow-400" title="Suspender — Revoca acceso, el usuario pasa a rechazado">
+                <Button variant="ghost" size="sm" onClick={() => confirmSuspend(user.user_id)} className="text-yellow-500 hover:text-yellow-400" title="Suspender">
                   <Ban className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title="Eliminar — Borra permanentemente el perfil del usuario">
+                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title="Eliminar">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </>
             )}
             {showActions === 'rejected' && (
               <>
-                <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-500" title="Aprobar — Reactiva el acceso del usuario">
+                <Button variant="ghost" size="sm" onClick={() => approveUser(user.user_id)} className="text-green-500 hover:text-green-500" title="Aprobar">
                   <CheckCircle2 className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title="Eliminar — Borra permanentemente el perfil del usuario">
+                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title="Eliminar">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </>
@@ -371,7 +472,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
                     <CheckCircle2 className="w-4 h-4" />
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title="Eliminar permanentemente">
+                <Button variant="ghost" size="sm" onClick={() => confirmDelete(user.user_id)} className="text-destructive hover:text-destructive" title="Eliminar">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </>
@@ -382,20 +483,63 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     );
   };
 
-  // Unified table columns - same across ALL tabs
+  // Flexible table header with sort + resize
   const renderTableHeader = (showStatus: boolean) => (
     <thead>
       <tr className="border-b border-border text-left text-muted-foreground">
-        <th className="pb-3 font-medium">{t('displayName')}</th>
-        <th className="pb-3 font-medium hidden md:table-cell">{t('companyName')}</th>
-        <th className="pb-3 font-medium hidden md:table-cell">{t('phone')}</th>
-        <th className="pb-3 font-medium hidden lg:table-cell">{t('clientCount')}</th>
-        <th className="pb-3 font-medium hidden lg:table-cell">{t('networkType')}</th>
-        <th className="pb-3 font-medium hidden lg:table-cell">{t('activePlans')}</th>
-        {showStatus && <th className="pb-3 font-medium">Status</th>}
-        <th className="pb-3 font-medium text-right">{t('actions')}</th>
+        {visibleColumns.map(col => (
+          <th
+            key={col.id}
+            className="pb-3 px-2 font-medium relative select-none group"
+            style={columnWidths[col.id] ? { width: columnWidths[col.id], minWidth: col.minWidth } : { minWidth: col.minWidth }}
+          >
+            <button
+              type="button"
+              onClick={() => handleSort(col.id)}
+              className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+            >
+              {col.label}
+              {sortColumn === col.id ? (
+                sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+              ) : (
+                <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+              )}
+            </button>
+            <div
+              className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors"
+              onMouseDown={(e) => handleResizeStart(col.id, e)}
+            />
+          </th>
+        ))}
+        {showStatus && <th className="pb-3 px-2 font-medium">Status</th>}
+        <th className="pb-3 px-2 font-medium text-right">{t('actions')}</th>
       </tr>
     </thead>
+  );
+
+  // Column visibility toggle button
+  const ColumnToggle = () => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2 border-border">
+          <Columns3 className="w-4 h-4" /> {t('columns') || 'Columnas'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 bg-card border-border p-3" align="end">
+        <p className="text-xs font-medium text-muted-foreground mb-2">{t('toggleColumns') || 'Mostrar/Ocultar columnas'}</p>
+        <div className="space-y-2">
+          {columnDefs.map(col => (
+            <label key={col.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={columnVisibility[col.id]}
+                onCheckedChange={() => toggleColumn(col.id)}
+              />
+              <span className="text-foreground">{col.label}</span>
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 
   return (
@@ -430,6 +574,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           />
         </div>
         <div className="flex gap-2">
+          <ColumnToggle />
           <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowImportDialog(true)}>
             <Upload className="w-4 h-4" /> {t('importUsers')}
           </Button>
