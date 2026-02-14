@@ -109,8 +109,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
                         <ExternalLink className="w-3 h-3" /> {t('accessApp')}
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
-                      <Info className="w-3 h-3" /> {t('moreInfo') || 'Detalhes'}
+                    <Button size="sm" variant="outline" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); setShowPurchase(true); }}>
+                      <Info className="w-3 h-3" /> {t('moreInfo')}
                     </Button>
                   </>
                 ) : (
@@ -173,7 +173,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
         </div>
       </motion.div>
 
-      {/* Purchase Dialog */}
+      {/* Product Details / Purchase Dialog */}
       <Dialog open={showPurchase} onOpenChange={setShowPurchase}>
         <DialogContent className="bg-card border-border max-w-md">
           <DialogHeader>
@@ -195,7 +195,24 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
               )}
             </div>
 
-            {activeOffers.length > 0 ? (
+            {/* Show action buttons for accessible products */}
+            {hasAccess && (
+              <div className="flex flex-col gap-2">
+                {product.course_id && (
+                  <Button className="gap-1.5 w-full" onClick={() => { setShowPurchase(false); goToCourse(); }}>
+                    <Play className="w-4 h-4" /> {t('watchNow')}
+                  </Button>
+                )}
+                {isSaas && (
+                  <Button variant="secondary" className="gap-1.5 w-full" onClick={openSaas}>
+                    <ExternalLink className="w-4 h-4" /> {t('accessApp')}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Show purchase options for inaccessible products */}
+            {!hasAccess && activeOffers.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">{t('offers')}:</p>
                 {activeOffers.map(offer => (
@@ -211,27 +228,16 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
                         <ShoppingCart className="w-3.5 h-3.5" /> {t('buyAccess')}
                       </Button>
                     ) : offer.stripe_price_id ? (
-                      <Button size="sm" className="gap-1.5" onClick={async () => {
-                        try {
-                          const { data: { session } } = await (await import('@/integrations/supabase/client')).supabase.auth.getSession();
-                          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-                            body: JSON.stringify({ priceId: offer.stripe_price_id }),
-                          });
-                          const result = await res.json();
-                          if (result.url) window.location.href = result.url;
-                        } catch (err) { console.error(err); }
-                      }}>
+                      <Button size="sm" className="gap-1.5" onClick={() => window.open(offer.stripe_price_id!, '_blank', 'noopener')}>
                         <ShoppingCart className="w-3.5 h-3.5" /> {t('buyAccess')}
                       </Button>
                     ) : null}
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : !hasAccess ? (
               <p className="text-sm text-muted-foreground text-center py-4">{t('noOffers')}</p>
-            )}
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

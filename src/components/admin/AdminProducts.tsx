@@ -367,7 +367,7 @@ const AdminProducts: React.FC = () => {
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                                 <span className="font-semibold text-foreground">{offer.currency === 'USD' ? 'U$' : offer.currency} {offer.price}</span>
-                                {offer.stripe_price_id && <span className="truncate max-w-32">Stripe: {offer.stripe_price_id}</span>}
+                                {offer.stripe_price_id && <span className="truncate max-w-32">Stripe ✓</span>}
                                 {offer.valid_from && (
                                   <span className="flex items-center gap-1">
                                     <Calendar className="w-3 h-3" />
@@ -520,29 +520,28 @@ const AdminProducts: React.FC = () => {
               <label className="text-sm text-muted-foreground mb-1 block">{t('offerName')}</label>
               <Input value={offerForm.name} onChange={e => setOfferForm(f => ({ ...f, name: e.target.value }))} className="bg-secondary border-border" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">{t('planPrice')} (USD)</label>
-                <Input type="number" value={offerForm.price} onChange={e => setOfferForm(f => ({ ...f, price: e.target.value }))} className="bg-secondary border-border" />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Stripe Price ID</label>
-                <Input value={offerForm.stripe_price_id} onChange={e => setOfferForm(f => ({ ...f, stripe_price_id: e.target.value }))} className="bg-secondary border-border" placeholder="price_..." />
-              </div>
-            </div>
-
-            {/* Hotmart URL */}
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">{t('hotmartUrl') || 'Link de Pagamento Hotmart'}</label>
-              <Input value={offerForm.hotmart_url} onChange={e => setOfferForm(f => ({ ...f, hotmart_url: e.target.value }))} className="bg-secondary border-border" placeholder="https://pay.hotmart.com/..." />
+              <label className="text-sm text-muted-foreground mb-1 block">{t('planPrice')} (USD)</label>
+              <Input type="number" value={offerForm.price} onChange={e => setOfferForm(f => ({ ...f, price: e.target.value }))} className="bg-secondary border-border" />
             </div>
 
-            {/* Payment link active */}
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <Switch checked={offerForm.payment_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, payment_link_active: v }))} />
-                {t('paymentLinkActive') || 'Link de Pagamento Ativo'}
-              </label>
+            {/* Stripe Payment Link */}
+            <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">{t('stripePaymentLink')}</label>
+                <Switch checked={!!offerForm.stripe_price_id && offerForm.payment_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, payment_link_active: v }))} />
+              </div>
+              <Input value={offerForm.stripe_price_id} onChange={e => setOfferForm(f => ({ ...f, stripe_price_id: e.target.value }))} className="bg-secondary border-border" placeholder="https://buy.stripe.com/..." />
+              <p className="text-xs text-muted-foreground">{t('stripePaymentLinkHint')}</p>
+            </div>
+
+            {/* Hotmart Payment Link */}
+            <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">{t('hotmartUrl')}</label>
+                <Switch checked={!!offerForm.hotmart_url && offerForm.payment_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, payment_link_active: v }))} />
+              </div>
+              <Input value={offerForm.hotmart_url} onChange={e => setOfferForm(f => ({ ...f, hotmart_url: e.target.value }))} className="bg-secondary border-border" placeholder="https://pay.hotmart.com/..." />
             </div>
 
             {/* Periodicity - only for recurring products */}

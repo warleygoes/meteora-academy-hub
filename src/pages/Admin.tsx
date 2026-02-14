@@ -34,8 +34,8 @@ const AdminPage: React.FC = () => {
     { id: 'analytics', label: t('analytics'), icon: TrendingUp, desc: t('analyticsDesc') },
     { id: 'settings', label: t('settingsTitle'), icon: Settings, desc: t('settingsDesc') },
     { id: 'logs', label: t('systemLogs'), icon: ScrollText, desc: t('systemLogsDesc') },
-    { id: 'comments', label: 'Comentários', icon: MessageSquare, desc: 'Comentários das aulas' },
-    { id: 'menu-links', label: 'Links do Menu', icon: Link2, desc: 'Links personalizados do menu' },
+    { id: 'comments', label: t('allComments'), icon: MessageSquare, desc: t('adminCoursesDesc') },
+    { id: 'menu-links', label: t('menuLinks'), icon: Link2, desc: t('menuLinksDesc') },
     { id: 'api', label: 'API', icon: Plug, desc: 'Chave e documentação da API' },
   ];
 
