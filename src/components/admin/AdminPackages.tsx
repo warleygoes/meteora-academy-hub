@@ -72,11 +72,12 @@ const AdminPackages: React.FC = () => {
 
   const [form, setForm] = useState({
     name: '', description: '', payment_type: 'one_time', features: '', duration_days: '',
+    is_trail: false, show_in_showcase: false,
   });
 
   const [offerForm, setOfferForm] = useState({
     name: 'Oferta Padrão', price: '', currency: 'USD', stripe_price_id: '',
-    is_default: false, active: true, valid_from: '', valid_until: '',
+    is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '',
   });
 
   const fetchPackages = useCallback(async () => {
@@ -123,7 +124,7 @@ const AdminPackages: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', payment_type: 'one_time', features: '', duration_days: '' });
+    setForm({ name: '', description: '', payment_type: 'one_time', features: '', duration_days: '', is_trail: false, show_in_showcase: false });
     setShowEditor(true);
   };
 
@@ -133,6 +134,8 @@ const AdminPackages: React.FC = () => {
       name: pkg.name, description: pkg.description || '',
       payment_type: pkg.payment_type, features: (pkg.features || []).join('\n'),
       duration_days: (pkg as any).duration_days?.toString() || '',
+      is_trail: (pkg as any).is_trail || false,
+      show_in_showcase: (pkg as any).show_in_showcase || false,
     });
     setShowEditor(true);
   };
@@ -145,6 +148,8 @@ const AdminPackages: React.FC = () => {
       payment_type: form.payment_type,
       features: form.features.split('\n').filter(f => f.trim()),
       duration_days: form.duration_days ? parseInt(form.duration_days) : null,
+      is_trail: form.is_trail,
+      show_in_showcase: form.show_in_showcase,
     };
 
     if (editing) {
@@ -203,7 +208,7 @@ const AdminPackages: React.FC = () => {
   const openNewOffer = (pkgId: string) => {
     setOfferPkgId(pkgId);
     setEditingOffer(null);
-    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '' });
+    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '' });
     setShowOfferEditor(true);
   };
 
@@ -215,6 +220,7 @@ const AdminPackages: React.FC = () => {
       stripe_price_id: offer.stripe_price_id || '', is_default: offer.is_default, active: offer.active,
       valid_from: offer.valid_from ? offer.valid_from.slice(0, 16) : '',
       valid_until: offer.valid_until ? offer.valid_until.slice(0, 16) : '',
+      periodicity: (offer as any).periodicity || '',
     });
     setShowOfferEditor(true);
   };
@@ -226,6 +232,7 @@ const AdminPackages: React.FC = () => {
       stripe_price_id: offerForm.stripe_price_id || null, is_default: offerForm.is_default, active: offerForm.active,
       valid_from: offerForm.valid_from ? new Date(offerForm.valid_from).toISOString() : null,
       valid_until: offerForm.valid_until ? new Date(offerForm.valid_until).toISOString() : null,
+      periodicity: offerForm.periodicity || null,
     };
     if (editingOffer) {
       await supabase.from('offers').update(payload).eq('id', editingOffer.id);
@@ -281,8 +288,9 @@ const AdminPackages: React.FC = () => {
                         {pkg.active ? t('active') : t('inactive')}
                       </Badge>
                       <Badge variant="outline" className="text-xs">
-                        {pkg.payment_type === 'monthly' ? (t('monthly') || 'Mensual') : (t('oneTime') || 'Único')}
+                        {pkg.payment_type === 'recurring' ? (t('recurring') || 'Recorrente') : (t('oneTime') || 'Único')}
                       </Badge>
+                      {(pkg as any).is_trail && <Badge className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/20">Trilha</Badge>}
                     </div>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => openProductLinker(pkg.id)} title={t('linkProducts') || 'Vincular productos'}>
@@ -435,15 +443,15 @@ const AdminPackages: React.FC = () => {
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="bg-secondary border-border" />
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">{t('packageDescription') || 'Descripción del paquete'}</label>
-              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" />
+              <label className="text-sm text-muted-foreground mb-1 block">{t('packageDescription') || 'Descrição do paquete'}</label>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" rows={4} placeholder="Descrição detalhada..." />
             </div>
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">{t('paymentType') || 'Tipo de pago'}</label>
               <Select value={form.payment_type} onValueChange={v => setForm(f => ({ ...f, payment_type: v }))}>
                 <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly">{t('monthly') || 'Mensual'}</SelectItem>
+                  <SelectItem value="recurring">{t('recurring') || 'Recorrente'}</SelectItem>
                   <SelectItem value="one_time">{t('oneTime') || 'Pago Único'}</SelectItem>
                 </SelectContent>
               </Select>
@@ -457,6 +465,23 @@ const AdminPackages: React.FC = () => {
               <label className="text-sm text-muted-foreground mb-1 block">{t('packageFeatures') || 'Características (una por línea)'}</label>
               <Textarea value={form.features} onChange={e => setForm(f => ({ ...f, features: e.target.value }))} className="bg-secondary border-border" rows={4} placeholder={t('packageFeaturesPlaceholder') || 'Acceso a la comunidad\nSoporte prioritario\nCursos incluidos'} />
             </div>
+            {/* Trail toggles */}
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
+              <Switch checked={form.is_trail} onCheckedChange={v => setForm(f => ({ ...f, is_trail: v }))} />
+              <div>
+                <p className="text-sm font-medium text-foreground">Trilha de cursos</p>
+                <p className="text-xs text-muted-foreground">Marque se este pacote é uma trilha de aprendizado.</p>
+              </div>
+            </div>
+            {form.is_trail && (
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
+                <Switch checked={form.show_in_showcase} onCheckedChange={v => setForm(f => ({ ...f, show_in_showcase: v }))} />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Exibir na vitrine</p>
+                  <p className="text-xs text-muted-foreground">Mostrar esta trilha como carrossel na vitrine do aluno.</p>
+                </div>
+              </div>
+            )}
             <Button onClick={savePackage} className="w-full">{t('save')}</Button>
           </div>
         </DialogContent>
@@ -531,6 +556,19 @@ const AdminPackages: React.FC = () => {
                 <label className="text-sm text-muted-foreground mb-1 block">{t('validUntil') || 'Válido hasta'}</label>
                 <Input type="datetime-local" value={offerForm.valid_until} onChange={e => setOfferForm(f => ({ ...f, valid_until: e.target.value }))} className="bg-secondary border-border" />
               </div>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Periodicidade</label>
+              <Select value={offerForm.periodicity || 'none'} onValueChange={v => setOfferForm(f => ({ ...f, periodicity: v === 'none' ? '' : v }))}>
+                <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">N/A (pagamento único)</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="quarterly">Trimestral</SelectItem>
+                  <SelectItem value="semi_annual">Semestral</SelectItem>
+                  <SelectItem value="annual">Anual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 text-sm">

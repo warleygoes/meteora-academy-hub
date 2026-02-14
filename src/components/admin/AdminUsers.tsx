@@ -517,19 +517,20 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     </thead>
   );
 
-  // Column visibility toggle button
+  // Column visibility toggle button - stays open until clicking outside
+  const [columnPopoverOpen, setColumnPopoverOpen] = useState(false);
   const ColumnToggle = () => (
-    <Popover>
+    <Popover open={columnPopoverOpen} onOpenChange={setColumnPopoverOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2 border-border">
           <Columns3 className="w-4 h-4" /> {t('columns') || 'Columnas'}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-52 bg-card border-border p-3" align="end">
+      <PopoverContent className="w-52 bg-card border-border p-3" align="end" onInteractOutside={() => setColumnPopoverOpen(false)}>
         <p className="text-xs font-medium text-muted-foreground mb-2">{t('toggleColumns') || 'Mostrar/Ocultar columnas'}</p>
         <div className="space-y-2">
           {columnDefs.map(col => (
-            <label key={col.id} className="flex items-center gap-2 text-sm cursor-pointer">
+            <label key={col.id} className="flex items-center gap-2 text-sm cursor-pointer" onClick={(e) => e.stopPropagation()}>
               <Checkbox
                 checked={columnVisibility[col.id]}
                 onCheckedChange={() => toggleColumn(col.id)}
