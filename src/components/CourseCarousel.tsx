@@ -3,13 +3,21 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CourseCard } from './CourseCard';
 import type { ContentProduct } from '@/lib/courseTypes';
 
+interface Offer {
+  id: string; name: string; price: number; currency: string;
+  stripe_price_id: string | null; hotmart_url: string | null;
+  payment_link_active: boolean; active: boolean;
+}
+
 interface CourseCarouselProps {
   title: string;
   products: ContentProduct[];
   variant?: 'horizontal' | 'vertical';
+  accessibleProductIds?: Set<string>;
+  productOffers?: Record<string, Offer[]>;
 }
 
-export const CourseCarousel: React.FC<CourseCarouselProps> = ({ title, products, variant = 'horizontal' }) => {
+export const CourseCarousel: React.FC<CourseCarouselProps> = ({ title, products, variant = 'horizontal', accessibleProductIds, productOffers }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cardWidth = variant === 'vertical' ? 200 : 280;
 
@@ -40,7 +48,12 @@ export const CourseCarousel: React.FC<CourseCarouselProps> = ({ title, products,
         >
           {products.map((product) => (
             <div key={product.id} className="flex-shrink-0" style={{ width: cardWidth }}>
-              <CourseCard product={product} variant={variant} />
+              <CourseCard
+                product={product}
+                variant={variant}
+                hasAccess={!accessibleProductIds || accessibleProductIds.has(product.id)}
+                offers={productOffers?.[product.id]}
+              />
             </div>
           ))}
         </div>

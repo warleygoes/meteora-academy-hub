@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MessageSquare, Reply, HelpCircle, Heart, Clock, BookOpen, Video, ChevronDown, ChevronRight, Filter, Layers, ExternalLink } from 'lucide-react';
+import { MessageSquare, Reply, HelpCircle, Heart, Clock, BookOpen, Video, ChevronDown, ChevronRight, Filter, Layers, ExternalLink, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -55,6 +56,8 @@ const AdminComments: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [selectedUser, setSelectedUser] = useState<ProfileUser | null>(null);
+  const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
@@ -71,7 +74,6 @@ const AdminComments: React.FC = () => {
     const lessonMap: Record<string, { title: string; module_id: string }> = {};
     lessons?.forEach(l => { lessonMap[l.id] = { title: l.title, module_id: l.module_id }; });
 
-    // Fetch modules
     const moduleIds = [...new Set(Object.values(lessonMap).map(l => l.module_id))];
     const { data: modulesData } = moduleIds.length > 0
       ? await supabase.from('course_modules').select('id, title').in('id', moduleIds)
@@ -127,6 +129,28 @@ const AdminComments: React.FC = () => {
     setReplyText(''); setReplyingTo(null);
     fetchComments();
     toast({ title: t('replyComment') || 'Resposta enviada' });
+  };
+
+  const confirmDeleteComment = (id: string) => {
+    setDeleteCommentId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const executeDeleteComment = async () => {
+    if (!deleteCommentId) return;
+    // Delete replies first, then the comment
+    await supabase.from('lesson_comments').delete().eq('parent_id', deleteCommentId);
+    await supabase.from('lesson_comments').delete().eq('id', deleteCommentId);
+    toast({ title: 'Comentário excluído' });
+    setShowDeleteConfirm(false);
+    setDeleteCommentId(null);
+    fetchComments();
+  };
+
+  const deleteReply = async (replyId: string) => {
+    await supabase.from('lesson_comments').delete().eq('id', replyId);
+    toast({ title: 'Resposta excluída' });
+    fetchComments();
   };
 
   const openUserProfile = async (userId: string) => {
@@ -296,6 +320,9 @@ const AdminComments: React.FC = () => {
                         {comment.replies.length} {t('repliesCount') || 'resposta'}{comment.replies.length > 1 ? 's' : ''}
                       </Button>
                     )}
+                    <Button variant="ghost" size="sm" className="gap-1 text-xs text-destructive hover:text-destructive ml-auto" onClick={() => confirmDeleteComment(comment.id)}>
+                      <Trash2 className="w-3.5 h-3.5" /> Excluir
+                    </Button>
                   </div>
 
                   {/* Reply form */}
@@ -320,10 +347,13 @@ const AdminComments: React.FC = () => {
                         <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0 mt-0.5">
                           {(reply.user_name || reply.user_email || '?')[0].toUpperCase()}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <button onClick={() => openUserProfile(reply.user_id)} className="text-sm font-medium text-primary hover:underline">{reply.user_name || reply.user_email}</button>
                             <span className="text-xs text-muted-foreground">{new Date(reply.created_at).toLocaleString()}</span>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive hover:text-destructive ml-auto" onClick={() => deleteReply(reply.id)}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
                           </div>
                           <p className="text-sm text-foreground whitespace-pre-wrap">{reply.content}</p>
                         </div>
@@ -336,6 +366,22 @@ const AdminComments: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Delete Comment Confirm */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir comentário?</AlertDialogTitle>
+            <AlertDialogDescription>O comentário e todas as suas respostas serão excluídos permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDeleteComment} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <Trash2 className="w-4 h-4 mr-2" /> Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* User Profile Dialog */}
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>

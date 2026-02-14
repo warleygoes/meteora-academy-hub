@@ -9,6 +9,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ContentProduct } from '@/lib/courseTypes';
 import { logSystemEvent } from '@/lib/systemLog';
 
+interface Offer {
+  id: string; name: string; price: number; currency: string;
+  stripe_price_id: string | null; hotmart_url: string | null;
+  payment_link_active: boolean; active: boolean;
+  product_id: string | null; package_id: string | null;
+}
+
 interface PackageShowcase {
   id: string;
   name: string;
@@ -23,6 +30,8 @@ const Index: React.FC = () => {
   const [packageShowcases, setPackageShowcases] = useState<PackageShowcase[]>([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
   const [freeProductIds, setFreeProductIds] = useState<Set<string>>(new Set());
+  const [accessibleProductIds, setAccessibleProductIds] = useState<Set<string>>(new Set());
+  const [productOffers, setProductOffers] = useState<Record<string, Offer[]>>({});
 
   // Fetch packages marked with show_in_showcase
   useEffect(() => {
@@ -77,15 +86,55 @@ const Index: React.FC = () => {
     fetchFree();
   }, []);
 
-  // Fetch user's enrolled courses
+  // Fetch user's enrolled courses and accessible products
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      const { data } = await supabase.from('course_enrollments').select('course_id').eq('user_id', user.id);
-      setEnrolledCourseIds(new Set((data || []).map(d => d.course_id)));
+    const fetchAccess = async () => {
+      // Enrolled courses
+      const { data: enrollments } = await supabase.from('course_enrollments').select('course_id').eq('user_id', user.id);
+      setEnrolledCourseIds(new Set((enrollments || []).map(d => d.course_id)));
+
+      // Direct product access
+      const { data: userProducts } = await supabase.from('user_products').select('product_id').eq('user_id', user.id);
+      const directAccess = new Set((userProducts || []).map(d => d.product_id));
+
+      // Package-based access
+      const { data: userPlans } = await supabase.from('user_plans').select('package_id').eq('user_id', user.id).eq('status', 'active');
+      const packageIds = (userPlans || []).map(d => d.package_id);
+
+      if (packageIds.length > 0) {
+        const { data: pkgProducts } = await supabase.from('package_products').select('product_id').in('package_id', packageIds);
+        (pkgProducts || []).forEach(pp => directAccess.add(pp.product_id));
+      }
+
+      // Free products are accessible
+      const { data: freeOffers } = await supabase.from('offers').select('product_id').eq('price', 0).not('product_id', 'is', null);
+      (freeOffers || []).forEach(o => { if (o.product_id) directAccess.add(o.product_id); });
+
+      setAccessibleProductIds(directAccess);
     };
-    fetch();
+    fetchAccess();
   }, [user]);
+
+  // Fetch product offers for purchase buttons
+  useEffect(() => {
+    const fetchOffers = async () => {
+      const { data } = await supabase
+        .from('offers')
+        .select('id, name, price, currency, stripe_price_id, hotmart_url, payment_link_active, active, product_id, package_id')
+        .eq('active', true)
+        .eq('payment_link_active', true)
+        .not('product_id', 'is', null);
+      const map: Record<string, Offer[]> = {};
+      (data || []).forEach((o: any) => {
+        if (!o.product_id) return;
+        if (!map[o.product_id]) map[o.product_id] = [];
+        map[o.product_id].push(o);
+      });
+      setProductOffers(map);
+    };
+    fetchOffers();
+  }, []);
 
   // Log page view
   useEffect(() => {
@@ -124,21 +173,21 @@ const Index: React.FC = () => {
       <HeroBanner />
       <div className="px-6 md:px-12 -mt-16 relative z-10 pb-12">
         {continueWatching.length > 0 && (
-          <CourseCarousel title={t('continueWatching')} products={continueWatching} />
+          <CourseCarousel title={t('continueWatching')} products={continueWatching} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         )}
         {myCourses.length > 0 && (
-          <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} />
+          <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         )}
         {packageShowcases.map(pkg => (
-          <CourseCarousel key={pkg.id} title={`📦 ${pkg.name}`} products={pkg.products} variant="vertical" />
+          <CourseCarousel key={pkg.id} title={`📦 ${pkg.name}`} products={pkg.products} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         ))}
         {freeCourses.length > 0 && (
-          <CourseCarousel title={`🆓 ${t('freeCourses') || 'Cursos Gratuitos'}`} products={freeCourses} variant="vertical" />
+          <CourseCarousel title={`🆓 ${t('freeCourses') || 'Cursos Gratuitos'}`} products={freeCourses} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         )}
         {allProducts.length > 0 && (
-          <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} variant="vertical" />
+          <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         )}
-        <CourseCarousel title={t('allContent')} products={allProducts} />
+        <CourseCarousel title={t('allContent')} products={allProducts} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
       </div>
     </div>
   );
