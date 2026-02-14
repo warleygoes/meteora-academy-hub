@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, BookOpen, Users, Info } from 'lucide-react';
+import { Play, BookOpen, Users, Info, ExternalLink } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -24,8 +24,15 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
 
   const aspectClass = variant === 'vertical' ? 'aspect-[2/3]' : 'aspect-video';
 
+  const isSaas = product.type === 'saas' && !!product.saas_url;
+
   const goToCourse = () => {
     if (product.course_id) navigate(`/app/courses/${product.course_id}`);
+  };
+
+  const openSaas = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (product.saas_url) window.open(product.saas_url, '_blank', 'noopener');
   };
 
   return (
@@ -58,9 +65,16 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
               <p className="text-xs text-center text-muted-foreground line-clamp-3 max-w-[90%]">{product.description}</p>
             )}
             <div className="flex flex-col gap-1.5 w-full max-w-[85%]">
-              <Button size="sm" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
-                <Play className="w-3 h-3" /> {t('startNow') || 'Acessar'}
-              </Button>
+              {product.course_id && (
+                <Button size="sm" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
+                  <Play className="w-3 h-3" /> Assistir Agora
+                </Button>
+              )}
+              {isSaas && (
+                <Button size="sm" variant="secondary" className="gap-1.5 w-full text-xs" onClick={openSaas}>
+                  <ExternalLink className="w-3 h-3" /> Acessar App
+                </Button>
+              )}
               <Button size="sm" variant="outline" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
                 <Info className="w-3 h-3" /> {t('moreInfo') || 'Detalhes'}
               </Button>
