@@ -52,17 +52,17 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-4 gap-3"
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-3 gap-2"
           >
             {product.description && (
               <p className="text-xs text-center text-muted-foreground line-clamp-3 max-w-[90%]">{product.description}</p>
             )}
-            <div className="flex gap-2">
-              <Button size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
-                <Play className="w-3.5 h-3.5" /> {t('startNow') || 'Acessar'}
+            <div className="flex flex-col gap-1.5 w-full max-w-[85%]">
+              <Button size="sm" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
+                <Play className="w-3 h-3" /> {t('startNow') || 'Acessar'}
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
-                <Info className="w-3.5 h-3.5" /> {t('moreInfo') || 'Detalhes'}
+              <Button size="sm" variant="outline" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
+                <Info className="w-3 h-3" /> {t('moreInfo') || 'Detalhes'}
               </Button>
             </div>
           </motion.div>

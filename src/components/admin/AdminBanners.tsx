@@ -201,6 +201,7 @@ const AdminBanners: React.FC = () => {
             </div>
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Imagem / GIF</label>
+              <p className="text-xs text-muted-foreground mb-1.5">📐 Tamanho recomendado: <strong>1920 × 600px</strong> (proporção 16:5). Formatos: JPG, PNG, GIF, WebP.</p>
               <div className="flex gap-2">
                 <Input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} className="bg-secondary border-border flex-1" placeholder="URL ou suba um arquivo" />
                 <input ref={fileRef} type="file" accept="image/*,.gif" className="hidden" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])} />

@@ -126,13 +126,13 @@ const Index: React.FC = () => {
           <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} />
         )}
         {trails.map(trail => (
-          <CourseCarousel key={trail.id} title={`🎯 ${trail.name}`} products={trail.products} />
+          <CourseCarousel key={trail.id} title={`🎯 ${trail.name}`} products={trail.products} variant="vertical" />
         ))}
         {freeCourses.length > 0 && (
-          <CourseCarousel title={`🆓 ${t('freeCourses') || 'Cursos Gratuitos'}`} products={freeCourses} />
+          <CourseCarousel title={`🆓 ${t('freeCourses') || 'Cursos Gratuitos'}`} products={freeCourses} variant="vertical" />
         )}
         {allProducts.length > 0 && (
-          <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} />
+          <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} variant="vertical" />
         )}
         <CourseCarousel title={t('allContent')} products={allProducts} />
       </div>

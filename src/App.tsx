@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
 import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
+import ApiDocs from "./pages/ApiDocs";
 import CoursesPage from "./pages/Courses";
 import CommunityPage from "./pages/Community";
 import AdminPage from "./pages/Admin";
@@ -77,6 +78,7 @@ const App = () => (
                 <Route path="/app/topology" element={<NetworkTopology />} />
                 <Route path="/app/meetings" element={<Meetings />} />
                 <Route path="/app/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+                <Route path="/app/admin/api-docs" element={<AdminRoute><ApiDocs /></AdminRoute>} />
               </Route>
 
               <Route path="*" element={<NotFound />} />
