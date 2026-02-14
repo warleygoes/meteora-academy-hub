@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus, Upload } from 'lucide-react';
+import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus, Upload, GripVertical } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,19 +9,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logSystemEvent } from '@/lib/systemLog';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Category { id: string; name: string; description: string | null; }
 
 interface LessonContent {
-  id: string;
-  lesson_id: string;
+  id: string; lesson_id: string;
   type: 'video' | 'text' | 'image' | 'audio' | 'link' | 'pdf';
-  title: string;
-  content: string | null;
-  sort_order: number;
+  title: string; content: string | null; sort_order: number;
 }
 
 interface Lesson {
@@ -37,6 +52,7 @@ interface Course {
   thumbnail_vertical_url: string | null;
   category_id: string | null; status: string; sort_order: number;
   category?: Category | null; enrollment_count?: number;
+  product_id?: string;
 }
 
 interface Enrollment {
@@ -45,16 +61,48 @@ interface Enrollment {
 }
 
 const CONTENT_TYPE_ICONS: Record<string, React.ReactNode> = {
-  video: <Video className="w-3.5 h-3.5" />,
-  text: <FileText className="w-3.5 h-3.5" />,
-  image: <Image className="w-3.5 h-3.5" />,
-  audio: <Music className="w-3.5 h-3.5" />,
-  link: <LinkIcon className="w-3.5 h-3.5" />,
-  pdf: <FileDown className="w-3.5 h-3.5" />,
+  video: <Video className="w-3.5 h-3.5" />, text: <FileText className="w-3.5 h-3.5" />,
+  image: <Image className="w-3.5 h-3.5" />, audio: <Music className="w-3.5 h-3.5" />,
+  link: <LinkIcon className="w-3.5 h-3.5" />, pdf: <FileDown className="w-3.5 h-3.5" />,
 };
-
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   video: 'Video', text: 'Texto', image: 'Imagen', audio: 'Audio', link: 'Link', pdf: 'PDF',
+};
+
+// Sortable module item
+const SortableModuleItem: React.FC<{
+  mod: Module; mi: number; children: React.ReactNode;
+}> = ({ mod, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: mod.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div className="flex items-stretch">
+        <button {...listeners} className="px-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center">
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <div className="flex-1">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// Sortable lesson item
+const SortableLessonItem: React.FC<{
+  lesson: Lesson; children: React.ReactNode;
+}> = ({ lesson, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div className="flex items-stretch">
+        <button {...listeners} className="px-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center">
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+        <div className="flex-1">{children}</div>
+      </div>
+    </div>
+  );
 };
 
 const AdminCourses: React.FC = () => {
@@ -71,6 +119,9 @@ const AdminCourses: React.FC = () => {
   const [showStudentList, setShowStudentList] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
+  const [showCategoryAssign, setShowCategoryAssign] = useState(false);
+  const [categoryAssignCourseId, setCategoryAssignCourseId] = useState<string | null>(null);
+  const [assignedCategories, setAssignedCategories] = useState<Set<string>>(new Set());
 
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [publishCourseId, setPublishCourseId] = useState<string | null>(null);
@@ -90,10 +141,8 @@ const AdminCourses: React.FC = () => {
 
   const [editingContent, setEditingContent] = useState<string | null>(null);
   const [contentForm, setContentForm] = useState({ title: '', type: 'video' as LessonContent['type'], content: '' });
-
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
 
-  // Course image editor
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [imageEditorCourseId, setImageEditorCourseId] = useState<string | null>(null);
   const [imageForm, setImageForm] = useState({ thumbnail_url: '', thumbnail_vertical_url: '' });
@@ -102,47 +151,36 @@ const AdminCourses: React.FC = () => {
   const fileRefH = useRef<HTMLInputElement>(null);
   const fileRefV = useRef<HTMLInputElement>(null);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // --- Data fetching (same as before) ---
   const uploadCourseImage = async (file: File, orientation: 'horizontal' | 'vertical') => {
     const setter = orientation === 'horizontal' ? setUploadingH : setUploadingV;
     setter(true);
     const ext = file.name.split('.').pop();
     const path = `${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from('product-images').upload(path, file);
-    if (error) {
-      toast({ title: t('imageUploadError') || 'Error al subir imagen', description: error.message, variant: 'destructive' });
-      setter(false);
-      return;
-    }
+    if (error) { toast({ title: t('imageUploadError') || 'Error al subir imagen', description: error.message, variant: 'destructive' }); setter(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path);
-    if (orientation === 'horizontal') {
-      setImageForm(f => ({ ...f, thumbnail_url: publicUrl }));
-    } else {
-      setImageForm(f => ({ ...f, thumbnail_vertical_url: publicUrl }));
-    }
+    if (orientation === 'horizontal') setImageForm(f => ({ ...f, thumbnail_url: publicUrl }));
+    else setImageForm(f => ({ ...f, thumbnail_vertical_url: publicUrl }));
     setter(false);
     toast({ title: t('imageUploaded') || 'Imagen subida' });
   };
 
   const openImageEditor = (course: Course) => {
     setImageEditorCourseId(course.id);
-    setImageForm({
-      thumbnail_url: course.thumbnail_url || '',
-      thumbnail_vertical_url: course.thumbnail_vertical_url || '',
-    });
+    setImageForm({ thumbnail_url: course.thumbnail_url || '', thumbnail_vertical_url: course.thumbnail_vertical_url || '' });
     setShowImageEditor(true);
   };
 
   const saveCourseImages = async () => {
     if (!imageEditorCourseId) return;
-    await supabase.from('courses').update({
-      thumbnail_url: imageForm.thumbnail_url || null,
-      thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null,
-    }).eq('id', imageEditorCourseId);
-    // Also sync product if linked
-    await supabase.from('products').update({
-      thumbnail_url: imageForm.thumbnail_url || null,
-      thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null,
-    }).eq('course_id', imageEditorCourseId);
+    await supabase.from('courses').update({ thumbnail_url: imageForm.thumbnail_url || null, thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null }).eq('id', imageEditorCourseId);
+    await supabase.from('products').update({ thumbnail_url: imageForm.thumbnail_url || null, thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null }).eq('course_id', imageEditorCourseId);
     toast({ title: t('courseUpdated') || 'Contenido actualizado' });
     setShowImageEditor(false);
     fetchCourses();
@@ -155,7 +193,11 @@ const AdminCourses: React.FC = () => {
       const { data: enrollments } = await supabase.from('course_enrollments').select('course_id');
       const countMap: Record<string, number> = {};
       enrollments?.forEach(e => { countMap[e.course_id] = (countMap[e.course_id] || 0) + 1; });
-      setCourses(coursesData.map((c: any) => ({ ...c, category: c.course_categories, enrollment_count: countMap[c.id] || 0 })));
+      // Get product_ids for each course
+      const { data: products } = await supabase.from('products').select('id, course_id').not('course_id', 'is', null);
+      const productMap: Record<string, string> = {};
+      products?.forEach(p => { if (p.course_id) productMap[p.course_id] = p.id; });
+      setCourses(coursesData.map((c: any) => ({ ...c, category: c.course_categories, enrollment_count: countMap[c.id] || 0, product_id: productMap[c.id] })));
     }
     setLoading(false);
   }, []);
@@ -174,12 +216,10 @@ const AdminCourses: React.FC = () => {
     const { data: lessons } = moduleIds.length > 0
       ? await supabase.from('course_lessons').select('*').in('module_id', moduleIds).order('sort_order')
       : { data: [] };
-    
     const lessonIds = (lessons || []).map(l => l.id);
     const { data: contents } = lessonIds.length > 0
       ? await supabase.from('lesson_contents').select('*').in('lesson_id', lessonIds).order('sort_order')
       : { data: [] };
-
     setCourseModules(prev => ({
       ...prev,
       [courseId]: (modules || []).map(m => ({
@@ -203,6 +243,10 @@ const AdminCourses: React.FC = () => {
 
   const toggleLessonExpand = (lessonId: string) => {
     setExpandedLessons(prev => { const next = new Set(prev); next.has(lessonId) ? next.delete(lessonId) : next.add(lessonId); return next; });
+  };
+
+  const toggleModuleExpand = (id: string) => {
+    setExpandedModules(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   };
 
   // Status toggle
@@ -232,6 +276,28 @@ const AdminCourses: React.FC = () => {
     fetchCategories(); fetchCourses();
     toast({ title: t('categoryDeleted') || 'Categoría eliminada' });
     setShowDeleteCategoryConfirm(false); setDeleteCategoryId(null);
+  };
+
+  // Product-Category assignment
+  const openCategoryAssign = async (course: Course) => {
+    if (!course.product_id) { toast({ title: 'Produto não encontrado', variant: 'destructive' }); return; }
+    setCategoryAssignCourseId(course.product_id);
+    const { data } = await supabase.from('product_categories').select('category_id').eq('product_id', course.product_id);
+    setAssignedCategories(new Set((data || []).map(d => d.category_id)));
+    setShowCategoryAssign(true);
+  };
+
+  const toggleCategoryAssign = async (categoryId: string) => {
+    if (!categoryAssignCourseId) return;
+    const isAssigned = assignedCategories.has(categoryId);
+    if (isAssigned) {
+      await supabase.from('product_categories').delete().eq('product_id', categoryAssignCourseId).eq('category_id', categoryId);
+      setAssignedCategories(prev => { const n = new Set(prev); n.delete(categoryId); return n; });
+    } else {
+      await supabase.from('product_categories').insert({ product_id: categoryAssignCourseId, category_id: categoryId });
+      setAssignedCategories(prev => new Set(prev).add(categoryId));
+    }
+    toast({ title: isAssigned ? 'Categoria removida' : 'Categoria associada' });
   };
 
   // Inline Module CRUD
@@ -286,23 +352,49 @@ const AdminCourses: React.FC = () => {
     fetchCourseModules(courseId);
     toast({ title: t('contentAdded') });
   };
-
-  const startEditContent = (c: LessonContent) => {
-    setEditingContent(c.id);
-    setContentForm({ title: c.title, type: c.type, content: c.content || '' });
-  };
-
+  const startEditContent = (c: LessonContent) => { setEditingContent(c.id); setContentForm({ title: c.title, type: c.type, content: c.content || '' }); };
   const saveContent = async (contentId: string, courseId: string) => {
     await supabase.from('lesson_contents').update({ title: contentForm.title, type: contentForm.type, content: contentForm.content || null } as any).eq('id', contentId);
-    setEditingContent(null);
-    fetchCourseModules(courseId);
+    setEditingContent(null); fetchCourseModules(courseId);
     toast({ title: t('contentSaved') });
   };
-
   const deleteContent = async (contentId: string, courseId: string) => {
     await supabase.from('lesson_contents').delete().eq('id', contentId);
     fetchCourseModules(courseId);
     toast({ title: t('contentDeleted') });
+  };
+
+  // Drag-and-drop handlers
+  const handleModuleDragEnd = async (event: DragEndEvent, courseId: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const modules = courseModules[courseId] || [];
+    const oldIndex = modules.findIndex(m => m.id === active.id);
+    const newIndex = modules.findIndex(m => m.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(modules, oldIndex, newIndex);
+    setCourseModules(prev => ({ ...prev, [courseId]: reordered }));
+    // Persist new order
+    await Promise.all(reordered.map((m, i) => supabase.from('course_modules').update({ sort_order: i }).eq('id', m.id)));
+    toast({ title: 'Ordem dos módulos atualizada' });
+  };
+
+  const handleLessonDragEnd = async (event: DragEndEvent, moduleId: string, courseId: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const modules = courseModules[courseId] || [];
+    const mod = modules.find(m => m.id === moduleId);
+    if (!mod) return;
+    const oldIndex = mod.lessons.findIndex(l => l.id === active.id);
+    const newIndex = mod.lessons.findIndex(l => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(mod.lessons, oldIndex, newIndex);
+    setCourseModules(prev => ({
+      ...prev,
+      [courseId]: prev[courseId].map(m => m.id === moduleId ? { ...m, lessons: reordered } : m),
+    }));
+    await Promise.all(reordered.map((l, i) => supabase.from('course_lessons').update({ sort_order: i }).eq('id', l.id)));
+    toast({ title: 'Ordem das aulas atualizada' });
   };
 
   // Students
@@ -317,10 +409,6 @@ const AdminCourses: React.FC = () => {
       setStudents(enriched);
     } else { setStudents([]); }
     setShowStudentList(true);
-  };
-
-  const toggleModuleExpand = (id: string) => {
-    setExpandedModules(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   };
 
   const filtered = courses.filter(c => {
@@ -338,7 +426,7 @@ const AdminCourses: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-display font-bold text-foreground">{t('manageCourses')}</h2>
+          <h2 className="text-xl font-display font-bold text-foreground">{t('myLibrary') || 'Minha Biblioteca'}</h2>
           <p className="text-sm text-muted-foreground">{t('adminCoursesDesc')}</p>
           <p className="text-xs text-muted-foreground mt-1">{t('contentCreatedViaProducts')}</p>
         </div>
@@ -415,6 +503,9 @@ const AdminCourses: React.FC = () => {
                     <Switch checked={course.status === 'published'} onCheckedChange={() => confirmToggleStatus(course.id, course.status)} />
                     <span className="text-xs text-muted-foreground">{t('published')}</span>
                   </div>
+                  <Button variant="ghost" size="sm" onClick={() => openCategoryAssign(course)} title="Categorias">
+                    <Tag className="w-4 h-4" />
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => openImageEditor(course)} title={t('horizontalImage')}>
                     <Image className="w-4 h-4" />
                   </Button>
@@ -424,149 +515,159 @@ const AdminCourses: React.FC = () => {
                 </div>
               </div>
 
-              {/* Expandable modules/lessons */}
+              {/* Expandable modules/lessons with drag-and-drop */}
               {expandedCourses.has(course.id) && (
                 <div className="border-t border-border bg-secondary/30 p-4 space-y-2">
                   {loadingModules.has(course.id) ? (
                     <p className="text-sm text-muted-foreground text-center py-4">{t('loading')}...</p>
                   ) : (
                     <>
-                      {(courseModules[course.id] || []).map((mod, mi) => (
-                        <div key={mod.id} className="border border-border rounded-lg overflow-hidden bg-card">
-                          <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/50">
-                            <button onClick={() => toggleModuleExpand(mod.id)} className="flex items-center gap-2 flex-1 text-left">
-                              {expandedModules.has(mod.id) ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                              {inlineEditingModule === mod.id ? (
-                                <Input value={inlineModuleForm.title} onChange={e => setInlineModuleForm(f => ({ ...f, title: e.target.value }))}
-                                  className="bg-background border-border h-7 text-sm w-64" onClick={e => e.stopPropagation()}
-                                  onKeyDown={e => { if (e.key === 'Enter') saveInlineModule(mod); if (e.key === 'Escape') setInlineEditingModule(null); }} />
-                              ) : (
-                                <span className="font-medium text-foreground text-sm">{mi + 1}. {mod.title}</span>
-                              )}
-                              <Badge variant="secondary" className="text-xs">{mod.lessons.length} {t('lessons')}</Badge>
-                            </button>
-                            <div className="flex gap-1">
-                              {inlineEditingModule === mod.id ? (
-                                <>
-                                  <Button variant="ghost" size="sm" onClick={() => saveInlineModule(mod)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
-                                  <Button variant="ghost" size="sm" onClick={() => setInlineEditingModule(null)} className="h-7"><X className="w-3 h-3" /></Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button variant="ghost" size="sm" onClick={() => startEditModule(mod)} className="h-7"><Edit className="w-3 h-3" /></Button>
-                                  <Button variant="ghost" size="sm" onClick={() => deleteModuleInline(mod)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          {expandedModules.has(mod.id) && (
-                            <div className="p-3 space-y-2">
-                              {mod.lessons.map((lesson, li) => (
-                                <div key={lesson.id} className="rounded-lg bg-background border border-border/50">
-                                  <div className="px-3 py-2">
-                                    {inlineEditingLesson === lesson.id ? (
-                                      <div className="space-y-2">
-                                        <Input value={inlineLessonForm.title} onChange={e => setInlineLessonForm(f => ({ ...f, title: e.target.value }))}
-                                          className="bg-secondary border-border h-8 text-sm" placeholder={t('lessonTitle') || 'Título'} />
-                                        <Input value={inlineLessonForm.video_url} onChange={e => setInlineLessonForm(f => ({ ...f, video_url: e.target.value }))}
-                                          className="bg-secondary border-border h-8 text-sm" placeholder={t('videoUrl') || 'URL del video'} />
-                                        <div className="flex gap-2 items-center">
-                                          <label className="text-xs text-muted-foreground block mb-0.5">{t('durationMinutes') || 'Duração (minutos)'}</label>
-                                          <Input type="number" value={inlineLessonForm.duration_minutes}
-                                            onChange={e => setInlineLessonForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 0 }))}
-                                            className="bg-secondary border-border h-8 text-sm w-24" placeholder="min" />
-                                          <div className="flex items-center gap-1">
-                                            <Switch checked={inlineLessonForm.is_free} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_free: v }))} />
-                                            <span className="text-xs text-muted-foreground">{t('free') || 'Gratis'}</span>
-                                          </div>
-                                          <div className="flex gap-1 ml-auto">
-                                            <Button size="sm" variant="ghost" onClick={() => saveInlineLesson(lesson, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
-                                            <Button size="sm" variant="ghost" onClick={() => setInlineEditingLesson(null)} className="h-7"><X className="w-3 h-3" /></Button>
-                                          </div>
-                                        </div>
-                                      </div>
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleModuleDragEnd(e, course.id)}>
+                        <SortableContext items={(courseModules[course.id] || []).map(m => m.id)} strategy={verticalListSortingStrategy}>
+                          {(courseModules[course.id] || []).map((mod, mi) => (
+                            <SortableModuleItem key={mod.id} mod={mod} mi={mi}>
+                              <div className="border border-border rounded-lg overflow-hidden bg-card">
+                                <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/50">
+                                  <button onClick={() => toggleModuleExpand(mod.id)} className="flex items-center gap-2 flex-1 text-left">
+                                    {expandedModules.has(mod.id) ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                                    {inlineEditingModule === mod.id ? (
+                                      <Input value={inlineModuleForm.title} onChange={e => setInlineModuleForm(f => ({ ...f, title: e.target.value }))}
+                                        className="bg-background border-border h-7 text-sm w-64" onClick={e => e.stopPropagation()}
+                                        onKeyDown={e => { if (e.key === 'Enter') saveInlineModule(mod); if (e.key === 'Escape') setInlineEditingModule(null); }} />
                                     ) : (
-                                      <div className="flex items-center gap-3">
-                                        <button onClick={() => toggleLessonExpand(lesson.id)} className="text-muted-foreground hover:text-foreground shrink-0">
-                                          {expandedLessons.has(lesson.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                                        </button>
-                                        <Video className="w-4 h-4 text-muted-foreground shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-medium text-foreground truncate">{li + 1}. {lesson.title}</p>
-                                          <div className="flex gap-2 text-xs text-muted-foreground">
-                                            {lesson.duration_minutes ? <span>{lesson.duration_minutes} min</span> : null}
-                                            {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
-                                            {lesson.contents && lesson.contents.length > 0 && (
-                                              <span className="flex items-center gap-1">
-                                                {lesson.contents.length} {lesson.contents.length === 1 ? t('contentCount') : t('contentsCount')}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <Button variant="ghost" size="sm" onClick={() => startEditLesson(lesson)} className="h-7"><Edit className="w-3 h-3" /></Button>
-                                        <Button variant="ghost" size="sm" onClick={() => deleteLessonInline(lesson.id, course.id)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
-                                      </div>
+                                      <span className="font-medium text-foreground text-sm">{mi + 1}. {mod.title}</span>
+                                    )}
+                                    <Badge variant="secondary" className="text-xs">{mod.lessons.length} {t('lessons')}</Badge>
+                                  </button>
+                                  <div className="flex gap-1">
+                                    {inlineEditingModule === mod.id ? (
+                                      <>
+                                        <Button variant="ghost" size="sm" onClick={() => saveInlineModule(mod)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                        <Button variant="ghost" size="sm" onClick={() => setInlineEditingModule(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button variant="ghost" size="sm" onClick={() => startEditModule(mod)} className="h-7"><Edit className="w-3 h-3" /></Button>
+                                        <Button variant="ghost" size="sm" onClick={() => deleteModuleInline(mod)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
+                                      </>
                                     )}
                                   </div>
-
-                                  {/* Lesson contents */}
-                                  {expandedLessons.has(lesson.id) && (
-                                    <div className="border-t border-border/50 px-3 py-2 space-y-2 bg-secondary/20">
-                                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('lessonContents')}</p>
-                                      {(lesson.contents || []).map(cont => (
-                                        <div key={cont.id} className="flex items-start gap-2 p-2 rounded-md bg-background border border-border/30">
-                                          {editingContent === cont.id ? (
-                                            <div className="flex-1 space-y-2">
-                                              <Input value={contentForm.title} onChange={e => setContentForm(f => ({ ...f, title: e.target.value }))}
-                                                className="bg-secondary border-border h-7 text-sm" placeholder={t('contentTitle')} />
-                                              <Select value={contentForm.type} onValueChange={(v: any) => setContentForm(f => ({ ...f, type: v }))}>
-                                                <SelectTrigger className="h-7 text-sm bg-secondary border-border w-32"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                  {Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => (
-                                                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                                                  ))}
-                                                </SelectContent>
-                                              </Select>
-                                              {contentForm.type === 'text' ? (
-                                                <Textarea value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
-                                                  className="bg-secondary border-border text-sm min-h-[60px]" placeholder="Texto / Markdown" />
-                                              ) : (
-                                                <Input value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
-                                                  className="bg-secondary border-border h-7 text-sm" placeholder="URL" />
-                                              )}
-                                              <div className="flex gap-1">
-                                                <Button size="sm" variant="ghost" onClick={() => saveContent(cont.id, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
-                                                <Button size="sm" variant="ghost" onClick={() => setEditingContent(null)} className="h-7"><X className="w-3 h-3" /></Button>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <>
-                                              <span className="text-muted-foreground mt-0.5">{CONTENT_TYPE_ICONS[cont.type]}</span>
-                                              <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-foreground truncate">{cont.title}</p>
-                                                <p className="text-xs text-muted-foreground">{CONTENT_TYPE_LABELS[cont.type]}</p>
-                                              </div>
-                                              <Button variant="ghost" size="sm" onClick={() => startEditContent(cont)} className="h-6"><Edit className="w-3 h-3" /></Button>
-                                              <Button variant="ghost" size="sm" onClick={() => deleteContent(cont.id, course.id)} className="text-destructive h-6"><Trash2 className="w-3 h-3" /></Button>
-                                            </>
-                                          )}
-                                        </div>
-                                      ))}
-                                      <Button size="sm" variant="ghost" onClick={() => addContent(lesson.id, course.id)} className="gap-1 w-full text-primary text-xs">
-                                        <Plus className="w-3.5 h-3.5" /> {t('addContent')}
-                                      </Button>
-                                    </div>
-                                  )}
                                 </div>
-                              ))}
-                              <Button size="sm" variant="ghost" onClick={() => openNewLessonInline(mod.id, course.id)} className="gap-1 w-full text-primary">
-                                <FilePlus className="w-4 h-4" /> {t('addLesson') || 'Agregar Aula'}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+
+                                {expandedModules.has(mod.id) && (
+                                  <div className="p-3 space-y-2">
+                                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleLessonDragEnd(e, mod.id, course.id)}>
+                                      <SortableContext items={mod.lessons.map(l => l.id)} strategy={verticalListSortingStrategy}>
+                                        {mod.lessons.map((lesson, li) => (
+                                          <SortableLessonItem key={lesson.id} lesson={lesson}>
+                                            <div className="rounded-lg bg-background border border-border/50">
+                                              <div className="px-3 py-2">
+                                                {inlineEditingLesson === lesson.id ? (
+                                                  <div className="space-y-2">
+                                                    <Input value={inlineLessonForm.title} onChange={e => setInlineLessonForm(f => ({ ...f, title: e.target.value }))}
+                                                      className="bg-secondary border-border h-8 text-sm" placeholder={t('lessonTitle') || 'Título'} />
+                                                    <Input value={inlineLessonForm.video_url} onChange={e => setInlineLessonForm(f => ({ ...f, video_url: e.target.value }))}
+                                                      className="bg-secondary border-border h-8 text-sm" placeholder={t('videoUrl') || 'URL del video'} />
+                                                    <div className="flex gap-2 items-center">
+                                                      <label className="text-xs text-muted-foreground block mb-0.5">{t('durationMinutes') || 'Duração (minutos)'}</label>
+                                                      <Input type="number" value={inlineLessonForm.duration_minutes}
+                                                        onChange={e => setInlineLessonForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 0 }))}
+                                                        className="bg-secondary border-border h-8 text-sm w-24" placeholder="min" />
+                                                      <div className="flex items-center gap-1">
+                                                        <Switch checked={inlineLessonForm.is_free} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_free: v }))} />
+                                                        <span className="text-xs text-muted-foreground">{t('free') || 'Gratis'}</span>
+                                                      </div>
+                                                      <div className="flex gap-1 ml-auto">
+                                                        <Button size="sm" variant="ghost" onClick={() => saveInlineLesson(lesson, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                                        <Button size="sm" variant="ghost" onClick={() => setInlineEditingLesson(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ) : (
+                                                  <div className="flex items-center gap-3">
+                                                    <button onClick={() => toggleLessonExpand(lesson.id)} className="text-muted-foreground hover:text-foreground shrink-0">
+                                                      {expandedLessons.has(lesson.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                    <Video className="w-4 h-4 text-muted-foreground shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                      <p className="text-sm font-medium text-foreground truncate">{li + 1}. {lesson.title}</p>
+                                                      <div className="flex gap-2 text-xs text-muted-foreground">
+                                                        {lesson.duration_minutes ? <span>{lesson.duration_minutes} min</span> : null}
+                                                        {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
+                                                        {lesson.contents && lesson.contents.length > 0 && (
+                                                          <span>{lesson.contents.length} {t('contentsCount') || 'conteúdos'}</span>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    <Button variant="ghost" size="sm" onClick={() => startEditLesson(lesson)} className="h-7"><Edit className="w-3 h-3" /></Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => deleteLessonInline(lesson.id, course.id)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {/* Lesson contents */}
+                                              {expandedLessons.has(lesson.id) && (
+                                                <div className="border-t border-border/50 px-3 py-2 space-y-2 bg-secondary/20">
+                                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('lessonContents')}</p>
+                                                  {(lesson.contents || []).map(cont => (
+                                                    <div key={cont.id} className="flex items-start gap-2 p-2 rounded-md bg-background border border-border/30">
+                                                      {editingContent === cont.id ? (
+                                                        <div className="flex-1 space-y-2">
+                                                          <Input value={contentForm.title} onChange={e => setContentForm(f => ({ ...f, title: e.target.value }))}
+                                                            className="bg-secondary border-border h-7 text-sm" placeholder={t('contentTitle')} />
+                                                          <Select value={contentForm.type} onValueChange={(v: any) => setContentForm(f => ({ ...f, type: v }))}>
+                                                            <SelectTrigger className="h-7 text-sm bg-secondary border-border w-32"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                              {Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => (
+                                                                <SelectItem key={k} value={k}>{v}</SelectItem>
+                                                              ))}
+                                                            </SelectContent>
+                                                          </Select>
+                                                          {contentForm.type === 'text' ? (
+                                                            <Textarea value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
+                                                              className="bg-secondary border-border text-sm min-h-[60px]" placeholder="Texto / Markdown" />
+                                                          ) : (
+                                                            <Input value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
+                                                              className="bg-secondary border-border h-7 text-sm" placeholder="URL" />
+                                                          )}
+                                                          <div className="flex gap-1">
+                                                            <Button size="sm" variant="ghost" onClick={() => saveContent(cont.id, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                                            <Button size="sm" variant="ghost" onClick={() => setEditingContent(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                                          </div>
+                                                        </div>
+                                                      ) : (
+                                                        <>
+                                                          <span className="text-muted-foreground mt-0.5">{CONTENT_TYPE_ICONS[cont.type]}</span>
+                                                          <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-foreground truncate">{cont.title}</p>
+                                                            <p className="text-xs text-muted-foreground">{CONTENT_TYPE_LABELS[cont.type]}</p>
+                                                          </div>
+                                                          <Button variant="ghost" size="sm" onClick={() => startEditContent(cont)} className="h-6"><Edit className="w-3 h-3" /></Button>
+                                                          <Button variant="ghost" size="sm" onClick={() => deleteContent(cont.id, course.id)} className="text-destructive h-6"><Trash2 className="w-3 h-3" /></Button>
+                                                        </>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                  <Button size="sm" variant="ghost" onClick={() => addContent(lesson.id, course.id)} className="gap-1 w-full text-primary text-xs">
+                                                    <Plus className="w-3.5 h-3.5" /> {t('addContent')}
+                                                  </Button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </SortableLessonItem>
+                                        ))}
+                                      </SortableContext>
+                                    </DndContext>
+                                    <Button size="sm" variant="ghost" onClick={() => openNewLessonInline(mod.id, course.id)} className="gap-1 w-full text-primary">
+                                      <FilePlus className="w-4 h-4" /> {t('addLesson') || 'Agregar Aula'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </SortableModuleItem>
+                          ))}
+                        </SortableContext>
+                      </DndContext>
                       <Button size="sm" variant="outline" onClick={() => openNewModuleInline(course.id)} className="gap-1 w-full">
                         <FolderPlus className="w-4 h-4" /> {t('addModule') || 'Agregar Módulo'}
                       </Button>
@@ -600,6 +701,28 @@ const AdminCourses: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Category Assignment to Product */}
+      <Dialog open={showCategoryAssign} onOpenChange={setShowCategoryAssign}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Associar Categorias</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {categories.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma categoria criada</p>
+            ) : categories.map(cat => (
+              <label key={cat.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer transition-colors">
+                <Checkbox checked={assignedCategories.has(cat.id)} onCheckedChange={() => toggleCategoryAssign(cat.id)} />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{cat.name}</p>
+                  {cat.description && <p className="text-xs text-muted-foreground">{cat.description}</p>}
+                </div>
+              </label>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Category Confirm */}
       <AlertDialog open={showDeleteCategoryConfirm} onOpenChange={setShowDeleteCategoryConfirm}>
         <AlertDialogContent className="bg-card border-border">
@@ -620,9 +743,7 @@ const AdminCourses: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>{publishAction === 'published' ? (t('publishCourseConfirm') || '¿Publicar este curso?') : (t('unpublishCourseConfirm') || '¿Mover a borrador?')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {publishAction === 'published'
-                ? (t('publishCourseDesc') || 'El curso será visible para todos los usuarios.')
-                : (t('unpublishCourseDesc') || 'El curso dejará de ser visible para los usuarios.')}
+              {publishAction === 'published' ? (t('publishCourseDesc') || 'El curso será visible para todos los usuarios.') : (t('unpublishCourseDesc') || 'El curso dejará de ser visible para los usuarios.')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
