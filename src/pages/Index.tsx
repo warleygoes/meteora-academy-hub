@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ContentProduct } from '@/lib/courseTypes';
 import { logSystemEvent } from '@/lib/systemLog';
 
-interface Trail {
+interface PackageShowcase {
   id: string;
   name: string;
   description: string | null;
@@ -20,21 +20,20 @@ const Index: React.FC = () => {
   const { t } = useLanguage();
   const { products, loading } = useContentProducts();
   const { user } = useAuth();
-  const [trails, setTrails] = useState<Trail[]>([]);
+  const [packageShowcases, setPackageShowcases] = useState<PackageShowcase[]>([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
   const [freeProductIds, setFreeProductIds] = useState<Set<string>>(new Set());
 
-  // Fetch trails (packages marked as is_trail + show_in_showcase)
+  // Fetch packages marked with show_in_showcase
   useEffect(() => {
-    const fetchTrails = async () => {
+    const fetchPackages = async () => {
       const { data: pkgs } = await supabase
         .from('packages')
         .select('id, name, description')
-        .eq('is_trail', true)
         .eq('show_in_showcase', true)
         .eq('active', true);
 
-      if (!pkgs || pkgs.length === 0) return;
+      if (!pkgs || pkgs.length === 0) { setPackageShowcases([]); return; }
 
       const { data: ppData } = await supabase
         .from('package_products')
@@ -42,11 +41,11 @@ const Index: React.FC = () => {
         .in('package_id', pkgs.map(p => p.id))
         .order('sort_order');
 
-      const trailMap: Record<string, ContentProduct[]> = {};
+      const prodMap: Record<string, ContentProduct[]> = {};
       (ppData || []).forEach((pp: any) => {
         if (!pp.products || !pp.products.active) return;
-        if (!trailMap[pp.package_id]) trailMap[pp.package_id] = [];
-        trailMap[pp.package_id].push({
+        if (!prodMap[pp.package_id]) prodMap[pp.package_id] = [];
+        prodMap[pp.package_id].push({
           id: pp.products.id,
           name: pp.products.name,
           description: pp.products.description,
@@ -60,12 +59,16 @@ const Index: React.FC = () => {
         });
       });
 
-      setTrails(pkgs.map(p => ({ id: p.id, name: p.name, description: p.description, products: trailMap[p.id] || [] })).filter(t => t.products.length > 0));
+      setPackageShowcases(
+        pkgs
+          .map(p => ({ id: p.id, name: p.name, description: p.description, products: prodMap[p.id] || [] }))
+          .filter(p => p.products.length > 0)
+      );
     };
-    fetchTrails();
+    fetchPackages();
   }, []);
 
-  // Fetch free product IDs (products that have an offer with price = 0)
+  // Fetch free product IDs
   useEffect(() => {
     const fetchFree = async () => {
       const { data } = await supabase.from('offers').select('product_id').eq('price', 0).not('product_id', 'is', null);
@@ -126,8 +129,8 @@ const Index: React.FC = () => {
         {myCourses.length > 0 && (
           <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} />
         )}
-        {trails.map(trail => (
-          <CourseCarousel key={trail.id} title={`🎯 ${trail.name}`} products={trail.products} variant="vertical" />
+        {packageShowcases.map(pkg => (
+          <CourseCarousel key={pkg.id} title={`📦 ${pkg.name}`} products={pkg.products} variant="vertical" />
         ))}
         {freeCourses.length > 0 && (
           <CourseCarousel title={`🆓 ${t('freeCourses') || 'Cursos Gratuitos'}`} products={freeCourses} variant="vertical" />
