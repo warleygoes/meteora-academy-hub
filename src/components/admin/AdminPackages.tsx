@@ -28,6 +28,7 @@ interface Offer {
   valid_from: string | null; valid_until: string | null;
   periodicity: string | null; hotmart_url: string | null;
   payment_link_active: boolean; duration_type: string; duration_days: number | null;
+  stripe_link_active: boolean; hotmart_link_active: boolean;
 }
 
 interface ProductRef {
@@ -100,6 +101,7 @@ const AdminPackages: React.FC = () => {
     name: 'Oferta Padrão', price: '', currency: 'USD', stripe_price_id: '',
     is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '',
     hotmart_url: '', payment_link_active: true, duration_type: 'no_expiration', duration_days: '',
+    stripe_link_active: false, hotmart_link_active: false,
   });
 
   const sensors = useSensors(
@@ -271,7 +273,7 @@ const AdminPackages: React.FC = () => {
   const openNewOffer = (pkgId: string) => {
     setOfferPkgId(pkgId);
     setEditingOffer(null);
-    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '', hotmart_url: '', payment_link_active: true, duration_type: 'no_expiration', duration_days: '' });
+    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '', hotmart_url: '', payment_link_active: true, duration_type: 'no_expiration', duration_days: '', stripe_link_active: false, hotmart_link_active: false });
     setShowOfferEditor(true);
   };
 
@@ -288,6 +290,8 @@ const AdminPackages: React.FC = () => {
       payment_link_active: offer.payment_link_active ?? true,
       duration_type: offer.duration_type || 'no_expiration',
       duration_days: offer.duration_days?.toString() || '',
+      stripe_link_active: offer.stripe_link_active ?? false,
+      hotmart_link_active: offer.hotmart_link_active ?? false,
     });
     setShowOfferEditor(true);
   };
@@ -301,9 +305,11 @@ const AdminPackages: React.FC = () => {
       valid_until: offerForm.valid_until ? new Date(offerForm.valid_until).toISOString() : null,
       periodicity: offerForm.periodicity || null,
       hotmart_url: offerForm.hotmart_url || null,
-      payment_link_active: offerForm.payment_link_active,
+      payment_link_active: offerForm.stripe_link_active || offerForm.hotmart_link_active,
       duration_type: offerForm.duration_type,
       duration_days: offerForm.duration_days ? parseInt(offerForm.duration_days) : null,
+      stripe_link_active: offerForm.stripe_link_active,
+      hotmart_link_active: offerForm.hotmart_link_active,
     };
     if (editingOffer) {
       await supabase.from('offers').update(payload).eq('id', editingOffer.id);
@@ -652,7 +658,7 @@ const AdminPackages: React.FC = () => {
             <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">{t('stripePaymentLink')}</label>
-                <Switch checked={!!offerForm.stripe_price_id && offerForm.payment_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, payment_link_active: v }))} />
+                <Switch checked={offerForm.stripe_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, stripe_link_active: v }))} />
               </div>
               <Input value={offerForm.stripe_price_id} onChange={e => setOfferForm(f => ({ ...f, stripe_price_id: e.target.value }))} className="bg-secondary border-border" placeholder="https://buy.stripe.com/..." />
               <p className="text-xs text-muted-foreground">{t('stripePaymentLinkHint')}</p>
@@ -662,7 +668,7 @@ const AdminPackages: React.FC = () => {
             <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">{t('hotmartUrl')}</label>
-                <Switch checked={!!offerForm.hotmart_url && offerForm.payment_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, payment_link_active: v }))} />
+                <Switch checked={offerForm.hotmart_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, hotmart_link_active: v }))} />
               </div>
               <Input value={offerForm.hotmart_url} onChange={e => setOfferForm(f => ({ ...f, hotmart_url: e.target.value }))} className="bg-secondary border-border" placeholder="https://pay.hotmart.com/..." />
             </div>

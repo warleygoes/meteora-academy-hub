@@ -7,6 +7,7 @@ interface Offer {
   id: string; name: string; price: number; currency: string;
   stripe_price_id: string | null; hotmart_url: string | null;
   payment_link_active: boolean; active: boolean;
+  stripe_link_active: boolean; hotmart_link_active: boolean;
 }
 
 interface CourseCarouselProps {

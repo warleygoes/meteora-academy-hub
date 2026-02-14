@@ -127,11 +127,7 @@ const CoursePage: React.FC = () => {
     const lesson = allLessons.find(l => l.id === lessonId);
     if (lesson && !canAccessLesson(lesson)) return;
     setActiveLessonId(lessonId);
-    if (!user || !courseId) return;
-    await supabase.from('lesson_progress').upsert(
-      { user_id: user.id, course_id: courseId, lesson_id: lessonId, updated_at: new Date().toISOString() } as any,
-      { onConflict: 'user_id,course_id' }
-    );
+    // Only track which lesson the user is viewing, don't touch completed status
   };
 
   const toggleComplete = async (lessonId: string) => {
@@ -142,11 +138,20 @@ const CoursePage: React.FC = () => {
       isCompleted ? next.delete(lessonId) : next.add(lessonId);
       return next;
     });
-    if (lessonId === activeLessonId) {
-      await supabase.from('lesson_progress').upsert(
-        { user_id: user.id, course_id: courseId, lesson_id: lessonId, completed: !isCompleted, updated_at: new Date().toISOString() } as any,
-        { onConflict: 'user_id,course_id' }
-      );
+    // Check if a progress record already exists for this specific lesson
+    const { data: existing } = await supabase
+      .from('lesson_progress')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('course_id', courseId)
+      .eq('lesson_id', lessonId)
+      .maybeSingle();
+    if (existing) {
+      await supabase.from('lesson_progress').update({ completed: !isCompleted, updated_at: new Date().toISOString() }).eq('id', existing.id);
+    } else {
+      await supabase.from('lesson_progress').insert({
+        user_id: user.id, course_id: courseId, lesson_id: lessonId, completed: !isCompleted, updated_at: new Date().toISOString(),
+      });
     }
   };
 
@@ -210,7 +215,11 @@ const CoursePage: React.FC = () => {
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-secondary/50 text-left transition-colors">
                   {expandedModules.has(mod.id) ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
                   <span className="text-sm font-medium text-foreground truncate">{mi + 1}. {mod.title}</span>
-                  <Badge variant="secondary" className="text-xs ml-auto shrink-0">{mod.lessons.length}</Badge>
+                  {mod.lessons.length > 0 && mod.lessons.every(l => completedLessons.has(l.id)) ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-500 ml-auto shrink-0" />
+                  ) : (
+                    <Badge variant="secondary" className="text-xs ml-auto shrink-0">{mod.lessons.filter(l => completedLessons.has(l.id)).length}/{mod.lessons.length}</Badge>
+                  )}
                 </button>
                 {expandedModules.has(mod.id) && (
                   <div className="ml-4 space-y-0.5">

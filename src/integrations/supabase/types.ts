@@ -749,6 +749,7 @@ export type Database = {
           currency: string
           duration_days: number | null
           duration_type: string
+          hotmart_link_active: boolean
           hotmart_url: string | null
           id: string
           is_default: boolean
@@ -758,6 +759,7 @@ export type Database = {
           periodicity: string | null
           price: number
           product_id: string | null
+          stripe_link_active: boolean
           stripe_price_id: string | null
           valid_from: string | null
           valid_until: string | null
@@ -768,6 +770,7 @@ export type Database = {
           currency?: string
           duration_days?: number | null
           duration_type?: string
+          hotmart_link_active?: boolean
           hotmart_url?: string | null
           id?: string
           is_default?: boolean
@@ -777,6 +780,7 @@ export type Database = {
           periodicity?: string | null
           price?: number
           product_id?: string | null
+          stripe_link_active?: boolean
           stripe_price_id?: string | null
           valid_from?: string | null
           valid_until?: string | null
@@ -787,6 +791,7 @@ export type Database = {
           currency?: string
           duration_days?: number | null
           duration_type?: string
+          hotmart_link_active?: boolean
           hotmart_url?: string | null
           id?: string
           is_default?: boolean
@@ -796,6 +801,7 @@ export type Database = {
           periodicity?: string | null
           price?: number
           product_id?: string | null
+          stripe_link_active?: boolean
           stripe_price_id?: string | null
           valid_from?: string | null
           valid_until?: string | null
