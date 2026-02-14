@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Plus, Edit, Trash2, CheckCircle2, Package as PackageIcon, Users, Tag, ChevronDown, ChevronRight, AlertTriangle, Calendar } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, CheckCircle2, Package as PackageIcon, Users, Tag, ChevronDown, ChevronRight, AlertTriangle, Calendar, Layers } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { logSystemEvent } from '@/lib/systemLog';
 
 interface Offer {
   id: string;
@@ -43,6 +44,18 @@ interface PackageData {
   subscriber_count: number;
   products: ProductRef[];
   offers: Offer[];
+  is_trail: boolean;
+  show_in_showcase: boolean;
+}
+
+interface ProductGroup {
+  id: string;
+  package_id: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  thumbnail_url: string | null;
+  thumbnail_vertical_url: string | null;
 }
 
 const AdminPackages: React.FC = () => {
@@ -69,6 +82,13 @@ const AdminPackages: React.FC = () => {
   const [offerPkgId, setOfferPkgId] = useState<string | null>(null);
   const [showDeleteOffer, setShowDeleteOffer] = useState(false);
   const [deleteOfferId, setDeleteOfferId] = useState<string | null>(null);
+
+  // Group editor
+  const [showGroupManager, setShowGroupManager] = useState(false);
+  const [groupPkgId, setGroupPkgId] = useState<string | null>(null);
+  const [groups, setGroups] = useState<ProductGroup[]>([]);
+  const [editingGroup, setEditingGroup] = useState<ProductGroup | null>(null);
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', sort_order: 0 });
 
   const [form, setForm] = useState({
     name: '', description: '', payment_type: 'one_time', features: '', duration_days: '',
@@ -154,6 +174,7 @@ const AdminPackages: React.FC = () => {
 
     if (editing) {
       await supabase.from('packages').update(payload).eq('id', editing.id);
+      logSystemEvent({ action: 'Paquete actualizado', entity_type: 'package', entity_id: editing.id, details: form.name, level: 'info' });
       toast({ title: t('packageUpdated') || 'Paquete actualizado' });
     } else {
       const { data: newPkg } = await supabase.from('packages').insert({ ...payload, active: true }).select().single();
@@ -162,6 +183,7 @@ const AdminPackages: React.FC = () => {
           package_id: newPkg.id, name: 'Oferta Padrão', price: 0, currency: 'USD', is_default: true, active: true,
         });
       }
+      logSystemEvent({ action: 'Paquete creado', entity_type: 'package', entity_id: newPkg?.id, details: form.name, level: 'success' });
       toast({ title: t('packageCreated') || 'Paquete creado' });
     }
     setShowEditor(false);
@@ -171,7 +193,9 @@ const AdminPackages: React.FC = () => {
   const confirmDelete = (id: string) => { setDeleteId(id); setShowDelete(true); };
   const executeDelete = async () => {
     if (!deleteId) return;
+    const pkg = packages.find(p => p.id === deleteId);
     await supabase.from('packages').delete().eq('id', deleteId);
+    logSystemEvent({ action: 'Paquete eliminado', entity_type: 'package', entity_id: deleteId, details: pkg?.name, level: 'warning' });
     toast({ title: t('packageDeleted') || 'Paquete eliminado' });
     setShowDelete(false); setDeleteId(null); fetchPackages();
   };
@@ -194,11 +218,45 @@ const AdminPackages: React.FC = () => {
   const saveProductLinks = async () => {
     if (!linkerPkgId) return;
     await supabase.from('package_products').delete().eq('package_id', linkerPkgId);
-    const inserts = Array.from(linkedProductIds).map(product_id => ({ package_id: linkerPkgId, product_id }));
+    const inserts = Array.from(linkedProductIds).map((product_id, i) => ({ package_id: linkerPkgId, product_id, sort_order: i }));
     if (inserts.length > 0) await supabase.from('package_products').insert(inserts);
+    logSystemEvent({ action: 'Productos del paquete actualizados', entity_type: 'package', entity_id: linkerPkgId, level: 'info' });
     toast({ title: t('productLinksUpdated') || 'Productos del paquete actualizados' });
     setShowProductLinker(false);
     fetchPackages();
+  };
+
+  // Group management
+  const openGroupManager = async (pkgId: string) => {
+    setGroupPkgId(pkgId);
+    const { data } = await supabase.from('package_product_groups').select('*').eq('package_id', pkgId).order('sort_order');
+    setGroups(data || []);
+    setEditingGroup(null);
+    setGroupForm({ name: '', description: '', sort_order: 0 });
+    setShowGroupManager(true);
+  };
+
+  const saveGroup = async () => {
+    if (!groupPkgId || !groupForm.name.trim()) return;
+    if (editingGroup) {
+      await supabase.from('package_product_groups').update({ name: groupForm.name, description: groupForm.description || null, sort_order: groupForm.sort_order }).eq('id', editingGroup.id);
+    } else {
+      await supabase.from('package_product_groups').insert({ package_id: groupPkgId, name: groupForm.name, description: groupForm.description || null, sort_order: groupForm.sort_order });
+    }
+    const { data } = await supabase.from('package_product_groups').select('*').eq('package_id', groupPkgId).order('sort_order');
+    setGroups(data || []);
+    setEditingGroup(null);
+    setGroupForm({ name: '', description: '', sort_order: 0 });
+    logSystemEvent({ action: editingGroup ? 'Grupo de trilha atualizado' : 'Grupo de trilha criado', entity_type: 'package', entity_id: groupPkgId, level: 'info' });
+    toast({ title: editingGroup ? 'Grupo atualizado' : 'Grupo criado' });
+  };
+
+  const deleteGroup = async (groupId: string) => {
+    // Unlink products from this group
+    await supabase.from('package_products').update({ group_id: null }).eq('group_id', groupId);
+    await supabase.from('package_product_groups').delete().eq('id', groupId);
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    toast({ title: 'Grupo excluído' });
   };
 
   const compatibleProducts = allProducts.filter(p => p.payment_type === linkerPaymentType);
@@ -296,6 +354,11 @@ const AdminPackages: React.FC = () => {
                       <Button variant="ghost" size="sm" onClick={() => openProductLinker(pkg.id)} title={t('linkProducts') || 'Vincular productos'}>
                         <PackageIcon className="w-4 h-4" />
                       </Button>
+                      {pkg.is_trail && (
+                        <Button variant="ghost" size="sm" onClick={() => openGroupManager(pkg.id)} title={t('trailGroups') || 'Grupos da Trilha'}>
+                          <Layers className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => openEdit(pkg)}><Edit className="w-4 h-4" /></Button>
                       <Button variant="ghost" size="sm" onClick={() => confirmDelete(pkg.id)} className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
                     </div>
@@ -581,6 +644,50 @@ const AdminPackages: React.FC = () => {
               </label>
             </div>
             <Button onClick={saveOffer} className="w-full">{t('save')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Group Manager */}
+      <Dialog open={showGroupManager} onOpenChange={setShowGroupManager}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display">{t('trailGroups') || 'Grupos da Trilha'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Existing groups */}
+            {groups.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">{t('noGroups') || 'Sem grupos.'}</p>
+            ) : (
+              <div className="space-y-2">
+                {groups.map(g => (
+                  <div key={g.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-foreground">{g.name}</span>
+                      {g.description && <p className="text-xs text-muted-foreground">{g.description}</p>}
+                      <span className="text-xs text-muted-foreground">Ordem: {g.sort_order}</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setEditingGroup(g);
+                      setGroupForm({ name: g.name, description: g.description || '', sort_order: g.sort_order });
+                    }}><Edit className="w-3.5 h-3.5" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => deleteGroup(g.id)} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add/Edit group form */}
+            <div className="border-t border-border pt-4 space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">{editingGroup ? 'Editar Grupo' : (t('addGroup') || 'Adicionar Grupo')}</h4>
+              <Input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} placeholder={t('groupName') || 'Nome do grupo'} className="bg-secondary border-border" />
+              <Textarea value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder={t('groupDescription') || 'Descrição'} className="bg-secondary border-border" rows={2} />
+              <Input type="number" value={groupForm.sort_order} onChange={e => setGroupForm(f => ({ ...f, sort_order: parseInt(e.target.value) || 0 }))} placeholder="Ordem" className="bg-secondary border-border w-24" />
+              <div className="flex gap-2">
+                <Button onClick={saveGroup} size="sm" disabled={!groupForm.name.trim()}>{t('save')}</Button>
+                {editingGroup && <Button variant="outline" size="sm" onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '', sort_order: 0 }); }}>{t('cancel')}</Button>}
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

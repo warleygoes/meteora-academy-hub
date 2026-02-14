@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { logSystemEvent } from '@/lib/systemLog';
 
 interface Offer {
   id: string; name: string; price: number; currency: string;
@@ -147,6 +148,7 @@ const AdminProducts: React.FC = () => {
           await supabase.from('products').update({ course_id: newCourse.id }).eq('id', editing.id);
         }
       }
+      logSystemEvent({ action: 'Producto actualizado', entity_type: 'product', entity_id: editing.id, details: form.name, level: 'info' });
       toast({ title: t('productUpdated') });
     } else {
       let courseId: string | null = null;
@@ -161,6 +163,7 @@ const AdminProducts: React.FC = () => {
       if (newProduct) {
         await supabase.from('offers').insert({ product_id: newProduct.id, name: t('defaultOffer'), price: 0, currency: 'USD', is_default: true, active: true });
       }
+      logSystemEvent({ action: 'Producto creado', entity_type: 'product', entity_id: newProduct?.id, details: form.name, level: 'success' });
       toast({ title: t('productCreated') });
     }
     setShowEditor(false);
@@ -208,6 +211,7 @@ const AdminProducts: React.FC = () => {
       await supabase.from('courses').delete().eq('id', product.course_id);
     }
     
+    logSystemEvent({ action: 'Producto eliminado', entity_type: 'product', entity_id: deleteId, details: product?.name, level: 'warning' });
     toast({ title: t('productDeleted') });
     setShowDelete(false); setDeleteId(null); fetchProducts();
   };

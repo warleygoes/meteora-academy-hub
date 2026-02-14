@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { logSystemEvent } from '@/lib/systemLog';
 
 interface Category { id: string; name: string; description: string | null; }
 
@@ -209,6 +210,7 @@ const AdminCourses: React.FC = () => {
   const executeToggleStatus = async () => {
     if (!publishCourseId) return;
     await supabase.from('courses').update({ status: publishAction }).eq('id', publishCourseId);
+    logSystemEvent({ action: publishAction === 'published' ? 'Curso publicado' : 'Curso despublicado', entity_type: 'course', entity_id: publishCourseId, level: 'info' });
     toast({ title: publishAction === 'published' ? (t('coursePublished') || 'Curso publicado') : (t('courseDrafted') || 'Curso movido a borrador') });
     setShowPublishConfirm(false); setPublishCourseId(null); fetchCourses();
   };

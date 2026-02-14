@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ContentProduct } from '@/lib/courseTypes';
+import { logSystemEvent } from '@/lib/systemLog';
 
 interface Trail {
   id: string;
@@ -21,6 +22,7 @@ const Index: React.FC = () => {
   const { user } = useAuth();
   const [trails, setTrails] = useState<Trail[]>([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
+  const [freeProductIds, setFreeProductIds] = useState<Set<string>>(new Set());
 
   // Fetch trails (packages marked as is_trail + show_in_showcase)
   useEffect(() => {
@@ -62,6 +64,15 @@ const Index: React.FC = () => {
     fetchTrails();
   }, []);
 
+  // Fetch free product IDs (products that have an offer with price = 0)
+  useEffect(() => {
+    const fetchFree = async () => {
+      const { data } = await supabase.from('offers').select('product_id').eq('price', 0).not('product_id', 'is', null);
+      setFreeProductIds(new Set((data || []).map(d => d.product_id!)));
+    };
+    fetchFree();
+  }, []);
+
   // Fetch user's enrolled courses
   useEffect(() => {
     if (!user) return;
@@ -72,9 +83,16 @@ const Index: React.FC = () => {
     fetch();
   }, [user]);
 
+  // Log page view
+  useEffect(() => {
+    if (user) {
+      logSystemEvent({ action: 'Acceso a vitrine', entity_type: 'auth', level: 'info' });
+    }
+  }, [user]);
+
   const continueWatching = products.filter(p => p.progress !== undefined && p.progress > 0 && p.progress < 100);
   const myCourses = products.filter(p => p.course_id && enrolledCourseIds.has(p.course_id));
-  const freeCourses = products; // All content products shown here; filter by price if available
+  const freeCourses = products.filter(p => freeProductIds.has(p.id));
   const allProducts = products;
 
   if (loading) {
@@ -110,6 +128,9 @@ const Index: React.FC = () => {
         {trails.map(trail => (
           <CourseCarousel key={trail.id} title={`🎯 ${trail.name}`} products={trail.products} />
         ))}
+        {freeCourses.length > 0 && (
+          <CourseCarousel title={`🆓 ${t('freeCourses') || 'Cursos Gratuitos'}`} products={freeCourses} />
+        )}
         {allProducts.length > 0 && (
           <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} />
         )}
