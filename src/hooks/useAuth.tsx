@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logSystemEvent } from '@/lib/systemLog';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -59,6 +60,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error) {
+      logSystemEvent({ action: 'Login', entity_type: 'auth', details: email, level: 'success' });
+    }
     return { error: error?.message ?? null };
   };
 
@@ -83,6 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    logSystemEvent({ action: 'Logout', entity_type: 'auth', level: 'info' });
     await supabase.auth.signOut();
   };
 

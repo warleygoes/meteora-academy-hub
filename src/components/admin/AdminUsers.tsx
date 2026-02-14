@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import UserPackagesManager from './UserPackagesManager';
 import UserDetailContent from './UserDetailContent';
 import ImportUsersDialog from './ImportUsersDialog';
+import { logSystemEvent } from '@/lib/systemLog';
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -224,7 +225,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: true, status: 'approved' } : prev);
     const { error } = await supabase.from('profiles').update({ approved: true, status: 'approved' }).eq('user_id', userId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers(); }
-    else { toast({ title: t('userApproved') }); fetchApprovedUsers(); fetchAllUsers(); }
+    else { logSystemEvent({ action: 'Usuario aprobado', entity_type: 'user', entity_id: userId, level: 'success' }); toast({ title: t('userApproved') }); fetchApprovedUsers(); fetchAllUsers(); }
   };
 
   
@@ -273,7 +274,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setSelectedUser(null);
     const { error } = await supabase.from('profiles').delete().eq('user_id', actionUserId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers(); }
-    else { toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' }); fetchAllUsers(); }
+    else { logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning' }); toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' }); fetchAllUsers(); }
     setShowDeleteConfirm(false); setActionUserId(null);
   };
 

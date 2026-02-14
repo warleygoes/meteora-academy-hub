@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { logSystemEvent } from '@/lib/systemLog';
 
 const AdminSettings: React.FC = () => {
   const { t } = useLanguage();
@@ -25,6 +26,7 @@ const AdminSettings: React.FC = () => {
   };
 
   const saveSettings = () => {
+    logSystemEvent({ action: 'Configuración guardada', entity_type: 'settings', level: 'info' });
     toast({ title: t('settingsSaved') });
   };
 
