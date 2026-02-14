@@ -3,26 +3,25 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronDown, ChevronRight, Video, FileText, Image, Music, Link as LinkIcon, FileDown, CheckCircle2, Circle, ArrowLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, Video, FileText, Image, Music, Link as LinkIcon, FileDown, CheckCircle2, Circle, ArrowLeft, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import VideoPlayer from '@/components/VideoPlayer';
 import LessonComments from '@/components/LessonComments';
+import LessonRating from '@/components/LessonRating';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
 
 interface LessonContent {
-  id: string;
-  lesson_id: string;
+  id: string; lesson_id: string;
   type: 'video' | 'text' | 'image' | 'audio' | 'link' | 'pdf';
-  title: string;
-  content: string | null;
-  sort_order: number;
+  title: string; content: string | null; sort_order: number;
 }
 
 interface Lesson {
   id: string; module_id: string; title: string; description: string | null;
-  video_url: string | null; duration_minutes: number | null; sort_order: number; is_free: boolean;
+  video_url: string | null; duration_minutes: number | null; sort_order: number;
+  is_free: boolean; is_private: boolean;
   contents: LessonContent[];
 }
 
@@ -36,12 +35,9 @@ interface Course {
 }
 
 const CONTENT_ICONS: Record<string, React.ReactNode> = {
-  video: <Video className="w-4 h-4" />,
-  text: <FileText className="w-4 h-4" />,
-  image: <Image className="w-4 h-4" />,
-  audio: <Music className="w-4 h-4" />,
-  link: <LinkIcon className="w-4 h-4" />,
-  pdf: <FileDown className="w-4 h-4" />,
+  video: <Video className="w-4 h-4" />, text: <FileText className="w-4 h-4" />,
+  image: <Image className="w-4 h-4" />, audio: <Music className="w-4 h-4" />,
+  link: <LinkIcon className="w-4 h-4" />, pdf: <FileDown className="w-4 h-4" />,
 };
 
 const CoursePage: React.FC = () => {
@@ -55,6 +51,7 @@ const CoursePage: React.FC = () => {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  const [accessiblePrivateLessons, setAccessiblePrivateLessons] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const allLessons = modules.flatMap(m => m.lessons);
@@ -73,12 +70,16 @@ const CoursePage: React.FC = () => {
     setCourse(courseData);
 
     const moduleIds = (modulesData || []).map(m => m.id);
-    const [{ data: lessonsData }, { data: progressData }] = await Promise.all([
+    const [{ data: lessonsData }, { data: progressData }, { data: accessData }] = await Promise.all([
       moduleIds.length > 0
         ? supabase.from('course_lessons').select('*').in('module_id', moduleIds).order('sort_order')
         : Promise.resolve({ data: [] as any[] }),
       supabase.from('lesson_progress').select('lesson_id, completed').eq('user_id', user.id).eq('course_id', courseId),
+      supabase.from('user_lesson_access').select('lesson_id').eq('user_id', user.id),
     ]);
+
+    // Set accessible private lessons
+    setAccessiblePrivateLessons(new Set((accessData || []).map(a => a.lesson_id)));
 
     const lessonIds = (lessonsData || []).map(l => l.id);
     const { data: contentsData } = lessonIds.length > 0
@@ -89,24 +90,22 @@ const CoursePage: React.FC = () => {
       ...m,
       lessons: (lessonsData || []).filter(l => l.module_id === m.id).map(l => ({
         ...l,
+        is_private: l.is_private || false,
         contents: ((contentsData || []) as LessonContent[]).filter(c => c.lesson_id === l.id),
       })),
     }));
 
     setModules(builtModules);
 
-    // Set completed lessons
     const completed = new Set<string>();
     (progressData || []).forEach(p => { if (p.completed) completed.add(p.lesson_id); });
     setCompletedLessons(completed);
 
-    // Resume: find last progress entry or first lesson
-    const lastProgress = progressData && progressData.length > 0 ? progressData[0] : null;
     const allL = builtModules.flatMap(m => m.lessons);
+    const lastProgress = progressData && progressData.length > 0 ? progressData[0] : null;
 
     if (lastProgress) {
       setActiveLessonId(lastProgress.lesson_id);
-      // Expand the module containing this lesson
       const parentMod = builtModules.find(m => m.lessons.some(l => l.id === lastProgress.lesson_id));
       if (parentMod) setExpandedModules(new Set([parentMod.id]));
     } else if (allL.length > 0) {
@@ -119,10 +118,16 @@ const CoursePage: React.FC = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const canAccessLesson = (lesson: Lesson) => {
+    if (!lesson.is_private) return true;
+    return accessiblePrivateLessons.has(lesson.id);
+  };
+
   const selectLesson = async (lessonId: string) => {
+    const lesson = allLessons.find(l => l.id === lessonId);
+    if (lesson && !canAccessLesson(lesson)) return;
     setActiveLessonId(lessonId);
     if (!user || !courseId) return;
-    // Upsert progress
     await supabase.from('lesson_progress').upsert(
       { user_id: user.id, course_id: courseId, lesson_id: lessonId, updated_at: new Date().toISOString() } as any,
       { onConflict: 'user_id,course_id' }
@@ -137,8 +142,6 @@ const CoursePage: React.FC = () => {
       isCompleted ? next.delete(lessonId) : next.add(lessonId);
       return next;
     });
-    // We need a separate tracking for per-lesson completion since lesson_progress is unique per course
-    // For now we just update if it's the active lesson
     if (lessonId === activeLessonId) {
       await supabase.from('lesson_progress').upsert(
         { user_id: user.id, course_id: courseId, lesson_id: lessonId, completed: !isCompleted, updated_at: new Date().toISOString() } as any,
@@ -153,41 +156,33 @@ const CoursePage: React.FC = () => {
 
   const renderContent = (content: LessonContent) => {
     switch (content.type) {
-      case 'video':
-        if (!content.content) return null;
-        return <VideoPlayer url={content.content} />;
-      case 'text':
-        return <div className="prose prose-invert max-w-none text-foreground text-sm leading-relaxed whitespace-pre-wrap">{content.content}</div>;
-      case 'image':
-        return content.content ? <img src={content.content} alt={content.title} className="rounded-lg max-w-full" /> : null;
-      case 'audio':
-        return content.content ? <audio src={content.content} controls className="w-full" /> : null;
-      case 'link':
-        return content.content ? (
-          <a href={content.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-2">
-            <LinkIcon className="w-4 h-4" /> {content.content}
+      case 'video': return content.content ? <VideoPlayer url={content.content} /> : null;
+      case 'text': return <div className="prose prose-invert max-w-none text-foreground text-sm leading-relaxed whitespace-pre-wrap">{content.content}</div>;
+      case 'image': return content.content ? <img src={content.content} alt={content.title} className="rounded-lg max-w-full" /> : null;
+      case 'audio': return content.content ? <audio src={content.content} controls className="w-full" /> : null;
+      case 'link': return content.content ? (
+        <a href={content.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-2">
+          <LinkIcon className="w-4 h-4" /> {content.content}
+        </a>
+      ) : null;
+      case 'pdf': return content.content ? (
+        <div className="space-y-2">
+          <iframe src={content.content} className="w-full h-[500px] rounded-lg border border-border" />
+          <a href={content.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm flex items-center gap-1">
+            <FileDown className="w-3.5 h-3.5" /> {t('downloadPdf') || 'Descargar PDF'}
           </a>
-        ) : null;
-      case 'pdf':
-        return content.content ? (
-          <div className="space-y-2">
-            <iframe src={content.content} className="w-full h-[500px] rounded-lg border border-border" />
-            <a href={content.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm flex items-center gap-1">
-              <FileDown className="w-3.5 h-3.5" /> Descargar PDF
-            </a>
-          </div>
-        ) : null;
-      default:
-        return null;
+        </div>
+      ) : null;
+      default: return null;
     }
   };
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">{t('loading')}...</div>;
-  if (!course) return <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">Curso no encontrado</div>;
+  if (!course) return <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">{t('courseNotFound') || 'Curso no encontrado'}</div>;
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)]">
-      {/* Sidebar - lesson navigation */}
+      {/* Sidebar */}
       <div className="w-full lg:w-80 xl:w-96 border-b lg:border-b-0 lg:border-r border-border bg-card flex-shrink-0">
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2 mb-2">
@@ -219,18 +214,27 @@ const CoursePage: React.FC = () => {
                 </button>
                 {expandedModules.has(mod.id) && (
                   <div className="ml-4 space-y-0.5">
-                    {mod.lessons.map((lesson, li) => (
-                      <button key={lesson.id} onClick={() => selectLesson(lesson.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left text-sm transition-colors ${
-                          activeLessonId === lesson.id ? 'bg-primary/10 text-primary' : 'hover:bg-secondary/50 text-muted-foreground'
-                        }`}>
-                        {completedLessons.has(lesson.id)
-                          ? <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                          : <Circle className="w-4 h-4 shrink-0" />}
-                        <span className="truncate">{li + 1}. {lesson.title}</span>
-                        {lesson.duration_minutes ? <span className="text-xs ml-auto shrink-0">{lesson.duration_minutes}m</span> : null}
-                      </button>
-                    ))}
+                    {mod.lessons.map((lesson, li) => {
+                      const hasAccess = canAccessLesson(lesson);
+                      return (
+                        <button key={lesson.id} onClick={() => hasAccess && selectLesson(lesson.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left text-sm transition-colors ${
+                            !hasAccess ? 'opacity-50 cursor-not-allowed' :
+                            activeLessonId === lesson.id ? 'bg-primary/10 text-primary' : 'hover:bg-secondary/50 text-muted-foreground'
+                          }`}>
+                          {lesson.is_private && !hasAccess ? (
+                            <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                          ) : completedLessons.has(lesson.id) ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                          ) : (
+                            <Circle className="w-4 h-4 shrink-0" />
+                          )}
+                          <span className="truncate">{li + 1}. {lesson.title}</span>
+                          {lesson.is_private && <Lock className="w-3 h-3 text-muted-foreground shrink-0" />}
+                          {lesson.duration_minutes ? <span className="text-xs ml-auto shrink-0">{lesson.duration_minutes}m</span> : null}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -239,7 +243,7 @@ const CoursePage: React.FC = () => {
         </ScrollArea>
       </div>
 
-      {/* Main content area */}
+      {/* Main content */}
       <div className="flex-1 overflow-y-auto">
         {activeLesson ? (
           <motion.div key={activeLesson.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 max-w-4xl mx-auto space-y-6">
@@ -248,20 +252,14 @@ const CoursePage: React.FC = () => {
               <Button variant="outline" size="sm" onClick={() => toggleComplete(activeLesson.id)}
                 className={completedLessons.has(activeLesson.id) ? 'text-green-500 border-green-500/30' : ''}>
                 {completedLessons.has(activeLesson.id) ? <CheckCircle2 className="w-4 h-4 mr-1" /> : <Circle className="w-4 h-4 mr-1" />}
-                {completedLessons.has(activeLesson.id) ? (t('completed') || 'Completada') : 'Marcar completada'}
+                {completedLessons.has(activeLesson.id) ? (t('completed') || 'Completada') : (t('markComplete') || 'Marcar completada')}
               </Button>
             </div>
 
-            {activeLesson.description && (
-              <p className="text-muted-foreground">{activeLesson.description}</p>
-            )}
+            {activeLesson.description && <p className="text-muted-foreground">{activeLesson.description}</p>}
 
-            {/* Legacy video_url fallback */}
-            {activeLesson.video_url && activeLesson.contents.length === 0 && (
-              <VideoPlayer url={activeLesson.video_url} />
-            )}
+            {activeLesson.video_url && activeLesson.contents.length === 0 && <VideoPlayer url={activeLesson.video_url} />}
 
-            {/* Render all contents */}
             {activeLesson.contents.map(cont => (
               <div key={cont.id} className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -272,12 +270,13 @@ const CoursePage: React.FC = () => {
               </div>
             ))}
 
-            {/* Comments */}
-            {courseId && (
-              <LessonComments lessonId={activeLesson.id} courseId={courseId} />
-            )}
+            {/* Rating */}
+            {courseId && <LessonRating lessonId={activeLesson.id} courseId={courseId} />}
 
-            {/* Navigation buttons */}
+            {/* Comments */}
+            {courseId && <LessonComments lessonId={activeLesson.id} courseId={courseId} />}
+
+            {/* Navigation */}
             <div className="flex justify-between pt-6 border-t border-border">
               {(() => {
                 const idx = allLessons.findIndex(l => l.id === activeLessonId);
@@ -296,7 +295,7 @@ const CoursePage: React.FC = () => {
           </motion.div>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            Selecciona una aula para comenzar
+            {t('selectLesson') || 'Selecciona una aula para comenzar'}
           </div>
         )}
       </div>

@@ -587,6 +587,13 @@ const AdminProducts: React.FC = () => {
                 <Input type="number" value={offerForm.duration_days} onChange={e => setOfferForm(f => ({ ...f, duration_days: e.target.value }))} className="bg-secondary border-border" placeholder="30" />
               </div>
             )}
+            {offerForm.duration_type === 'fixed_date' && (
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('expirationDate') || 'Data de expiração do acesso'}</label>
+                <Input type="date" value={offerForm.valid_until ? offerForm.valid_until.slice(0, 10) : ''} onChange={e => setOfferForm(f => ({ ...f, valid_until: e.target.value ? new Date(e.target.value).toISOString() : '' }))} className="bg-secondary border-border" />
+                <p className="text-xs text-muted-foreground mt-1">Após esta data, o acesso do usuário será expirado.</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
