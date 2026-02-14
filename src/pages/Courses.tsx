@@ -47,7 +47,7 @@ const CoursesPage: React.FC = () => {
 
   const filtered = products.filter(p => {
     if (activeType !== 'all' && p.type !== activeType) return false;
-    if (activeCategory !== 'all' && p.category_name !== activeCategory) return false;
+    if (activeCategory !== 'all' && !(p.category_names || []).includes(activeCategory)) return false;
     return true;
   });
 
