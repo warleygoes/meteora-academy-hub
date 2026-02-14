@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag, ScrollText, Image as ImageIcon, Plug, MessageSquare } from 'lucide-react';
+import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag, ScrollText, Image as ImageIcon, Plug, MessageSquare, Link2 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AdminUsers from '@/components/admin/AdminUsers';
 import AdminCourses from '@/components/admin/AdminCourses';
@@ -12,6 +12,7 @@ import AdminLogs from '@/components/admin/AdminLogs';
 import AdminBanners from '@/components/admin/AdminBanners';
 import AdminAPI from '@/components/admin/AdminAPI';
 import AdminComments from '@/components/admin/AdminComments';
+import AdminMenuLinks from '@/components/admin/AdminMenuLinks';
 import { cn } from '@/lib/utils';
 
 const AdminPage: React.FC = () => {
@@ -34,6 +35,7 @@ const AdminPage: React.FC = () => {
     { id: 'settings', label: t('settingsTitle'), icon: Settings, desc: t('settingsDesc') },
     { id: 'logs', label: t('systemLogs'), icon: ScrollText, desc: t('systemLogsDesc') },
     { id: 'comments', label: 'Comentários', icon: MessageSquare, desc: 'Comentários das aulas' },
+    { id: 'menu-links', label: 'Links do Menu', icon: Link2, desc: 'Links personalizados do menu' },
     { id: 'api', label: 'API', icon: Plug, desc: 'Chave e documentação da API' },
   ];
 
@@ -71,6 +73,7 @@ const AdminPage: React.FC = () => {
       {activeSection === 'diagnostics' && <AdminDiagnostics />}
       {activeSection === 'logs' && <AdminLogs />}
       {activeSection === 'comments' && <AdminComments />}
+      {activeSection === 'menu-links' && <AdminMenuLinks />}
       {activeSection === 'api' && <AdminAPI />}
     </div>
   );

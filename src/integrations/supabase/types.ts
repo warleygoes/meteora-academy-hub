@@ -607,6 +607,114 @@ export type Database = {
           },
         ]
       }
+      menu_link_packages: {
+        Row: {
+          created_at: string
+          id: string
+          menu_link_id: string
+          package_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          menu_link_id: string
+          package_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          menu_link_id?: string
+          package_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_link_packages_menu_link_id_fkey"
+            columns: ["menu_link_id"]
+            isOneToOne: false
+            referencedRelation: "menu_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_link_packages_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_link_products: {
+        Row: {
+          created_at: string
+          id: string
+          menu_link_id: string
+          product_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          menu_link_id: string
+          product_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          menu_link_id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_link_products_menu_link_id_fkey"
+            columns: ["menu_link_id"]
+            isOneToOne: false
+            referencedRelation: "menu_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_link_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_links: {
+        Row: {
+          active: boolean
+          created_at: string
+          icon: string
+          id: string
+          open_mode: string
+          sort_order: number
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          icon?: string
+          id?: string
+          open_mode?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          icon?: string
+          id?: string
+          open_mode?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       network_topologies: {
         Row: {
           created_at: string
