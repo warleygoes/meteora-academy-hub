@@ -79,9 +79,9 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
 
           {/* Lock overlay for inaccessible products */}
           {!hasAccess && !isHovered && (
-            <div className="absolute top-2 right-2">
-              <div className="bg-background/80 backdrop-blur-sm rounded-full p-1.5">
-                <Lock className="w-4 h-4 text-muted-foreground" />
+            <div className="absolute inset-0 flex items-center justify-center bg-background/40">
+              <div className="bg-background/90 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                <Lock className="w-10 h-10 text-muted-foreground" />
               </div>
             </div>
           )}
@@ -101,12 +101,12 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
                   <>
                     {product.course_id && (
                       <Button size="sm" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
-                        <Play className="w-3 h-3" /> Assistir Agora
+                        <Play className="w-3 h-3" /> {t('watchNow')}
                       </Button>
                     )}
                     {isSaas && (
                       <Button size="sm" variant="secondary" className="gap-1.5 w-full text-xs" onClick={openSaas}>
-                        <ExternalLink className="w-3 h-3" /> Acessar App
+                        <ExternalLink className="w-3 h-3" /> {t('accessApp')}
                       </Button>
                     )}
                     <Button size="sm" variant="outline" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
@@ -116,10 +116,10 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
                 ) : (
                   <>
                     <Button size="sm" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); setShowPurchase(true); }}>
-                      <ShoppingCart className="w-3 h-3" /> Comprar Acesso
+                      <ShoppingCart className="w-3 h-3" /> {t('buyAccess')}
                     </Button>
                     <Button size="sm" variant="outline" className="gap-1.5 w-full text-xs" onClick={(e) => { e.stopPropagation(); setShowPurchase(true); }}>
-                      <Info className="w-3 h-3" /> Saiba Mais
+                      <Info className="w-3 h-3" /> {t('moreInfo')}
                     </Button>
                   </>
                 )}
@@ -188,16 +188,16 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
             )}
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {product.lesson_count > 0 && (
-                <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {product.lesson_count} aulas</span>
+                <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {product.lesson_count} {t('lessons')}</span>
               )}
               {product.enrollment_count > 0 && (
-                <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {product.enrollment_count} alunos</span>
+                <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {product.enrollment_count} {t('students')}</span>
               )}
             </div>
 
             {activeOffers.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Opções de acesso:</p>
+                <p className="text-sm font-medium text-foreground">{t('offers')}:</p>
                 {activeOffers.map(offer => (
                   <div key={offer.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30">
                     <div>
@@ -208,7 +208,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
                     </div>
                     {offer.hotmart_url ? (
                       <Button size="sm" className="gap-1.5" onClick={() => window.open(offer.hotmart_url!, '_blank', 'noopener')}>
-                        <ShoppingCart className="w-3.5 h-3.5" /> Comprar
+                        <ShoppingCart className="w-3.5 h-3.5" /> {t('buyAccess')}
                       </Button>
                     ) : offer.stripe_price_id ? (
                       <Button size="sm" className="gap-1.5" onClick={async () => {
@@ -223,14 +223,14 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
                           if (result.url) window.location.href = result.url;
                         } catch (err) { console.error(err); }
                       }}>
-                        <ShoppingCart className="w-3.5 h-3.5" /> Comprar
+                        <ShoppingCart className="w-3.5 h-3.5" /> {t('buyAccess')}
                       </Button>
                     ) : null}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma oferta disponível no momento.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('noOffers')}</p>
             )}
           </div>
         </DialogContent>

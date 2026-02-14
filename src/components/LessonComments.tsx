@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { MessageSquare, Heart, HelpCircle, Reply, Clock, ChevronDown, ChevronRight, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Comment {
   id: string;
@@ -28,11 +29,7 @@ interface LessonCommentsProps {
   currentVideoTime?: number; // seconds
 }
 
-const COMMENT_TYPES = [
-  { value: 'comment', label: 'Comentário', icon: <MessageSquare className="w-3.5 h-3.5" />, color: 'text-muted-foreground' },
-  { value: 'praise', label: 'Elogio', icon: <Heart className="w-3.5 h-3.5" />, color: 'text-pink-500' },
-  { value: 'doubt', label: 'Dúvida', icon: <HelpCircle className="w-3.5 h-3.5" />, color: 'text-yellow-500' },
-];
+// Will be built dynamically based on language context
 
 const formatTimestamp = (seconds: number | null) => {
   if (seconds === null || seconds === undefined) return null;
@@ -44,6 +41,13 @@ const formatTimestamp = (seconds: number | null) => {
 const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, currentVideoTime }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
+
+  const COMMENT_TYPES = useMemo(() => [
+    { value: 'comment', label: t('commentTypeComment'), icon: <MessageSquare className="w-3.5 h-3.5" />, color: 'text-muted-foreground' },
+    { value: 'praise', label: t('commentTypePraise'), icon: <Heart className="w-3.5 h-3.5" />, color: 'text-pink-500' },
+    { value: 'doubt', label: t('commentTypeQuestion'), icon: <HelpCircle className="w-3.5 h-3.5" />, color: 'text-yellow-500' },
+  ], [t]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
@@ -118,7 +122,7 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
     setIncludeTimestamp(false);
     setSubmitting(false);
     fetchComments();
-    toast({ title: 'Comentário enviado!' });
+    toast({ title: t('contentSaved') || 'Comentário enviado!' });
   };
 
   const submitReply = async (parentId: string) => {
@@ -137,7 +141,7 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
     setReplyingTo(null);
     setSubmitting(false);
     fetchComments();
-    toast({ title: 'Resposta enviada!' });
+    toast({ title: t('replyComment') || 'Resposta enviada!' });
   };
 
   const typeConfig = COMMENT_TYPES.find(t => t.value === commentType) || COMMENT_TYPES[0];
@@ -145,7 +149,7 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-display font-bold text-foreground flex items-center gap-2">
-        <MessageSquare className="w-5 h-5" /> Comentários ({comments.length})
+        <MessageSquare className="w-5 h-5" /> {t('allComments')} ({comments.length})
       </h3>
 
       {/* New comment form */}
@@ -176,21 +180,21 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
           <Textarea
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
-            placeholder={commentType === 'doubt' ? 'Descreva sua dúvida...' : commentType === 'praise' ? 'Deixe seu elogio...' : 'Escreva um comentário...'}
+            placeholder={commentType === 'doubt' ? (t('commentTypeQuestion') + '...') : commentType === 'praise' ? (t('commentTypePraise') + '...') : (t('commentTypeComment') + '...')}
             className="bg-secondary border-border min-h-[60px] text-sm"
           />
 
           <Button size="sm" onClick={submitComment} disabled={!newComment.trim() || submitting} className="gap-1">
-            <Send className="w-3.5 h-3.5" /> Enviar
+            <Send className="w-3.5 h-3.5" /> {t('publish') || 'Enviar'}
           </Button>
         </div>
       )}
 
       {/* Comments list */}
       {loading ? (
-        <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+        <p className="text-sm text-muted-foreground text-center py-4">{t('loading')}...</p>
       ) : comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-6">Nenhum comentário ainda. Seja o primeiro!</p>
+        <p className="text-sm text-muted-foreground text-center py-6">{t('addComment')}</p>
       ) : (
         <div className="space-y-3">
           {comments.map(comment => {
@@ -218,7 +222,7 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground ml-auto">
-                      {new Date(comment.created_at).toLocaleDateString()}
+                      {new Date(comment.created_at).toLocaleDateString()} {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
@@ -231,7 +235,7 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
                       setReplyingTo(replyingTo === comment.id ? null : comment.id);
                       setReplyText('');
                     }}>
-                      <Reply className="w-3.5 h-3.5" /> Responder
+                      <Reply className="w-3.5 h-3.5" /> {t('replyComment')}
                     </Button>
                     {comment.replies && comment.replies.length > 0 && (
                       <Button variant="ghost" size="sm" className="gap-1 text-xs h-7" onClick={() => {
@@ -242,7 +246,7 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
                         });
                       }}>
                         {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                        {comment.replies.length} resposta{comment.replies.length > 1 ? 's' : ''}
+                        {comment.replies.length} {comment.replies.length > 1 ? (t('allComments')) : (t('comment'))}
                       </Button>
                     )}
                   </div>
@@ -251,10 +255,10 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
                   {replyingTo === comment.id && (
                     <div className="mt-3 ml-9 space-y-2">
                       <Textarea value={replyText} onChange={e => setReplyText(e.target.value)}
-                        placeholder="Sua resposta..." className="bg-secondary border-border min-h-[50px] text-sm" />
+                        placeholder={t('replyComment') + '...'} className="bg-secondary border-border min-h-[50px] text-sm" />
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => submitReply(comment.id)} disabled={!replyText.trim() || submitting}>Enviar</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setReplyingTo(null)}>Cancelar</Button>
+                        <Button size="sm" onClick={() => submitReply(comment.id)} disabled={!replyText.trim() || submitting}>{t('publish') || 'Enviar'}</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setReplyingTo(null)}>{t('cancel')}</Button>
                       </div>
                     </div>
                   )}
@@ -271,7 +275,7 @@ const LessonComments: React.FC<LessonCommentsProps> = ({ lessonId, courseId, cur
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm font-medium text-foreground">{reply.user_name || 'Anônimo'}</span>
-                            <span className="text-xs text-muted-foreground">{new Date(reply.created_at).toLocaleDateString()}</span>
+                            <span className="text-xs text-muted-foreground">{new Date(reply.created_at).toLocaleDateString()} {new Date(reply.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                           <p className="text-sm text-foreground whitespace-pre-wrap">{reply.content}</p>
                         </div>

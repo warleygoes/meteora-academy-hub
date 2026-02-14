@@ -152,7 +152,7 @@ const Index: React.FC = () => {
     return (
       <div>
         <HeroBanner />
-        <div className="px-6 md:px-12 -mt-16 relative z-10 pb-12 space-y-8">
+        <div className="px-6 md:px-12 -mt-8 relative z-10 pb-12 space-y-8">
           {[1, 2].map(i => (
             <div key={i}>
               <Skeleton className="h-6 w-48 mb-4" />
@@ -171,7 +171,7 @@ const Index: React.FC = () => {
   return (
     <div>
       <HeroBanner />
-      <div className="px-6 md:px-12 -mt-16 relative z-10 pb-12">
+      <div className="px-6 md:px-12 -mt-8 relative z-10 pb-12">
         {continueWatching.length > 0 && (
           <CourseCarousel title={t('continueWatching')} products={continueWatching} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         )}

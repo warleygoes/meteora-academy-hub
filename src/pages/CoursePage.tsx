@@ -178,7 +178,7 @@ const CoursePage: React.FC = () => {
   };
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">{t('loading')}...</div>;
-  if (!course) return <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">{t('courseNotFound') || 'Curso no encontrado'}</div>;
+  if (!course) return <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">{t('courseNotFound')}</div>;
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)]">
@@ -252,7 +252,7 @@ const CoursePage: React.FC = () => {
               <Button variant="outline" size="sm" onClick={() => toggleComplete(activeLesson.id)}
                 className={completedLessons.has(activeLesson.id) ? 'text-green-500 border-green-500/30' : ''}>
                 {completedLessons.has(activeLesson.id) ? <CheckCircle2 className="w-4 h-4 mr-1" /> : <Circle className="w-4 h-4 mr-1" />}
-                {completedLessons.has(activeLesson.id) ? (t('completed') || 'Completada') : (t('markComplete') || 'Marcar completada')}
+                {completedLessons.has(activeLesson.id) ? (t('completed')) : (t('markComplete'))}
               </Button>
             </div>
 
@@ -295,7 +295,7 @@ const CoursePage: React.FC = () => {
           </motion.div>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            {t('selectLesson') || 'Selecciona una aula para comenzar'}
+            {t('selectLesson')}
           </div>
         )}
       </div>
