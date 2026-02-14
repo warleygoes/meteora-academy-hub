@@ -28,13 +28,16 @@ export function useContentProducts() {
       const courseIds = productsData.map(p => p.course_id).filter(Boolean) as string[];
 
       // Parallel fetches
-      const [categoriesResult, lessonsResult, enrollmentsResult, progressResult] = await Promise.all([
-        // Categories via courses
-        courseIds.length > 0
+      // Get product IDs for category lookup
+      const productIds = productsData.map(p => p.id);
+
+      const [productCategoriesResult, lessonsResult, enrollmentsResult, progressResult] = await Promise.all([
+        // Categories via product_categories junction table
+        productIds.length > 0
           ? supabase
-              .from('courses')
-              .select('id, category_id, course_categories(name)')
-              .in('id', courseIds)
+              .from('product_categories')
+              .select('product_id, category_id, course_categories(name)')
+              .in('product_id', productIds)
           : Promise.resolve({ data: [] }),
         // Lesson counts per course
         courseIds.length > 0
@@ -57,11 +60,12 @@ export function useContentProducts() {
           : Promise.resolve({ data: [] }),
       ]);
 
-      // Build category map
-      const categoryMap: Record<string, string> = {};
-      (categoriesResult.data || []).forEach((c: any) => {
-        if (c.course_categories?.name) {
-          categoryMap[c.id] = c.course_categories.name;
+      // Build category map: product_id -> array of category names
+      const categoryMap: Record<string, string[]> = {};
+      (productCategoriesResult.data || []).forEach((pc: any) => {
+        if (pc.course_categories?.name) {
+          if (!categoryMap[pc.product_id]) categoryMap[pc.product_id] = [];
+          categoryMap[pc.product_id].push(pc.course_categories.name);
         }
       });
 
@@ -95,6 +99,7 @@ export function useContentProducts() {
         const totalLessons = p.course_id ? (lessonCountMap[p.course_id] || 0) : 0;
         const completedLessons = p.course_id ? (completedMap[p.course_id] || 0) : 0;
         const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : undefined;
+        const catNames = categoryMap[p.id] || [];
 
         return {
           id: p.id,
@@ -105,7 +110,8 @@ export function useContentProducts() {
           thumbnail_vertical_url: p.thumbnail_vertical_url,
           course_id: p.course_id,
           saas_url: p.saas_url,
-          category_name: p.course_id ? categoryMap[p.course_id] : undefined,
+          category_name: catNames[0],
+          category_names: catNames,
           lesson_count: totalLessons,
           enrollment_count: p.course_id ? (enrollCountMap[p.course_id] || 0) : 0,
           progress,
