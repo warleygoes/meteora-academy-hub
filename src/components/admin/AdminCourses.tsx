@@ -280,9 +280,27 @@ const AdminCourses: React.FC = () => {
 
   // Product-Category assignment
   const openCategoryAssign = async (course: Course) => {
-    if (!course.product_id) { toast({ title: 'Produto não encontrado', variant: 'destructive' }); return; }
-    setCategoryAssignCourseId(course.product_id);
-    const { data } = await supabase.from('product_categories').select('category_id').eq('product_id', course.product_id);
+    let productId = course.product_id;
+    if (!productId) {
+      // Try to find or create the product for this course
+      const { data: existingProd } = await supabase.from('products').select('id').eq('course_id', course.id).maybeSingle();
+      if (existingProd) {
+        productId = existingProd.id;
+      } else {
+        // Create a product for this course automatically
+        const { data: newProd } = await supabase.from('products').insert({
+          name: course.title, description: course.description, type: 'course' as any,
+          course_id: course.id, has_content: true, active: true,
+          thumbnail_url: course.thumbnail_url, thumbnail_vertical_url: course.thumbnail_vertical_url,
+        }).select('id').single();
+        if (!newProd) { toast({ title: 'Error al crear producto', variant: 'destructive' }); return; }
+        productId = newProd.id;
+        // Update local state
+        setCourses(prev => prev.map(c => c.id === course.id ? { ...c, product_id: productId! } : c));
+      }
+    }
+    setCategoryAssignCourseId(productId);
+    const { data } = await supabase.from('product_categories').select('category_id').eq('product_id', productId);
     setAssignedCategories(new Set((data || []).map(d => d.category_id)));
     setShowCategoryAssign(true);
   };
