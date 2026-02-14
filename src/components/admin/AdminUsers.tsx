@@ -89,6 +89,9 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
   const [showApproveAllConfirm, setShowApproveAllConfirm] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', phone: '' });
+  const [creatingUser, setCreatingUser] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
 
@@ -97,7 +100,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
-    name: true, company: true, country: true, phone: true, clients: true, network: true, plans: true,
+    name: true, company: true, country: true, phone: true, clients: true, network: true, plans: true, created: true,
   });
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
@@ -110,6 +113,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     { id: 'clients', label: t('clientCount'), minWidth: 80 },
     { id: 'network', label: t('networkType'), minWidth: 80 },
     { id: 'plans', label: t('activePlans'), minWidth: 60 },
+    { id: 'created', label: t('createdAt') || 'Fecha de Registro', minWidth: 130 },
   ];
 
   const getColumnValue = (user: ProfileUser, colId: string): string | number => {
@@ -121,6 +125,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       case 'clients': return user.client_count || '';
       case 'network': return user.network_type || '';
       case 'plans': return activePlansCounts[user.user_id] || 0;
+      case 'created': return user.created_at || '';
       default: return '';
     }
   };
@@ -338,6 +343,43 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     else { toast({ title: 'Administrador removido.' }); fetchAdmins(); fetchAdminUserIds(); }
   };
 
+  const createUser = async () => {
+    if (!newUser.name.trim() || !newUser.email.trim() || !newUser.password.trim()) {
+      toast({ title: t('fillRequiredFields') || 'Preencha todos os campos obrigatórios.', variant: 'destructive' });
+      return;
+    }
+    if (newUser.password.length < 6) {
+      toast({ title: t('passwordMin6') || 'La contraseña debe tener al menos 6 caracteres.', variant: 'destructive' });
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ users: [{ name: newUser.name, email: newUser.email, phone: newUser.phone || undefined }], defaultPassword: newUser.password }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error');
+      if (result.created > 0) {
+        toast({ title: t('userCreatedSuccess') || 'Usuario creado exitosamente.' });
+        logSystemEvent({ action: 'Usuario creado manualmente', entity_type: 'user', details: newUser.email, level: 'success' });
+      } else if (result.exists > 0) {
+        toast({ title: t('userAlreadyExists') || 'Este email ya está registrado.', variant: 'destructive' });
+      } else {
+        toast({ title: result.results?.[0]?.message || 'Error', variant: 'destructive' });
+      }
+      setNewUser({ name: '', email: '', password: '', phone: '' });
+      setShowCreateUser(false);
+      fetchAllUsers(); fetchPendingUsers(); fetchApprovedUsers(); fetchRejectedUsers();
+    } catch (err: any) {
+      toast({ title: err.message, variant: 'destructive' });
+    }
+    setCreatingUser(false);
+  };
+
+
   // Global search filter function - searches across all fields
   const matchesGlobalSearch = (u: ProfileUser) => {
     if (!globalSearch) return true;
@@ -367,7 +409,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     return matchesFilter;
   }));
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('es-LA', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formatDateTime = (d: string) => {
+    const date = new Date(d);
+    return date.toLocaleDateString('es-LA', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + date.toLocaleTimeString('es-LA', { hour: '2-digit', minute: '2-digit' });
+  };
 
   const getStatusBadge = (user: ProfileUser) => {
     if (user.status === 'approved') return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">{t('approved')}</Badge>;
@@ -406,6 +451,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       case 'clients': return <span className="text-muted-foreground">{user.client_count || '—'}</span>;
       case 'network': return <span className="text-muted-foreground">{user.network_type || '—'}</span>;
       case 'plans': return <span className="text-muted-foreground">{activePlansCounts[user.user_id] || 0}</span>;
+      case 'created': return <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(user.created_at)}</span>;
       default: return null;
     }
   };
@@ -575,8 +621,11 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
             className="pl-10 bg-secondary border-border"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <ColumnToggle />
+          <Button size="sm" className="gap-2" onClick={() => setShowCreateUser(true)}>
+            <Plus className="w-4 h-4" /> {t('addUser') || 'Agregar Usuario'}
+          </Button>
           <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowImportDialog(true)}>
             <Upload className="w-4 h-4" /> {t('importUsers')}
           </Button>
@@ -820,6 +869,39 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
         onOpenChange={setShowImportDialog}
         onImportComplete={() => { fetchAllUsers(); fetchPendingUsers(); fetchApprovedUsers(); fetchRejectedUsers(); }}
       />
+
+      {/* Create User Dialog */}
+      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" /> {t('addUser') || 'Agregar Usuario'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t('fullName')} *</label>
+              <Input value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder={t('fullName')} className="bg-secondary border-border" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t('email')} *</label>
+              <Input type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="usuario@email.com" className="bg-secondary border-border" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t('password')} *</label>
+              <Input type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder={t('passwordMinChars') || 'Mínimo 6 caracteres'} className="bg-secondary border-border" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t('phone')}</label>
+              <Input value={newUser.phone} onChange={e => setNewUser(p => ({ ...p, phone: e.target.value }))} placeholder="+55 11 99999-9999" className="bg-secondary border-border" />
+            </div>
+            <Button onClick={createUser} disabled={creatingUser} className="w-full gap-2">
+              {creatingUser ? <Clock className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {creatingUser ? (t('creating') || 'Creando...') : (t('createUser') || 'Crear Usuario')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
