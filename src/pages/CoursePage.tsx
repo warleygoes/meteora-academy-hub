@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, Video, FileText, Image, Music, Link as LinkI
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import VideoPlayer from '@/components/VideoPlayer';
+import LessonComments from '@/components/LessonComments';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
 
@@ -270,6 +271,11 @@ const CoursePage: React.FC = () => {
                 {renderContent(cont)}
               </div>
             ))}
+
+            {/* Comments */}
+            {courseId && (
+              <LessonComments lessonId={activeLesson.id} courseId={courseId} />
+            )}
 
             {/* Navigation buttons */}
             <div className="flex justify-between pt-6 border-t border-border">

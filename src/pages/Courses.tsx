@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { useContentProducts } from '@/hooks/useContentProducts';
+import { useTranslateCategory } from '@/hooks/useTranslateCategory';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { BookOpen, Users, ExternalLink } from 'lucide-react';
@@ -18,19 +19,29 @@ const CoursesPage: React.FC = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { products, loading } = useContentProducts();
+  const { translateText } = useTranslateCategory();
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeType, setActiveType] = useState('all');
-  const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([]);
+  const [allCategories, setAllCategories] = useState<{ id: string; name: string; translatedName?: string }[]>([]);
 
   useEffect(() => {
     const fetchCategories = async () => {
       const { data } = await supabase.from('course_categories').select('id, name').order('name');
-      if (data) setAllCategories(data);
+      if (data) {
+        setAllCategories(data.map(c => ({ ...c, translatedName: undefined })));
+        // Translate if not Spanish
+        if (language !== 'es') {
+          const translated = await Promise.all(data.map(async c => ({
+            ...c,
+            translatedName: await translateText(c.name),
+          })));
+          setAllCategories(translated);
+        }
+      }
     };
     fetchCategories();
-  }, []);
+  }, [language, translateText]);
 
-  // Get unique product types from products
   const productTypes = [...new Set(products.map(p => p.type))];
   const typeLabels = PRODUCT_TYPE_LABELS[language] || PRODUCT_TYPE_LABELS.es;
 
@@ -71,7 +82,7 @@ const CoursesPage: React.FC = () => {
         {allCategories.map(cat => (
           <button key={cat.id} onClick={() => setActiveCategory(cat.name)}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeCategory === cat.name ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
-            {cat.name}
+            {cat.translatedName || cat.name}
           </button>
         ))}
       </div>
