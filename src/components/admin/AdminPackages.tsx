@@ -88,7 +88,9 @@ const AdminPackages: React.FC = () => {
   const [groupPkgId, setGroupPkgId] = useState<string | null>(null);
   const [groups, setGroups] = useState<ProductGroup[]>([]);
   const [editingGroup, setEditingGroup] = useState<ProductGroup | null>(null);
-  const [groupForm, setGroupForm] = useState({ name: '', description: '', sort_order: 0 });
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', sort_order: 0, thumbnail_url: '', thumbnail_vertical_url: '' });
+  const [groupProducts, setGroupProducts] = useState<Record<string, Set<string>>>({}); // group_id -> product_ids
+  const [pkgLinkedProducts, setPkgLinkedProducts] = useState<ProductRef[]>([]);
 
   const [form, setForm] = useState({
     name: '', description: '', payment_type: 'one_time', features: '', duration_days: '',
@@ -232,21 +234,42 @@ const AdminPackages: React.FC = () => {
     const { data } = await supabase.from('package_product_groups').select('*').eq('package_id', pkgId).order('sort_order');
     setGroups(data || []);
     setEditingGroup(null);
-    setGroupForm({ name: '', description: '', sort_order: 0 });
+    setGroupForm({ name: '', description: '', sort_order: 0, thumbnail_url: '', thumbnail_vertical_url: '' });
+
+    // Fetch linked products for this package
+    const { data: ppData } = await supabase.from('package_products').select('product_id, group_id, products(id, name, type, payment_type)').eq('package_id', pkgId).order('sort_order');
+    const prods: ProductRef[] = [];
+    const gp: Record<string, Set<string>> = {};
+    (ppData || []).forEach((pp: any) => {
+      if (pp.products) prods.push(pp.products);
+      if (pp.group_id) {
+        if (!gp[pp.group_id]) gp[pp.group_id] = new Set();
+        gp[pp.group_id].add(pp.product_id);
+      }
+    });
+    setPkgLinkedProducts(prods);
+    setGroupProducts(gp);
     setShowGroupManager(true);
   };
 
   const saveGroup = async () => {
     if (!groupPkgId || !groupForm.name.trim()) return;
+    const payload = {
+      name: groupForm.name,
+      description: groupForm.description || null,
+      sort_order: groupForm.sort_order,
+      thumbnail_url: groupForm.thumbnail_url || null,
+      thumbnail_vertical_url: groupForm.thumbnail_vertical_url || null,
+    };
     if (editingGroup) {
-      await supabase.from('package_product_groups').update({ name: groupForm.name, description: groupForm.description || null, sort_order: groupForm.sort_order }).eq('id', editingGroup.id);
+      await supabase.from('package_product_groups').update(payload).eq('id', editingGroup.id);
     } else {
-      await supabase.from('package_product_groups').insert({ package_id: groupPkgId, name: groupForm.name, description: groupForm.description || null, sort_order: groupForm.sort_order });
+      await supabase.from('package_product_groups').insert({ package_id: groupPkgId, ...payload });
     }
     const { data } = await supabase.from('package_product_groups').select('*').eq('package_id', groupPkgId).order('sort_order');
     setGroups(data || []);
     setEditingGroup(null);
-    setGroupForm({ name: '', description: '', sort_order: 0 });
+    setGroupForm({ name: '', description: '', sort_order: 0, thumbnail_url: '', thumbnail_vertical_url: '' });
     logSystemEvent({ action: editingGroup ? 'Grupo de trilha atualizado' : 'Grupo de trilha criado', entity_type: 'package', entity_id: groupPkgId, level: 'info' });
     toast({ title: editingGroup ? 'Grupo atualizado' : 'Grupo criado' });
   };
@@ -650,7 +673,7 @@ const AdminPackages: React.FC = () => {
 
       {/* Group Manager */}
       <Dialog open={showGroupManager} onOpenChange={setShowGroupManager}>
-        <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display">{t('trailGroups') || 'Grupos da Trilha'}</DialogTitle>
           </DialogHeader>
@@ -659,21 +682,52 @@ const AdminPackages: React.FC = () => {
             {groups.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">{t('noGroups') || 'Sem grupos.'}</p>
             ) : (
-              <div className="space-y-2">
-                {groups.map(g => (
-                  <div key={g.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-foreground">{g.name}</span>
-                      {g.description && <p className="text-xs text-muted-foreground">{g.description}</p>}
-                      <span className="text-xs text-muted-foreground">Ordem: {g.sort_order}</span>
+              <div className="space-y-3">
+                {groups.map(g => {
+                  const assignedProducts = groupProducts[g.id] || new Set<string>();
+                  const toggleProductInGroup = async (productId: string) => {
+                    const next = new Set(assignedProducts);
+                    if (next.has(productId)) {
+                      next.delete(productId);
+                      await supabase.from('package_products').update({ group_id: null }).eq('package_id', groupPkgId!).eq('product_id', productId);
+                    } else {
+                      next.add(productId);
+                      await supabase.from('package_products').update({ group_id: g.id }).eq('package_id', groupPkgId!).eq('product_id', productId);
+                    }
+                    setGroupProducts(prev => ({ ...prev, [g.id]: next }));
+                  };
+                  return (
+                    <div key={g.id} className="rounded-lg border border-border bg-secondary/30 overflow-hidden">
+                      <div className="flex items-center gap-3 p-3">
+                        {g.thumbnail_url && <img src={g.thumbnail_url} alt="" className="w-16 h-10 object-cover rounded shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-foreground">{g.name}</span>
+                          {g.description && <p className="text-xs text-muted-foreground">{g.description}</p>}
+                          <span className="text-xs text-muted-foreground">Ordem: {g.sort_order} • {assignedProducts.size} produtos</span>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          setEditingGroup(g);
+                          setGroupForm({ name: g.name, description: g.description || '', sort_order: g.sort_order, thumbnail_url: g.thumbnail_url || '', thumbnail_vertical_url: g.thumbnail_vertical_url || '' });
+                        }}><Edit className="w-3.5 h-3.5" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteGroup(g.id)} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                      </div>
+                      {/* Products in this group */}
+                      {pkgLinkedProducts.length > 0 && (
+                        <div className="border-t border-border px-3 py-2 space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Produtos neste grupo:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {pkgLinkedProducts.map(p => (
+                              <label key={p.id} className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded cursor-pointer border ${assignedProducts.has(p.id) ? 'bg-primary/10 border-primary/30 text-foreground' : 'bg-secondary/50 border-border text-muted-foreground'}`}>
+                                <Checkbox checked={assignedProducts.has(p.id)} onCheckedChange={() => toggleProductInGroup(p.id)} className="h-3 w-3" />
+                                {p.name}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      setEditingGroup(g);
-                      setGroupForm({ name: g.name, description: g.description || '', sort_order: g.sort_order });
-                    }}><Edit className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="sm" onClick={() => deleteGroup(g.id)} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -682,10 +736,20 @@ const AdminPackages: React.FC = () => {
               <h4 className="text-sm font-semibold text-foreground">{editingGroup ? 'Editar Grupo' : (t('addGroup') || 'Adicionar Grupo')}</h4>
               <Input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} placeholder={t('groupName') || 'Nome do grupo'} className="bg-secondary border-border" />
               <Textarea value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder={t('groupDescription') || 'Descrição'} className="bg-secondary border-border" rows={2} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Imagem Horizontal (URL)</label>
+                  <Input value={groupForm.thumbnail_url} onChange={e => setGroupForm(f => ({ ...f, thumbnail_url: e.target.value }))} placeholder="https://..." className="bg-secondary border-border" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Imagem Vertical (URL)</label>
+                  <Input value={groupForm.thumbnail_vertical_url} onChange={e => setGroupForm(f => ({ ...f, thumbnail_vertical_url: e.target.value }))} placeholder="https://..." className="bg-secondary border-border" />
+                </div>
+              </div>
               <Input type="number" value={groupForm.sort_order} onChange={e => setGroupForm(f => ({ ...f, sort_order: parseInt(e.target.value) || 0 }))} placeholder="Ordem" className="bg-secondary border-border w-24" />
               <div className="flex gap-2">
                 <Button onClick={saveGroup} size="sm" disabled={!groupForm.name.trim()}>{t('save')}</Button>
-                {editingGroup && <Button variant="outline" size="sm" onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '', sort_order: 0 }); }}>{t('cancel')}</Button>}
+                {editingGroup && <Button variant="outline" size="sm" onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '', sort_order: 0, thumbnail_url: '', thumbnail_vertical_url: '' }); }}>{t('cancel')}</Button>}
               </div>
             </div>
           </div>
