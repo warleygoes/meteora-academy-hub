@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus, Upload, GripVertical } from 'lucide-react';
+import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus, Upload, GripVertical, Lock, Search } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +42,12 @@ interface LessonContent {
 interface Lesson {
   id: string; module_id: string; title: string; description: string | null;
   video_url: string | null; duration_minutes: number | null; sort_order: number; is_free: boolean;
+  is_private: boolean;
   contents?: LessonContent[];
+}
+
+interface UserProfile {
+  user_id: string; display_name: string | null; email: string | null; company_name: string | null;
 }
 
 interface Module { id: string; course_id: string; title: string; description: string | null; sort_order: number; lessons: Lesson[]; }
@@ -150,6 +155,15 @@ const AdminCourses: React.FC = () => {
   const [uploadingV, setUploadingV] = useState(false);
   const fileRefH = useRef<HTMLInputElement>(null);
   const fileRefV = useRef<HTMLInputElement>(null);
+
+  // Private lesson user access
+  const [showAccessManager, setShowAccessManager] = useState(false);
+  const [accessLessonId, setAccessLessonId] = useState<string | null>(null);
+  const [accessLessonTitle, setAccessLessonTitle] = useState('');
+  const [accessUsers, setAccessUsers] = useState<string[]>([]);
+  const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
+  const [accessSearch, setAccessSearch] = useState('');
+  const [loadingAccess, setLoadingAccess] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -424,10 +438,47 @@ const AdminCourses: React.FC = () => {
         const { data: p } = await supabase.from('profiles').select('display_name, email, company_name').eq('user_id', e.user_id).single();
         enriched.push({ id: e.id, user_id: e.user_id, enrolled_at: e.enrolled_at, profile: p || undefined });
       }
-      setStudents(enriched);
+    setStudents(enriched);
     } else { setStudents([]); }
     setShowStudentList(true);
   };
+
+  // Private lesson user access management
+  const openAccessManager = async (lesson: Lesson) => {
+    setAccessLessonId(lesson.id);
+    setAccessLessonTitle(lesson.title);
+    setAccessSearch('');
+    setLoadingAccess(true);
+    setShowAccessManager(true);
+    
+    const [{ data: accessData }, { data: profilesData }] = await Promise.all([
+      supabase.from('user_lesson_access').select('user_id').eq('lesson_id', lesson.id),
+      supabase.from('profiles').select('user_id, display_name, email, company_name').eq('approved', true).order('display_name'),
+    ]);
+    setAccessUsers((accessData || []).map(a => a.user_id));
+    setAllProfiles(profilesData || []);
+    setLoadingAccess(false);
+  };
+
+  const toggleUserAccess = async (userId: string) => {
+    if (!accessLessonId) return;
+    const hasAccess = accessUsers.includes(userId);
+    if (hasAccess) {
+      await supabase.from('user_lesson_access').delete().eq('lesson_id', accessLessonId).eq('user_id', userId);
+      setAccessUsers(prev => prev.filter(id => id !== userId));
+      toast({ title: t('accessRemoved') || 'Acceso removido' });
+    } else {
+      await supabase.from('user_lesson_access').insert({ lesson_id: accessLessonId, user_id: userId });
+      setAccessUsers(prev => [...prev, userId]);
+      toast({ title: t('accessGranted') || 'Acceso concedido' });
+    }
+  };
+
+  const filteredProfiles = allProfiles.filter(p => {
+    if (!accessSearch) return true;
+    const s = accessSearch.toLowerCase();
+    return (p.display_name || '').toLowerCase().includes(s) || (p.email || '').toLowerCase().includes(s) || (p.company_name || '').toLowerCase().includes(s);
+  });
 
   const filtered = courses.filter(c => {
     if (filterStatus !== 'all' && c.status !== filterStatus) return false;
@@ -616,11 +667,17 @@ const AdminCourses: React.FC = () => {
                                                       <div className="flex gap-2 text-xs text-muted-foreground">
                                                         {lesson.duration_minutes ? <span>{lesson.duration_minutes} min</span> : null}
                                                         {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
+                                                        {(lesson as any).is_private && <Badge variant="outline" className="text-xs py-0 border-yellow-500/30 text-yellow-500">🔒 {t('privateLesson') || 'Privada'}</Badge>}
                                                         {lesson.contents && lesson.contents.length > 0 && (
                                                           <span>{lesson.contents.length} {t('contentsCount') || 'conteúdos'}</span>
                                                         )}
                                                       </div>
                                                     </div>
+                                                    {(lesson as any).is_private && (
+                                                      <Button variant="ghost" size="sm" onClick={() => openAccessManager(lesson)} className="h-7" title={t('manageAccess') || 'Gestionar acceso'}>
+                                                        <Lock className="w-3 h-3" />
+                                                      </Button>
+                                                    )}
                                                     <Button variant="ghost" size="sm" onClick={() => startEditLesson(lesson)} className="h-7"><Edit className="w-3 h-3" /></Button>
                                                     <Button variant="ghost" size="sm" onClick={() => deleteLessonInline(lesson.id, course.id)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
                                                   </div>
@@ -835,6 +892,38 @@ const AdminCourses: React.FC = () => {
             </div>
             <Button onClick={saveCourseImages} className="w-full">{t('save')}</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Private Lesson Access Manager */}
+      <Dialog open={showAccessManager} onOpenChange={setShowAccessManager}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" /> {t('manageAccess') || 'Gestionar Acceso'} — {accessLessonTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder={t('searchUsers')} value={accessSearch} onChange={e => setAccessSearch(e.target.value)} className="pl-10 bg-secondary border-border" />
+          </div>
+          {loadingAccess ? (
+            <p className="text-sm text-muted-foreground text-center py-6">{t('loading')}...</p>
+          ) : (
+            <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+              {filteredProfiles.map(p => (
+                <label key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer transition-colors">
+                  <Checkbox checked={accessUsers.includes(p.user_id)} onCheckedChange={() => toggleUserAccess(p.user_id)} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
+                    <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+                  </div>
+                </label>
+              ))}
+              {filteredProfiles.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t('noUsersFound')}</p>}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-2">{accessUsers.length} {t('usersWithAccess') || 'usuarios con acceso'}</p>
         </DialogContent>
       </Dialog>
     </div>

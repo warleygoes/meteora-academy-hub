@@ -13,6 +13,7 @@ interface Offer {
   id: string; name: string; price: number; currency: string;
   stripe_price_id: string | null; hotmart_url: string | null;
   payment_link_active: boolean; active: boolean;
+  stripe_link_active: boolean; hotmart_link_active: boolean;
 }
 
 interface CourseCardProps {
@@ -53,9 +54,9 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
     }
   };
 
-  const activeOffers = (offers || []).filter(o => o.active && o.payment_link_active);
-  const hasStripeOffers = activeOffers.some(o => o.stripe_price_id);
-  const hasHotmartOffers = activeOffers.some(o => o.hotmart_url);
+  const activeOffers = (offers || []).filter(o => o.active && (o.stripe_link_active || o.hotmart_link_active));
+  const hasStripeOffers = activeOffers.some(o => o.stripe_price_id && o.stripe_link_active);
+  const hasHotmartOffers = activeOffers.some(o => o.hotmart_url && o.hotmart_link_active);
 
   return (
     <>
@@ -216,22 +217,27 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">{t('offers')}:</p>
                 {activeOffers.map(offer => (
-                  <div key={offer.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{offer.name}</p>
-                      <p className="text-lg font-bold text-primary">
-                        {offer.currency === 'USD' ? 'U$' : offer.currency} {offer.price}
-                      </p>
+                  <div key={offer.id} className="flex flex-col gap-2 p-3 rounded-lg border border-border bg-secondary/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{offer.name}</p>
+                        <p className="text-lg font-bold text-primary">
+                          {offer.currency === 'USD' ? 'U$' : offer.currency} {offer.price}
+                        </p>
+                      </div>
                     </div>
-                    {offer.hotmart_url ? (
-                      <Button size="sm" className="gap-1.5" onClick={() => window.open(offer.hotmart_url!, '_blank', 'noopener')}>
-                        <ShoppingCart className="w-3.5 h-3.5" /> {t('buyAccess')}
-                      </Button>
-                    ) : offer.stripe_price_id ? (
-                      <Button size="sm" className="gap-1.5" onClick={() => window.open(offer.stripe_price_id!, '_blank', 'noopener')}>
-                        <ShoppingCart className="w-3.5 h-3.5" /> {t('buyAccess')}
-                      </Button>
-                    ) : null}
+                    <div className="flex gap-2">
+                      {offer.stripe_price_id && offer.stripe_link_active && (
+                        <Button size="sm" className="gap-1.5 flex-1" onClick={() => window.open(offer.stripe_price_id!, '_blank', 'noopener')}>
+                          <ShoppingCart className="w-3.5 h-3.5" /> {t('buyViaStripe') || 'Stripe'}
+                        </Button>
+                      )}
+                      {offer.hotmart_url && offer.hotmart_link_active && (
+                        <Button size="sm" variant="outline" className="gap-1.5 flex-1" onClick={() => window.open(offer.hotmart_url!, '_blank', 'noopener')}>
+                          <ShoppingCart className="w-3.5 h-3.5" /> {t('buyViaHotmart') || 'Hotmart'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

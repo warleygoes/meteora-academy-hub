@@ -14,6 +14,7 @@ interface Offer {
   stripe_price_id: string | null; hotmart_url: string | null;
   payment_link_active: boolean; active: boolean;
   product_id: string | null; package_id: string | null;
+  stripe_link_active: boolean; hotmart_link_active: boolean;
 }
 
 interface PackageShowcase {
@@ -121,9 +122,8 @@ const Index: React.FC = () => {
     const fetchOffers = async () => {
       const { data } = await supabase
         .from('offers')
-        .select('id, name, price, currency, stripe_price_id, hotmart_url, payment_link_active, active, product_id, package_id')
+        .select('id, name, price, currency, stripe_price_id, hotmart_url, payment_link_active, active, product_id, package_id, stripe_link_active, hotmart_link_active')
         .eq('active', true)
-        .eq('payment_link_active', true)
         .not('product_id', 'is', null);
       const map: Record<string, Offer[]> = {};
       (data || []).forEach((o: any) => {
