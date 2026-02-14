@@ -472,6 +472,7 @@ const AdminCourses: React.FC = () => {
                                         <Input value={inlineLessonForm.video_url} onChange={e => setInlineLessonForm(f => ({ ...f, video_url: e.target.value }))}
                                           className="bg-secondary border-border h-8 text-sm" placeholder={t('videoUrl') || 'URL del video'} />
                                         <div className="flex gap-2 items-center">
+                                          <label className="text-xs text-muted-foreground block mb-0.5">{t('durationMinutes') || 'Duração (minutos)'}</label>
                                           <Input type="number" value={inlineLessonForm.duration_minutes}
                                             onChange={e => setInlineLessonForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 0 }))}
                                             className="bg-secondary border-border h-8 text-sm w-24" placeholder="min" />

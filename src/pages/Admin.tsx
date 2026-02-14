@@ -25,7 +25,7 @@ const AdminPage: React.FC = () => {
   const sections = [
     { id: 'products', label: t('manageProducts'), icon: ShoppingBag, desc: t('adminProductsDesc') },
     { id: 'packages', label: t('managePackages'), icon: Package, desc: t('adminPackagesDesc') },
-    { id: 'courses', label: t('manageCourses'), icon: BookOpen, desc: t('adminCoursesDesc') },
+    { id: 'courses', label: t('myLibrary') || 'Minha Biblioteca', icon: BookOpen, desc: t('adminCoursesDesc') },
     { id: 'banners', label: 'Banners', icon: ImageIcon, desc: 'Banners da vitrine' },
     { id: 'users', label: t('manageUsers'), icon: Users, desc: t('adminUsersDesc') },
     { id: 'diagnostics', label: t('adminDiagnostics'), icon: ClipboardList, desc: t('adminDiagnosticsDesc') },

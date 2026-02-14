@@ -17,7 +17,7 @@ export const AppSidebar: React.FC = () => {
 
   const navItems = [
     { to: '/app', icon: Home, label: t('home') },
-    { to: '/app/courses', icon: BookOpen, label: t('courses') },
+    { to: '/app/courses', icon: BookOpen, label: t('myLibrary') || 'Minha Biblioteca' },
     { to: '/app/community', icon: Users, label: t('community') },
     { to: '/app/meetings', icon: Video, label: t('liveMeetings') },
     ...(isAdmin ? [
