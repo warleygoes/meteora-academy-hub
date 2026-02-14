@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { DollarSign, Plus, Edit, Trash2, CheckCircle2, Package as PackageIcon, Users, Tag, ChevronDown, ChevronRight, AlertTriangle, Calendar, Layers, GripVertical, Upload, Image } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, CheckCircle2, Package as PackageIcon, Users, Tag, ChevronDown, ChevronRight, AlertTriangle, Calendar, GripVertical, Upload } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +30,7 @@ interface Offer {
 
 interface ProductRef {
   id: string; name: string; type: string; payment_type: string;
-  pp_id?: string; // package_products.id for drag
+  pp_id?: string;
   sort_order?: number;
 }
 
@@ -42,11 +42,6 @@ interface PackageData {
   thumbnail_url: string | null; thumbnail_vertical_url: string | null;
 }
 
-interface ProductGroup {
-  id: string; package_id: string; name: string; description: string | null;
-  sort_order: number; thumbnail_url: string | null; thumbnail_vertical_url: string | null;
-}
-
 // Sortable product item for linker
 const SortableProductItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -56,22 +51,6 @@ const SortableProductItem: React.FC<{ id: string; children: React.ReactNode }> =
       <div className="flex items-center">
         <button {...listeners} className="px-1.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
           <GripVertical className="w-3.5 h-3.5" />
-        </button>
-        <div className="flex-1">{children}</div>
-      </div>
-    </div>
-  );
-};
-
-// Sortable group item
-const SortableGroupItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
-  return (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      <div className="flex items-stretch">
-        <button {...listeners} className="px-1.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center">
-          <GripVertical className="w-4 h-4" />
         </button>
         <div className="flex-1">{children}</div>
       </div>
@@ -95,7 +74,7 @@ const AdminPackages: React.FC = () => {
   const [showProductLinker, setShowProductLinker] = useState(false);
   const [linkerPkgId, setLinkerPkgId] = useState<string | null>(null);
   const [linkerPaymentType, setLinkerPaymentType] = useState('one_time');
-  const [linkedProducts, setLinkedProducts] = useState<ProductRef[]>([]); // ordered list
+  const [linkedProducts, setLinkedProducts] = useState<ProductRef[]>([]);
 
   // Offer editor
   const [showOfferEditor, setShowOfferEditor] = useState(false);
@@ -103,15 +82,6 @@ const AdminPackages: React.FC = () => {
   const [offerPkgId, setOfferPkgId] = useState<string | null>(null);
   const [showDeleteOffer, setShowDeleteOffer] = useState(false);
   const [deleteOfferId, setDeleteOfferId] = useState<string | null>(null);
-
-  // Group editor
-  const [showGroupManager, setShowGroupManager] = useState(false);
-  const [groupPkgId, setGroupPkgId] = useState<string | null>(null);
-  const [groups, setGroups] = useState<ProductGroup[]>([]);
-  const [editingGroup, setEditingGroup] = useState<ProductGroup | null>(null);
-  const [groupForm, setGroupForm] = useState({ name: '', description: '', thumbnail_url: '', thumbnail_vertical_url: '' });
-  const [groupProducts, setGroupProducts] = useState<Record<string, Set<string>>>({});
-  const [pkgLinkedProducts, setPkgLinkedProducts] = useState<ProductRef[]>([]);
 
   // Image upload
   const [uploadingH, setUploadingH] = useState(false);
@@ -291,66 +261,6 @@ const AdminPackages: React.FC = () => {
     fetchPackages();
   };
 
-  // Group management with drag-drop
-  const openGroupManager = async (pkgId: string) => {
-    setGroupPkgId(pkgId);
-    const { data } = await supabase.from('package_product_groups').select('*').eq('package_id', pkgId).order('sort_order');
-    setGroups(data || []);
-    setEditingGroup(null);
-    setGroupForm({ name: '', description: '', thumbnail_url: '', thumbnail_vertical_url: '' });
-    const { data: ppData } = await supabase.from('package_products').select('product_id, group_id, products(id, name, type, payment_type)').eq('package_id', pkgId).order('sort_order');
-    const prods: ProductRef[] = [];
-    const gp: Record<string, Set<string>> = {};
-    (ppData || []).forEach((pp: any) => {
-      if (pp.products) prods.push(pp.products);
-      if (pp.group_id) {
-        if (!gp[pp.group_id]) gp[pp.group_id] = new Set();
-        gp[pp.group_id].add(pp.product_id);
-      }
-    });
-    setPkgLinkedProducts(prods);
-    setGroupProducts(gp);
-    setShowGroupManager(true);
-  };
-
-  const handleGroupDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = groups.findIndex(g => g.id === active.id);
-    const newIndex = groups.findIndex(g => g.id === over.id);
-    const reordered = arrayMove(groups, oldIndex, newIndex);
-    setGroups(reordered);
-    // Persist
-    await Promise.all(reordered.map((g, i) => supabase.from('package_product_groups').update({ sort_order: i }).eq('id', g.id)));
-  };
-
-  const saveGroup = async () => {
-    if (!groupPkgId || !groupForm.name.trim()) return;
-    const payload = {
-      name: groupForm.name, description: groupForm.description || null,
-      sort_order: editingGroup ? editingGroup.sort_order : groups.length,
-      thumbnail_url: groupForm.thumbnail_url || null,
-      thumbnail_vertical_url: groupForm.thumbnail_vertical_url || null,
-    };
-    if (editingGroup) {
-      await supabase.from('package_product_groups').update(payload).eq('id', editingGroup.id);
-    } else {
-      await supabase.from('package_product_groups').insert({ package_id: groupPkgId, ...payload });
-    }
-    const { data } = await supabase.from('package_product_groups').select('*').eq('package_id', groupPkgId).order('sort_order');
-    setGroups(data || []);
-    setEditingGroup(null);
-    setGroupForm({ name: '', description: '', thumbnail_url: '', thumbnail_vertical_url: '' });
-    toast({ title: editingGroup ? 'Grupo atualizado' : 'Grupo criado' });
-  };
-
-  const deleteGroup = async (groupId: string) => {
-    await supabase.from('package_products').update({ group_id: null }).eq('group_id', groupId);
-    await supabase.from('package_product_groups').delete().eq('id', groupId);
-    setGroups(prev => prev.filter(g => g.id !== groupId));
-    toast({ title: 'Grupo excluído' });
-  };
-
   const compatibleProducts = allProducts.filter(p => p.payment_type === linkerPaymentType);
   const linkedProductIds = new Set(linkedProducts.map(p => p.id));
 
@@ -448,9 +358,6 @@ const AdminPackages: React.FC = () => {
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => openProductLinker(pkg.id)} title={t('linkProducts') || 'Vincular productos'}>
                         <PackageIcon className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openGroupManager(pkg.id)} title="Grupos">
-                        <Layers className="w-4 h-4" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => openEdit(pkg)}><Edit className="w-4 h-4" /></Button>
                       <Button variant="ghost" size="sm" onClick={() => confirmDelete(pkg.id)} className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
@@ -769,94 +676,6 @@ const AdminPackages: React.FC = () => {
               </label>
             </div>
             <Button onClick={saveOffer} className="w-full">{t('save')}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Group Manager with drag-drop */}
-      <Dialog open={showGroupManager} onOpenChange={setShowGroupManager}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-display">Grupos del Paquete</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {groups.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Sin grupos.</p>
-            ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupDragEnd}>
-                <SortableContext items={groups.map(g => g.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-3">
-                    {groups.map(g => {
-                      const assignedProducts = groupProducts[g.id] || new Set<string>();
-                      const toggleProductInGroup = async (productId: string) => {
-                        const next = new Set(assignedProducts);
-                        if (next.has(productId)) {
-                          next.delete(productId);
-                          await supabase.from('package_products').update({ group_id: null }).eq('package_id', groupPkgId!).eq('product_id', productId);
-                        } else {
-                          next.add(productId);
-                          await supabase.from('package_products').update({ group_id: g.id }).eq('package_id', groupPkgId!).eq('product_id', productId);
-                        }
-                        setGroupProducts(prev => ({ ...prev, [g.id]: next }));
-                      };
-                      return (
-                        <SortableGroupItem key={g.id} id={g.id}>
-                          <div className="rounded-lg border border-border bg-secondary/30 overflow-hidden">
-                            <div className="flex items-center gap-3 p-3">
-                              {g.thumbnail_url && <img src={g.thumbnail_url} alt="" className="w-16 h-10 object-cover rounded shrink-0" />}
-                              <div className="flex-1 min-w-0">
-                                <span className="text-sm font-medium text-foreground">{g.name}</span>
-                                {g.description && <p className="text-xs text-muted-foreground">{g.description}</p>}
-                                <span className="text-xs text-muted-foreground">{assignedProducts.size} produtos</span>
-                              </div>
-                              <Button variant="ghost" size="sm" onClick={() => {
-                                setEditingGroup(g);
-                                setGroupForm({ name: g.name, description: g.description || '', thumbnail_url: g.thumbnail_url || '', thumbnail_vertical_url: g.thumbnail_vertical_url || '' });
-                              }}><Edit className="w-3.5 h-3.5" /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => deleteGroup(g.id)} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
-                            </div>
-                            {pkgLinkedProducts.length > 0 && (
-                              <div className="border-t border-border px-3 py-2 space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Produtos neste grupo:</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {pkgLinkedProducts.map(p => (
-                                    <label key={p.id} className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded cursor-pointer border ${assignedProducts.has(p.id) ? 'bg-primary/10 border-primary/30 text-foreground' : 'bg-secondary/50 border-border text-muted-foreground'}`}>
-                                      <Checkbox checked={assignedProducts.has(p.id)} onCheckedChange={() => toggleProductInGroup(p.id)} className="h-3 w-3" />
-                                      {p.name}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </SortableGroupItem>
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            )}
-
-            {/* Add/Edit group form */}
-            <div className="border-t border-border pt-4 space-y-3">
-              <h4 className="text-sm font-semibold text-foreground">{editingGroup ? 'Editar Grupo' : 'Agregar Grupo'}</h4>
-              <Input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do grupo" className="bg-secondary border-border" />
-              <Textarea value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder="Descrição" className="bg-secondary border-border" rows={2} />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Imagem Horizontal (URL)</label>
-                  <Input value={groupForm.thumbnail_url} onChange={e => setGroupForm(f => ({ ...f, thumbnail_url: e.target.value }))} placeholder="https://..." className="bg-secondary border-border" />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Imagem Vertical (URL)</label>
-                  <Input value={groupForm.thumbnail_vertical_url} onChange={e => setGroupForm(f => ({ ...f, thumbnail_vertical_url: e.target.value }))} placeholder="https://..." className="bg-secondary border-border" />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={saveGroup} size="sm" disabled={!groupForm.name.trim()}>{t('save')}</Button>
-                {editingGroup && <Button variant="outline" size="sm" onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '', thumbnail_url: '', thumbnail_vertical_url: '' }); }}>{t('cancel')}</Button>}
-              </div>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
