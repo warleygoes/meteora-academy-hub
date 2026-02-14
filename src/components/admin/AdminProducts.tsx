@@ -3,6 +3,7 @@ import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -52,16 +53,17 @@ const AdminProducts: React.FC = () => {
     { value: 'implementation', label: t('typeImplementation') },
     { value: 'virtual_event', label: t('typeVirtualEvent') },
     { value: 'in_person_event', label: t('typeInPersonEvent') },
+    { value: 'saas', label: 'SaaS' },
   ];
 
   const [form, setForm] = useState({
     name: '', description: '', type: 'service' as string, payment_type: 'one_time',
-    thumbnail_url: '', thumbnail_vertical_url: '', has_content: false,
+    thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '',
   });
 
   const [offerForm, setOfferForm] = useState({
     name: t('defaultOffer'), price: '', currency: 'USD', stripe_price_id: '',
-    is_default: false, active: true, valid_from: '', valid_until: '',
+    is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '',
   });
 
   const fetchProducts = useCallback(async () => {
@@ -102,7 +104,7 @@ const AdminProducts: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false });
+    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '' });
     setShowEditor(true);
   };
 
@@ -112,7 +114,7 @@ const AdminProducts: React.FC = () => {
       name: p.name, description: p.description || '', type: p.type,
       payment_type: p.payment_type,
       thumbnail_url: p.thumbnail_url || '', thumbnail_vertical_url: p.thumbnail_vertical_url || '',
-      has_content: p.has_content,
+      has_content: p.has_content, saas_url: (p as any).saas_url || '',
     });
     setShowEditor(true);
   };
@@ -123,7 +125,7 @@ const AdminProducts: React.FC = () => {
       name: form.name, description: form.description || null, type: form.type,
       payment_type: form.payment_type, thumbnail_url: form.thumbnail_url || null,
       thumbnail_vertical_url: form.thumbnail_vertical_url || null,
-      has_content: form.has_content,
+      has_content: form.has_content, saas_url: form.saas_url || null,
     };
 
     if (editing) {
@@ -218,7 +220,7 @@ const AdminProducts: React.FC = () => {
   // Offers
   const openNewOffer = (productId: string) => {
     setOfferProductId(productId); setEditingOffer(null);
-    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '' });
+    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '' });
     setShowOfferEditor(true);
   };
 
@@ -229,6 +231,7 @@ const AdminProducts: React.FC = () => {
       stripe_price_id: offer.stripe_price_id || '', is_default: offer.is_default, active: offer.active,
       valid_from: offer.valid_from ? offer.valid_from.slice(0, 16) : '',
       valid_until: offer.valid_until ? offer.valid_until.slice(0, 16) : '',
+      periodicity: (offer as any).periodicity || '',
     });
     setShowOfferEditor(true);
   };
@@ -240,6 +243,7 @@ const AdminProducts: React.FC = () => {
       stripe_price_id: offerForm.stripe_price_id || null, is_default: offerForm.is_default, active: offerForm.active,
       valid_from: offerForm.valid_from ? new Date(offerForm.valid_from).toISOString() : null,
       valid_until: offerForm.valid_until ? new Date(offerForm.valid_until).toISOString() : null,
+      periodicity: offerForm.periodicity || null,
     };
     if (editingOffer) {
       await supabase.from('offers').update(payload).eq('id', editingOffer.id);
@@ -303,7 +307,7 @@ const AdminProducts: React.FC = () => {
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="outline" className="text-xs">{getTypeLabel(p.type)}</Badge>
                         <Badge variant="outline" className="text-xs">
-                          {p.payment_type === 'monthly' ? t('monthly') : t('oneTime')}
+                          {p.payment_type === 'recurring' ? (t('recurring') || 'Recorrente') : t('oneTime')}
                         </Badge>
                         {p.has_content && (
                           <Badge variant="secondary" className="text-xs gap-1">
@@ -420,7 +424,7 @@ const AdminProducts: React.FC = () => {
             </div>
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">{t('productDescription')}</label>
-              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" />
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" rows={4} placeholder="Descrição detalhada do produto..." />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -437,12 +441,21 @@ const AdminProducts: React.FC = () => {
                 <Select value={form.payment_type} onValueChange={v => setForm(f => ({ ...f, payment_type: v }))}>
                   <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="monthly">{t('monthly')}</SelectItem>
+                    <SelectItem value="recurring">{t('recurring') || 'Recorrente'}</SelectItem>
                     <SelectItem value="one_time">{t('oneTime')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {/* SaaS URL */}
+            {form.type === 'saas' && (
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">URL do SaaS</label>
+                <Input value={form.saas_url} onChange={e => setForm(f => ({ ...f, saas_url: e.target.value }))} className="bg-secondary border-border" placeholder="https://app.example.com" />
+                <p className="text-xs text-muted-foreground mt-1">URL que o aluno acessará quando tiver assinatura ativa.</p>
+              </div>
+            )}
 
             {/* Has content toggle */}
             <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
@@ -512,6 +525,19 @@ const AdminProducts: React.FC = () => {
                 <label className="text-sm text-muted-foreground mb-1 block">{t('validUntil')}</label>
                 <Input type="datetime-local" value={offerForm.valid_until} onChange={e => setOfferForm(f => ({ ...f, valid_until: e.target.value }))} className="bg-secondary border-border" />
               </div>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Periodicidade</label>
+              <Select value={offerForm.periodicity || 'none'} onValueChange={v => setOfferForm(f => ({ ...f, periodicity: v === 'none' ? '' : v }))}>
+                <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">N/A (pagamento único)</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="quarterly">Trimestral</SelectItem>
+                  <SelectItem value="semi_annual">Semestral</SelectItem>
+                  <SelectItem value="annual">Anual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 text-sm">

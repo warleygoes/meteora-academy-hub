@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      banners: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          image_url: string | null
+          link_label: string | null
+          link_target: string | null
+          link_url: string | null
+          segment_exclude_product_id: string | null
+          sort_order: number
+          subtitle: string | null
+          title: string
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+          video_url: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          link_label?: string | null
+          link_target?: string | null
+          link_url?: string | null
+          segment_exclude_product_id?: string | null
+          sort_order?: number
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          link_label?: string | null
+          link_target?: string | null
+          link_url?: string | null
+          segment_exclude_product_id?: string | null
+          sort_order?: number
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banners_segment_exclude_product_id_fkey"
+            columns: ["segment_exclude_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_comments: {
         Row: {
           content: string
@@ -472,6 +534,7 @@ export type Database = {
           is_default: boolean
           name: string
           package_id: string | null
+          periodicity: string | null
           price: number
           product_id: string | null
           stripe_price_id: string | null
@@ -486,6 +549,7 @@ export type Database = {
           is_default?: boolean
           name?: string
           package_id?: string | null
+          periodicity?: string | null
           price?: number
           product_id?: string | null
           stripe_price_id?: string | null
@@ -500,6 +564,7 @@ export type Database = {
           is_default?: boolean
           name?: string
           package_id?: string | null
+          periodicity?: string | null
           price?: number
           product_id?: string | null
           stripe_price_id?: string | null
@@ -523,26 +588,80 @@ export type Database = {
           },
         ]
       }
-      package_products: {
+      package_product_groups: {
         Row: {
           created_at: string
+          description: string | null
           id: string
+          name: string
           package_id: string
-          product_id: string
+          sort_order: number
+          thumbnail_url: string | null
+          thumbnail_vertical_url: string | null
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
+          name: string
           package_id: string
-          product_id: string
+          sort_order?: number
+          thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
         }
         Update: {
           created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          package_id?: string
+          sort_order?: number
+          thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_product_groups_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      package_products: {
+        Row: {
+          created_at: string
+          group_id: string | null
+          id: string
+          package_id: string
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          package_id: string
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          group_id?: string | null
           id?: string
           package_id?: string
           product_id?: string
+          sort_order?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "package_products_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "package_product_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "package_products_package_id_fkey"
             columns: ["package_id"]
@@ -567,8 +686,10 @@ export type Database = {
           duration_days: number | null
           features: string[] | null
           id: string
+          is_trail: boolean
           name: string
           payment_type: string
+          show_in_showcase: boolean
           updated_at: string
         }
         Insert: {
@@ -578,8 +699,10 @@ export type Database = {
           duration_days?: number | null
           features?: string[] | null
           id?: string
+          is_trail?: boolean
           name: string
           payment_type?: string
+          show_in_showcase?: boolean
           updated_at?: string
         }
         Update: {
@@ -589,8 +712,10 @@ export type Database = {
           duration_days?: number | null
           features?: string[] | null
           id?: string
+          is_trail?: boolean
           name?: string
           payment_type?: string
+          show_in_showcase?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -760,6 +885,7 @@ export type Database = {
           id: string
           name: string
           payment_type: string
+          saas_url: string | null
           sort_order: number
           thumbnail_url: string | null
           thumbnail_vertical_url: string | null
@@ -775,6 +901,7 @@ export type Database = {
           id?: string
           name: string
           payment_type?: string
+          saas_url?: string | null
           sort_order?: number
           thumbnail_url?: string | null
           thumbnail_vertical_url?: string | null
@@ -790,6 +917,7 @@ export type Database = {
           id?: string
           name?: string
           payment_type?: string
+          saas_url?: string | null
           sort_order?: number
           thumbnail_url?: string | null
           thumbnail_vertical_url?: string | null
@@ -1061,6 +1189,7 @@ export type Database = {
         | "implementation"
         | "virtual_event"
         | "in_person_event"
+        | "saas"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1197,6 +1326,7 @@ export const Constants = {
         "implementation",
         "virtual_event",
         "in_person_event",
+        "saas",
       ],
     },
   },

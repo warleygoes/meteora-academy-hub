@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, BookOpen, Users } from 'lucide-react';
+import { Play, BookOpen, Users, Info } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import type { ContentProduct } from '@/lib/courseTypes';
 
@@ -23,6 +24,10 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
 
   const aspectClass = variant === 'vertical' ? 'aspect-[2/3]' : 'aspect-video';
 
+  const goToCourse = () => {
+    if (product.course_id) navigate(`/app/courses/${product.course_id}`);
+  };
+
   return (
     <motion.div
       className="relative rounded-lg overflow-hidden cursor-pointer group card-shadow bg-card"
@@ -30,15 +35,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
       onMouseLeave={() => setIsHovered(false)}
       whileHover={{ scale: 1.05, zIndex: 10 }}
       transition={{ duration: 0.2 }}
-      onClick={() => product.course_id ? navigate(`/app/courses/${product.course_id}`) : null}
+      onClick={goToCourse}
     >
       <div className={`relative ${aspectClass} overflow-hidden`}>
         {thumbnail ? (
-          <img
-            src={thumbnail}
-            alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          />
+          <img src={thumbnail} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
           <div className="w-full h-full bg-secondary flex items-center justify-center">
             <BookOpen className="w-10 h-10 text-muted-foreground" />
@@ -46,14 +47,23 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent opacity-80" />
 
+        {/* Hover overlay with details */}
         {isHovered && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="absolute inset-0 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-4 gap-3"
           >
-            <div className="w-14 h-14 rounded-full bg-primary/90 flex items-center justify-center glow-primary">
-              <Play className="w-6 h-6 text-primary-foreground ml-1" />
+            {product.description && (
+              <p className="text-xs text-center text-muted-foreground line-clamp-3 max-w-[90%]">{product.description}</p>
+            )}
+            <div className="flex gap-2">
+              <Button size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
+                <Play className="w-3.5 h-3.5" /> {t('startNow') || 'Acessar'}
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={(e) => { e.stopPropagation(); goToCourse(); }}>
+                <Info className="w-3.5 h-3.5" /> {t('moreInfo') || 'Detalhes'}
+              </Button>
             </div>
           </motion.div>
         )}
@@ -64,9 +74,6 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
           <Badge variant="secondary" className="text-xs mb-1">{product.category_name}</Badge>
         )}
         <h3 className="font-semibold text-sm text-foreground line-clamp-2 mb-1">{product.name}</h3>
-        {product.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{product.description}</p>
-        )}
 
         <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
           {product.lesson_count > 0 && (
