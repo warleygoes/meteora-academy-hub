@@ -138,21 +138,10 @@ const CoursePage: React.FC = () => {
       isCompleted ? next.delete(lessonId) : next.add(lessonId);
       return next;
     });
-    // Check if a progress record already exists for this specific lesson
-    const { data: existing } = await supabase
-      .from('lesson_progress')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('course_id', courseId)
-      .eq('lesson_id', lessonId)
-      .maybeSingle();
-    if (existing) {
-      await supabase.from('lesson_progress').update({ completed: !isCompleted, updated_at: new Date().toISOString() }).eq('id', existing.id);
-    } else {
-      await supabase.from('lesson_progress').insert({
-        user_id: user.id, course_id: courseId, lesson_id: lessonId, completed: !isCompleted, updated_at: new Date().toISOString(),
-      });
-    }
+    await supabase.from('lesson_progress').upsert(
+      { user_id: user.id, course_id: courseId, lesson_id: lessonId, completed: !isCompleted, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,course_id,lesson_id' }
+    );
   };
 
   const toggleModuleExpand = (id: string) => {
