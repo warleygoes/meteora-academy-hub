@@ -6,6 +6,7 @@ export interface ContentProduct {
   thumbnail_url: string | null;
   thumbnail_vertical_url: string | null;
   course_id: string | null;
+  saas_url: string | null;
   category_name?: string;
   lesson_count: number;
   enrollment_count: number;

@@ -13,7 +13,7 @@ export function useContentProducts() {
       // Fetch products with content
       const { data: productsData } = await supabase
         .from('products')
-        .select('id, name, description, type, thumbnail_url, thumbnail_vertical_url, course_id, active, has_content, sort_order')
+        .select('id, name, description, type, thumbnail_url, thumbnail_vertical_url, course_id, saas_url, active, has_content, sort_order')
         .eq('has_content', true)
         .eq('active', true)
         .order('sort_order');
@@ -104,6 +104,7 @@ export function useContentProducts() {
           thumbnail_url: p.thumbnail_url,
           thumbnail_vertical_url: p.thumbnail_vertical_url,
           course_id: p.course_id,
+          saas_url: p.saas_url,
           category_name: p.course_id ? categoryMap[p.course_id] : undefined,
           lesson_count: totalLessons,
           enrollment_count: p.course_id ? (enrollCountMap[p.course_id] || 0) : 0,

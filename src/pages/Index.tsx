@@ -38,7 +38,7 @@ const Index: React.FC = () => {
 
       const { data: ppData } = await supabase
         .from('package_products')
-        .select('package_id, product_id, sort_order, products(id, name, description, type, thumbnail_url, thumbnail_vertical_url, course_id, active, has_content)')
+        .select('package_id, product_id, sort_order, products(id, name, description, type, thumbnail_url, thumbnail_vertical_url, course_id, saas_url, active, has_content)')
         .in('package_id', pkgs.map(p => p.id))
         .order('sort_order');
 
@@ -54,6 +54,7 @@ const Index: React.FC = () => {
           thumbnail_url: pp.products.thumbnail_url,
           thumbnail_vertical_url: pp.products.thumbnail_vertical_url,
           course_id: pp.products.course_id,
+          saas_url: pp.products.saas_url,
           lesson_count: 0,
           enrollment_count: 0,
         });
