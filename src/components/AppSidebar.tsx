@@ -1,12 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Video } from 'lucide-react';
+import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Video, Link2, ExternalLink, Headphones, Calendar, Star, Zap, Rocket, FileText, Settings, MessageSquare, LayoutDashboard, BookOpenCheck, Code } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/lib/i18n';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import meteoraLogo from '@/assets/logo-white-pink.png';
 
 const languageLabels: Record<Language, string> = { pt: 'PT', en: 'EN', es: 'ES' };
+
+const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
+  'link': Link2, 'external-link': ExternalLink, 'globe': Globe,
+  'video': Video, 'book-open': BookOpen, 'headphones': Headphones,
+  'message-square': MessageSquare, 'calendar': Calendar, 'star': Star,
+  'zap': Zap, 'rocket': Rocket, 'shield': Shield, 'settings': Settings,
+  'users': Users, 'layout-dashboard': LayoutDashboard, 'file-text': FileText,
+};
+
+interface CustomLink {
+  id: string; title: string; icon: string; url: string;
+  open_mode: string; sort_order: number;
+}
 
 export const AppSidebar: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -14,6 +28,55 @@ export const AppSidebar: React.FC = () => {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [customLinks, setCustomLinks] = useState<CustomLink[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchLinks = async () => {
+      // Fetch active links
+      const { data: links } = await supabase
+        .from('menu_links').select('*').eq('active', true).order('sort_order');
+      if (!links || links.length === 0) { setCustomLinks([]); return; }
+
+      // Fetch user's packages and products
+      const [{ data: userPlans }, { data: userProds }] = await Promise.all([
+        supabase.from('user_plans').select('package_id').eq('user_id', user.id).eq('status', 'active'),
+        supabase.from('user_products').select('product_id').eq('user_id', user.id),
+      ]);
+      const userPkgIds = new Set((userPlans || []).map(p => p.package_id));
+      const userProdIds = new Set((userProds || []).map(p => p.product_id));
+
+      // Fetch link visibility rules
+      const linkIds = links.map(l => l.id);
+      const [{ data: linkPkgs }, { data: linkProds }] = await Promise.all([
+        supabase.from('menu_link_packages').select('menu_link_id, package_id').in('menu_link_id', linkIds),
+        supabase.from('menu_link_products').select('menu_link_id, product_id').in('menu_link_id', linkIds),
+      ]);
+
+      const pkgMap: Record<string, string[]> = {};
+      (linkPkgs || []).forEach((r: any) => {
+        if (!pkgMap[r.menu_link_id]) pkgMap[r.menu_link_id] = [];
+        pkgMap[r.menu_link_id].push(r.package_id);
+      });
+      const prodMap: Record<string, string[]> = {};
+      (linkProds || []).forEach((r: any) => {
+        if (!prodMap[r.menu_link_id]) prodMap[r.menu_link_id] = [];
+        prodMap[r.menu_link_id].push(r.product_id);
+      });
+
+      // Filter: show if no restrictions OR user has matching pkg/prod
+      const visible = links.filter(l => {
+        const reqPkgs = pkgMap[l.id] || [];
+        const reqProds = prodMap[l.id] || [];
+        if (reqPkgs.length === 0 && reqProds.length === 0) return true; // visible to all
+        if (isAdmin) return true;
+        return reqPkgs.some(id => userPkgIds.has(id)) || reqProds.some(id => userProdIds.has(id));
+      });
+
+      setCustomLinks(visible);
+    };
+    fetchLinks();
+  }, [user, isAdmin]);
 
   const navItems = [
     { to: '/app', icon: Home, label: t('home') },
@@ -54,14 +117,14 @@ export const AppSidebar: React.FC = () => {
       )}
 
       {/* Nav */}
-      <nav className="flex-1 px-2">
+      <nav className="flex-1 px-2 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             onClick={() => setMobileOpen(false)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm transition-colors ${
-              isActive(to)
+              location.pathname === to
                 ? 'bg-primary/10 text-primary font-medium'
                 : 'text-sidebar-foreground hover:bg-sidebar-accent'
             }`}
@@ -70,6 +133,52 @@ export const AppSidebar: React.FC = () => {
             {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}
+
+        {/* Custom links */}
+        {customLinks.length > 0 && !collapsed && (
+          <div className="border-t border-sidebar-border my-2 pt-2">
+            <span className="px-3 text-xs text-muted-foreground uppercase tracking-wider">Links</span>
+          </div>
+        )}
+        {customLinks.map(link => {
+          const IconComp = ICON_MAP[link.icon] || Link2;
+          if (link.open_mode === 'embed') {
+            const to = `/app/embed/${link.id}`;
+            return (
+              <NavLink
+                key={link.id}
+                to={to}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm transition-colors ${
+                  location.pathname === to
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                }`}
+              >
+                <IconComp className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span>{link.title}</span>}
+              </NavLink>
+            );
+          }
+          return (
+            <a
+              key={link.id}
+              href={link.url}
+              target={link.open_mode === 'new_tab' ? '_blank' : '_self'}
+              rel={link.open_mode === 'new_tab' ? 'noopener noreferrer' : undefined}
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm transition-colors text-sidebar-foreground hover:bg-sidebar-accent"
+            >
+              <IconComp className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1">{link.title}</span>
+                  {link.open_mode === 'new_tab' && <ExternalLink className="w-3 h-3 text-muted-foreground" />}
+                </>
+              )}
+            </a>
+          );
+        })}
       </nav>
 
       {/* Language + User */}
