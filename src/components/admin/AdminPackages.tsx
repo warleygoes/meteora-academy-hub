@@ -26,6 +26,8 @@ interface Offer {
   id: string; name: string; price: number; currency: string;
   stripe_price_id: string | null; is_default: boolean; active: boolean;
   valid_from: string | null; valid_until: string | null;
+  periodicity: string | null; hotmart_url: string | null;
+  payment_link_active: boolean; duration_type: string; duration_days: number | null;
 }
 
 interface ProductRef {
@@ -97,6 +99,7 @@ const AdminPackages: React.FC = () => {
   const [offerForm, setOfferForm] = useState({
     name: 'Oferta Padrão', price: '', currency: 'USD', stripe_price_id: '',
     is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '',
+    hotmart_url: '', payment_link_active: true, duration_type: 'no_expiration', duration_days: '',
   });
 
   const sensors = useSensors(
@@ -268,7 +271,7 @@ const AdminPackages: React.FC = () => {
   const openNewOffer = (pkgId: string) => {
     setOfferPkgId(pkgId);
     setEditingOffer(null);
-    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '' });
+    setOfferForm({ name: '', price: '', currency: 'USD', stripe_price_id: '', is_default: false, active: true, valid_from: '', valid_until: '', periodicity: '', hotmart_url: '', payment_link_active: true, duration_type: 'no_expiration', duration_days: '' });
     setShowOfferEditor(true);
   };
 
@@ -280,7 +283,11 @@ const AdminPackages: React.FC = () => {
       stripe_price_id: offer.stripe_price_id || '', is_default: offer.is_default, active: offer.active,
       valid_from: offer.valid_from ? offer.valid_from.slice(0, 16) : '',
       valid_until: offer.valid_until ? offer.valid_until.slice(0, 16) : '',
-      periodicity: (offer as any).periodicity || '',
+      periodicity: offer.periodicity || '',
+      hotmart_url: offer.hotmart_url || '',
+      payment_link_active: offer.payment_link_active ?? true,
+      duration_type: offer.duration_type || 'no_expiration',
+      duration_days: offer.duration_days?.toString() || '',
     });
     setShowOfferEditor(true);
   };
@@ -293,6 +300,10 @@ const AdminPackages: React.FC = () => {
       valid_from: offerForm.valid_from ? new Date(offerForm.valid_from).toISOString() : null,
       valid_until: offerForm.valid_until ? new Date(offerForm.valid_until).toISOString() : null,
       periodicity: offerForm.periodicity || null,
+      hotmart_url: offerForm.hotmart_url || null,
+      payment_link_active: offerForm.payment_link_active,
+      duration_type: offerForm.duration_type,
+      duration_days: offerForm.duration_days ? parseInt(offerForm.duration_days) : null,
     };
     if (editingOffer) {
       await supabase.from('offers').update(payload).eq('id', editingOffer.id);
@@ -623,7 +634,7 @@ const AdminPackages: React.FC = () => {
 
       {/* Offer Editor */}
       <Dialog open={showOfferEditor} onOpenChange={setShowOfferEditor}>
-        <DialogContent className="bg-card border-border max-w-lg">
+        <DialogContent className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display">{editingOffer ? (t('editOffer') || 'Editar Oferta') : (t('addOffer') || 'Nueva Oferta')}</DialogTitle>
           </DialogHeader>
@@ -642,6 +653,71 @@ const AdminPackages: React.FC = () => {
                 <Input value={offerForm.stripe_price_id} onChange={e => setOfferForm(f => ({ ...f, stripe_price_id: e.target.value }))} className="bg-secondary border-border" placeholder="price_..." />
               </div>
             </div>
+
+            {/* Hotmart URL */}
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('hotmartUrl') || 'Link de Pagamento Hotmart'}</label>
+              <Input value={offerForm.hotmart_url} onChange={e => setOfferForm(f => ({ ...f, hotmart_url: e.target.value }))} className="bg-secondary border-border" placeholder="https://pay.hotmart.com/..." />
+            </div>
+
+            {/* Payment link active */}
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={offerForm.payment_link_active} onCheckedChange={v => setOfferForm(f => ({ ...f, payment_link_active: v }))} />
+                {t('paymentLinkActive') || 'Link de Pagamento Ativo'}
+              </label>
+            </div>
+
+            {/* Periodicity - only for recurring packages */}
+            {(() => {
+              const pkg = packages.find(p => p.id === offerPkgId);
+              const isRecurring = pkg?.payment_type === 'recurring';
+              return isRecurring ? (
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">{t('periodicity') || 'Periodicidade'}</label>
+                  <Select value={offerForm.periodicity || 'monthly'} onValueChange={v => setOfferForm(f => ({ ...f, periodicity: v }))}>
+                    <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">{t('periodicityMonthly') || 'Mensal'}</SelectItem>
+                      <SelectItem value="quarterly">{t('periodicityQuarterly') || 'Trimestral'}</SelectItem>
+                      <SelectItem value="semi_annual">{t('periodicitySemiannual') || 'Semestral'}</SelectItem>
+                      <SelectItem value="annual">{t('periodicityAnnual') || 'Anual'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                  <p className="text-sm text-muted-foreground">{t('oneTime') || 'Pagamento Único'}</p>
+                </div>
+              );
+            })()}
+
+            {/* Duration control */}
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('accessDurationType') || 'Tipo de Acesso'}</label>
+              <Select value={offerForm.duration_type} onValueChange={v => setOfferForm(f => ({ ...f, duration_type: v }))}>
+                <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no_expiration">{t('noExpiration') || 'Sem expiração'}</SelectItem>
+                  <SelectItem value="days">{t('daysAccess') || 'Número de dias'}</SelectItem>
+                  <SelectItem value="fixed_date">{t('fixedExpiration') || 'Até uma data'}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {offerForm.duration_type === 'days' && (
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('durationDays') || 'Dias de acesso'}</label>
+                <Input type="number" value={offerForm.duration_days} onChange={e => setOfferForm(f => ({ ...f, duration_days: e.target.value }))} className="bg-secondary border-border" placeholder="30" />
+              </div>
+            )}
+            {offerForm.duration_type === 'fixed_date' && (
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">{t('expirationDate') || 'Data de expiração do acesso'}</label>
+                <Input type="date" value={offerForm.valid_until ? offerForm.valid_until.slice(0, 10) : ''} onChange={e => setOfferForm(f => ({ ...f, valid_until: e.target.value ? new Date(e.target.value).toISOString() : '' }))} className="bg-secondary border-border" />
+                <p className="text-xs text-muted-foreground mt-1">Após esta data, o acesso do usuário será expirado.</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">{t('validFrom') || 'Válido desde'}</label>
@@ -652,19 +728,7 @@ const AdminPackages: React.FC = () => {
                 <Input type="datetime-local" value={offerForm.valid_until} onChange={e => setOfferForm(f => ({ ...f, valid_until: e.target.value }))} className="bg-secondary border-border" />
               </div>
             </div>
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Periodicidade</label>
-              <Select value={offerForm.periodicity || 'none'} onValueChange={v => setOfferForm(f => ({ ...f, periodicity: v === 'none' ? '' : v }))}>
-                <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">N/A (pagamento único)</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="quarterly">Trimestral</SelectItem>
-                  <SelectItem value="semi_annual">Semestral</SelectItem>
-                  <SelectItem value="annual">Anual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={offerForm.is_default} onCheckedChange={v => setOfferForm(f => ({ ...f, is_default: v }))} />
