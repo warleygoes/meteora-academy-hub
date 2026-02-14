@@ -418,6 +418,67 @@ export type Database = {
         }
         Relationships: []
       }
+      lesson_comments: {
+        Row: {
+          comment_type: string
+          content: string
+          course_id: string
+          created_at: string
+          id: string
+          lesson_id: string
+          parent_id: string | null
+          updated_at: string
+          user_id: string
+          video_timestamp_seconds: number | null
+        }
+        Insert: {
+          comment_type?: string
+          content: string
+          course_id: string
+          created_at?: string
+          id?: string
+          lesson_id: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id: string
+          video_timestamp_seconds?: number | null
+        }
+        Update: {
+          comment_type?: string
+          content?: string
+          course_id?: string
+          created_at?: string
+          id?: string
+          lesson_id?: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string
+          video_timestamp_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_comments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_comments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lesson_contents: {
         Row: {
           content: string | null
@@ -530,10 +591,14 @@ export type Database = {
           active: boolean
           created_at: string
           currency: string
+          duration_days: number | null
+          duration_type: string
+          hotmart_url: string | null
           id: string
           is_default: boolean
           name: string
           package_id: string | null
+          payment_link_active: boolean
           periodicity: string | null
           price: number
           product_id: string | null
@@ -545,10 +610,14 @@ export type Database = {
           active?: boolean
           created_at?: string
           currency?: string
+          duration_days?: number | null
+          duration_type?: string
+          hotmart_url?: string | null
           id?: string
           is_default?: boolean
           name?: string
           package_id?: string | null
+          payment_link_active?: boolean
           periodicity?: string | null
           price?: number
           product_id?: string | null
@@ -560,10 +629,14 @@ export type Database = {
           active?: boolean
           created_at?: string
           currency?: string
+          duration_days?: number | null
+          duration_type?: string
+          hotmart_url?: string | null
           id?: string
           is_default?: boolean
           name?: string
           package_id?: string | null
+          payment_link_active?: boolean
           periodicity?: string | null
           price?: number
           product_id?: string | null
@@ -875,6 +948,42 @@ export type Database = {
         }
         Relationships: []
       }
+      product_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "course_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_categories_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean
@@ -1086,6 +1195,7 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
+          offer_id: string | null
           package_id: string
           starts_at: string
           status: string
@@ -1095,6 +1205,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          offer_id?: string | null
           package_id: string
           starts_at?: string
           status?: string
@@ -1104,12 +1215,20 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          offer_id?: string | null
           package_id?: string
           starts_at?: string
           status?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_plans_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_plans_package_id_fkey"
             columns: ["package_id"]
@@ -1122,23 +1241,36 @@ export type Database = {
       user_products: {
         Row: {
           created_at: string
+          expires_at: string | null
           id: string
+          offer_id: string | null
           product_id: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
           id?: string
+          offer_id?: string | null
           product_id: string
           user_id: string
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
           id?: string
+          offer_id?: string | null
           product_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_products_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_products_product_id_fkey"
             columns: ["product_id"]

@@ -4,17 +4,24 @@ import { useNavigate } from 'react-router-dom';
 import { useContentProducts } from '@/hooks/useContentProducts';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
-import { BookOpen, Users } from 'lucide-react';
+import { BookOpen, Users, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+
+const PRODUCT_TYPE_LABELS: Record<string, Record<string, string>> = {
+  es: { course: 'Cursos', service: 'Servicios', consultation: 'Consultorías', implementation: 'Implementaciones', virtual_event: 'Eventos Virtuales', in_person_event: 'Eventos Presenciales', saas: 'SaaS' },
+  pt: { course: 'Cursos', service: 'Serviços', consultation: 'Consultorias', implementation: 'Implementações', virtual_event: 'Eventos Virtuais', in_person_event: 'Eventos Presenciais', saas: 'SaaS' },
+  en: { course: 'Courses', service: 'Services', consultation: 'Consultations', implementation: 'Implementations', virtual_event: 'Virtual Events', in_person_event: 'In-Person Events', saas: 'SaaS' },
+};
 
 const CoursesPage: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { products, loading } = useContentProducts();
   const [activeCategory, setActiveCategory] = useState('all');
+  const [activeType, setActiveType] = useState('all');
   const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([]);
 
-  // Fetch all categories from DB, not just from products
   useEffect(() => {
     const fetchCategories = async () => {
       const { data } = await supabase.from('course_categories').select('id, name').order('name');
@@ -23,16 +30,39 @@ const CoursesPage: React.FC = () => {
     fetchCategories();
   }, []);
 
-  const filtered = activeCategory === 'all'
-    ? products
-    : products.filter(p => p.category_name === activeCategory);
+  // Get unique product types from products
+  const productTypes = [...new Set(products.map(p => p.type))];
+  const typeLabels = PRODUCT_TYPE_LABELS[language] || PRODUCT_TYPE_LABELS.es;
+
+  const filtered = products.filter(p => {
+    if (activeType !== 'all' && p.type !== activeType) return false;
+    if (activeCategory !== 'all' && p.category_name !== activeCategory) return false;
+    return true;
+  });
 
   if (loading) return <div className="flex items-center justify-center min-h-[40vh] text-muted-foreground">{t('loading')}...</div>;
 
   return (
     <div className="px-6 md:px-12 py-8">
-      <h1 className="text-3xl font-display font-bold mb-6">{t('courses')}</h1>
+      <h1 className="text-3xl font-display font-bold mb-6">{t('myLibrary') || 'Minha Biblioteca'}</h1>
 
+      {/* Product type filter */}
+      {productTypes.length > 1 && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <button onClick={() => setActiveType('all')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeType === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
+            {t('allFilter') || 'Todos'}
+          </button>
+          {productTypes.map(type => (
+            <button key={type} onClick={() => setActiveType(type)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeType === type ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
+              {typeLabels[type] || type}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Category filter */}
       <div className="flex gap-2 mb-8 flex-wrap">
         <button onClick={() => setActiveCategory('all')}
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeCategory === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
@@ -61,7 +91,10 @@ const CoursesPage: React.FC = () => {
               </div>
             )}
             <div className="p-4 space-y-2">
-              {product.category_name && <Badge variant="secondary" className="text-xs">{product.category_name}</Badge>}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-xs">{typeLabels[product.type] || product.type}</Badge>
+                {product.category_name && <Badge variant="secondary" className="text-xs">{product.category_name}</Badge>}
+              </div>
               <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">{product.name}</h3>
               {product.description && <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>}
               <div className="flex gap-3 text-xs text-muted-foreground pt-1">
@@ -72,6 +105,12 @@ const CoursesPage: React.FC = () => {
                   <span className="flex items-center gap-1"><Users className="w-3 h-3" />{product.enrollment_count} {t('students')}</span>
                 )}
               </div>
+              {product.type === 'saas' && product.saas_url && (
+                <Button size="sm" variant="secondary" className="gap-1 w-full text-xs mt-2"
+                  onClick={(e) => { e.stopPropagation(); window.open(product.saas_url!, '_blank', 'noopener'); }}>
+                  <ExternalLink className="w-3 h-3" /> Acessar App
+                </Button>
+              )}
             </div>
           </motion.div>
         ))}
