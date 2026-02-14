@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag, ScrollText, Image as ImageIcon } from 'lucide-react';
+import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag, ScrollText, Image as ImageIcon, Plug } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AdminUsers from '@/components/admin/AdminUsers';
 import AdminCourses from '@/components/admin/AdminCourses';
@@ -10,6 +10,7 @@ import AdminSettings from '@/components/admin/AdminSettings';
 import AdminDiagnostics from '@/components/admin/AdminDiagnostics';
 import AdminLogs from '@/components/admin/AdminLogs';
 import AdminBanners from '@/components/admin/AdminBanners';
+import AdminAPI from '@/components/admin/AdminAPI';
 import { cn } from '@/lib/utils';
 
 const AdminPage: React.FC = () => {
@@ -31,6 +32,7 @@ const AdminPage: React.FC = () => {
     { id: 'analytics', label: t('analytics'), icon: TrendingUp, desc: t('analyticsDesc') },
     { id: 'settings', label: t('settingsTitle'), icon: Settings, desc: t('settingsDesc') },
     { id: 'logs', label: t('systemLogs'), icon: ScrollText, desc: t('systemLogsDesc') },
+    { id: 'api', label: 'API', icon: Plug, desc: 'Chave e documentação da API' },
   ];
 
   return (
@@ -66,6 +68,7 @@ const AdminPage: React.FC = () => {
       {activeSection === 'settings' && <AdminSettings />}
       {activeSection === 'diagnostics' && <AdminDiagnostics />}
       {activeSection === 'logs' && <AdminLogs />}
+      {activeSection === 'api' && <AdminAPI />}
     </div>
   );
 };

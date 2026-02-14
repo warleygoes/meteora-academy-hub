@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Video, FileCode2 } from 'lucide-react';
+import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Video } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/lib/i18n';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,7 +22,6 @@ export const AppSidebar: React.FC = () => {
     { to: '/app/meetings', icon: Video, label: t('liveMeetings') },
     ...(isAdmin ? [
       { to: '/app/admin', icon: Shield, label: t('admin') },
-      { to: '/app/admin/api-docs', icon: FileCode2, label: 'API Docs' },
     ] : []),
   ];
 
