@@ -248,6 +248,7 @@ export type Database = {
           duration_minutes: number | null
           id: string
           is_free: boolean
+          is_private: boolean
           module_id: string
           sort_order: number
           title: string
@@ -259,6 +260,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           is_free?: boolean
+          is_private?: boolean
           module_id: string
           sort_order?: number
           title: string
@@ -270,6 +272,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           is_free?: boolean
+          is_private?: boolean
           module_id?: string
           sort_order?: number
           title?: string
@@ -559,6 +562,51 @@ export type Database = {
           },
         ]
       }
+      lesson_ratings: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          lesson_id: string
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          lesson_id: string
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          lesson_id?: string
+          rating?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_ratings_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_ratings_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       network_topologies: {
         Row: {
           created_at: string
@@ -763,6 +811,8 @@ export type Database = {
           name: string
           payment_type: string
           show_in_showcase: boolean
+          thumbnail_url: string | null
+          thumbnail_vertical_url: string | null
           updated_at: string
         }
         Insert: {
@@ -776,6 +826,8 @@ export type Database = {
           name: string
           payment_type?: string
           show_in_showcase?: boolean
+          thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -789,6 +841,8 @@ export type Database = {
           name?: string
           payment_type?: string
           show_in_showcase?: boolean
+          thumbnail_url?: string | null
+          thumbnail_vertical_url?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -945,6 +999,27 @@ export type Database = {
           price?: number
           stripe_price_id?: string | null
           stripe_product_id?: string | null
+        }
+        Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string | null
         }
         Relationships: []
       }
@@ -1189,6 +1264,38 @@ export type Database = {
           performer_email?: string | null
         }
         Relationships: []
+      }
+      user_lesson_access: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          id: string
+          lesson_id: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          lesson_id: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          lesson_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_lesson_access_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_plans: {
         Row: {

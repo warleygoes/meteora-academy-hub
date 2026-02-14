@@ -137,7 +137,7 @@ const AdminCourses: React.FC = () => {
   const [inlineEditingModule, setInlineEditingModule] = useState<string | null>(null);
   const [inlineEditingLesson, setInlineEditingLesson] = useState<string | null>(null);
   const [inlineModuleForm, setInlineModuleForm] = useState({ title: '', description: '' });
-  const [inlineLessonForm, setInlineLessonForm] = useState({ title: '', description: '', video_url: '', duration_minutes: 0, is_free: false });
+  const [inlineLessonForm, setInlineLessonForm] = useState({ title: '', description: '', video_url: '', duration_minutes: 0, is_free: false, is_private: false });
 
   const [editingContent, setEditingContent] = useState<string | null>(null);
   const [contentForm, setContentForm] = useState({ title: '', type: 'video' as LessonContent['type'], content: '' });
@@ -328,12 +328,12 @@ const AdminCourses: React.FC = () => {
   };
   const startEditLesson = (lesson: Lesson) => {
     setInlineEditingLesson(lesson.id);
-    setInlineLessonForm({ title: lesson.title, description: lesson.description || '', video_url: lesson.video_url || '', duration_minutes: lesson.duration_minutes || 0, is_free: lesson.is_free });
+    setInlineLessonForm({ title: lesson.title, description: lesson.description || '', video_url: lesson.video_url || '', duration_minutes: lesson.duration_minutes || 0, is_free: lesson.is_free, is_private: (lesson as any).is_private || false });
   };
   const saveInlineLesson = async (lesson: Lesson, courseId: string) => {
     await supabase.from('course_lessons').update({
       title: inlineLessonForm.title, description: inlineLessonForm.description || null,
-      video_url: inlineLessonForm.video_url || null, duration_minutes: inlineLessonForm.duration_minutes || 0, is_free: inlineLessonForm.is_free,
+      video_url: inlineLessonForm.video_url || null, duration_minutes: inlineLessonForm.duration_minutes || 0, is_free: inlineLessonForm.is_free, is_private: inlineLessonForm.is_private,
     }).eq('id', lesson.id);
     setInlineEditingLesson(null); fetchCourseModules(courseId);
     toast({ title: t('lessonSaved') || 'Aula guardada' });
@@ -576,6 +576,10 @@ const AdminCourses: React.FC = () => {
                                                       <div className="flex items-center gap-1">
                                                         <Switch checked={inlineLessonForm.is_free} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_free: v }))} />
                                                         <span className="text-xs text-muted-foreground">{t('free') || 'Gratis'}</span>
+                                                      </div>
+                                                      <div className="flex items-center gap-1">
+                                                        <Switch checked={inlineLessonForm.is_private} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_private: v }))} />
+                                                        <span className="text-xs text-muted-foreground">🔒 {t('privateLesson') || 'Privada'}</span>
                                                       </div>
                                                       <div className="flex gap-1 ml-auto">
                                                         <Button size="sm" variant="ghost" onClick={() => saveInlineLesson(lesson, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>

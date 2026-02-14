@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Settings, Globe, Bell, Shield, Palette } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Globe, Bell, Shield, Key } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { logSystemEvent } from '@/lib/systemLog';
+import { supabase } from '@/integrations/supabase/client';
 
 const AdminSettings: React.FC = () => {
   const { t } = useLanguage();
@@ -21,6 +22,23 @@ const AdminSettings: React.FC = () => {
     maintenanceMode: false,
   });
 
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [openaiKeyLoaded, setOpenaiKeyLoaded] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
+
+  useEffect(() => {
+    const fetchOpenaiKey = async () => {
+      const { data } = await supabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'openai_api_key')
+        .single();
+      if (data?.value) setOpenaiKey(data.value);
+      setOpenaiKeyLoaded(true);
+    };
+    fetchOpenaiKey();
+  }, []);
+
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
@@ -30,12 +48,56 @@ const AdminSettings: React.FC = () => {
     toast({ title: t('settingsSaved') });
   };
 
+  const saveOpenaiKey = async () => {
+    setSavingKey(true);
+    const { error } = await supabase
+      .from('platform_settings')
+      .upsert({ key: 'openai_api_key', value: openaiKey, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    
+    if (error) {
+      toast({ title: 'Erro ao salvar chave', description: error.message, variant: 'destructive' });
+    } else {
+      logSystemEvent({ action: 'OpenAI API key atualizada', entity_type: 'settings', level: 'info' });
+      toast({ title: 'Chave OpenAI salva com sucesso' });
+    }
+    setSavingKey(false);
+  };
+
   return (
     <div>
       <h2 className="text-xl font-display font-bold text-foreground mb-2">{t('settingsTitle')}</h2>
       <p className="text-sm text-muted-foreground mb-6">{t('settingsDesc')}</p>
 
       <div className="space-y-6 max-w-2xl">
+        {/* OpenAI Integration */}
+        <div className="bg-card rounded-xl border border-border p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Key className="w-5 h-5 text-primary" />
+            <h3 className="font-display font-semibold text-foreground">OpenAI API</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Chave utilizada para tradução automática de categorias e outros recursos de IA da plataforma.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">API Key</label>
+              <Input
+                type="password"
+                value={openaiKey}
+                onChange={e => setOpenaiKey(e.target.value)}
+                className="bg-secondary border-border font-mono text-sm"
+                placeholder={openaiKeyLoaded ? 'sk-...' : 'Carregando...'}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Obtenha sua chave em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">platform.openai.com/api-keys</a>
+              </p>
+            </div>
+            <Button onClick={saveOpenaiKey} disabled={savingKey} size="sm">
+              {savingKey ? 'Salvando...' : 'Salvar Chave OpenAI'}
+            </Button>
+          </div>
+        </div>
+
         {/* General */}
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="flex items-center gap-2 mb-4">
