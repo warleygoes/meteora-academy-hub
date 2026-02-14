@@ -52,7 +52,7 @@ const LessonRating: React.FC<LessonRatingProps> = ({ lessonId, courseId }) => {
       );
 
     if (!error) {
-      toast({ title: t('ratingSubmitted') || '⭐ Avaliação enviada!' });
+      toast({ title: t('ratingSubmitted') });
       fetchRatings();
     }
     setSubmitting(false);
@@ -84,11 +84,11 @@ const LessonRating: React.FC<LessonRatingProps> = ({ lessonId, courseId }) => {
       </div>
       <div className="flex flex-col">
         <span className="text-sm font-medium text-foreground">
-          {t('rateThisLesson') || 'Avalie esta aula'}
+          {t('rateThisLesson')}
         </span>
         {totalRatings > 0 && (
           <span className="text-xs text-muted-foreground">
-            {avgRating.toFixed(1)} ⭐ ({totalRatings} {totalRatings === 1 ? (t('ratingVote') || 'voto') : (t('ratingVotes') || 'votos')})
+            {avgRating.toFixed(1)} ⭐ ({totalRatings} {totalRatings === 1 ? t('ratingVote') : t('ratingVotes')})
           </span>
         )}
       </div>

@@ -69,8 +69,8 @@ export const HeroBanner: React.FC = () => {
     return (
       <div className="relative w-full h-[60vh] min-h-[400px] overflow-hidden">
         <img src={heroBannerFallback} alt="Meteora Academy" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
         <div className="relative z-10 flex flex-col justify-end h-full pb-20 px-8 md:px-16 max-w-3xl">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
             <img src={meteoraLogo} alt="Meteora Academy" className="h-12 md:h-16 w-auto mb-4" />
@@ -107,10 +107,10 @@ export const HeroBanner: React.FC = () => {
         </motion.div>
       </AnimatePresence>
 
-      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/20" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
 
-      <div className="relative z-10 flex flex-col justify-end h-full pb-16 px-8 md:px-16 max-w-3xl">
+      <div className="relative z-10 flex flex-col justify-end h-full pb-24 px-8 md:px-16 max-w-3xl">
         <AnimatePresence mode="wait">
           <motion.div key={slide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4 }}>
             <h2 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-2">{slide.title}</h2>
