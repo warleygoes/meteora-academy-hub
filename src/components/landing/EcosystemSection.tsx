@@ -110,30 +110,30 @@ const EcosystemSection: React.FC = () => {
 
           {/* Professional Circular Ecosystem Diagram */}
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="flex justify-center mb-20">
-            <div className="relative w-[340px] h-[340px] md:w-[520px] md:h-[520px]">
+            <div className="relative w-[360px] h-[360px] md:w-[640px] md:h-[640px]">
               {/* Outer decorative ring */}
               <div className="absolute inset-0 rounded-full border border-border/20" />
               {/* Middle ring */}
-              <div className="absolute inset-8 md:inset-12 rounded-full border border-border/30" />
+              <div className="absolute inset-6 md:inset-10 rounded-full border border-border/30" />
               {/* Inner glow ring */}
-              <div className="absolute inset-16 md:inset-24 rounded-full border border-primary/20 shadow-[0_0_60px_hsl(349_100%_62%/0.08)]" />
+              <div className="absolute inset-[72px] md:inset-[140px] rounded-full border border-primary/20 shadow-[0_0_60px_hsl(349_100%_62%/0.08)]" />
               
               {/* Connecting lines from center to each node */}
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 520 520">
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 640 640">
                 {ecosystemItems.map((item) => {
                   const rad = (item.angle - 90) * (Math.PI / 180);
-                  const r = 220;
-                  const x = 260 + r * Math.cos(rad);
-                  const y = 260 + r * Math.sin(rad);
+                  const r = 270;
+                  const x = 320 + r * Math.cos(rad);
+                  const y = 320 + r * Math.sin(rad);
                   return (
                     <line
                       key={item.label + '-line'}
-                      x1="260" y1="260"
+                      x1="320" y1="320"
                       x2={x} y2={y}
                       stroke="hsl(207 30% 16%)"
                       strokeWidth="1"
                       strokeDasharray="4 4"
-                      opacity="0.5"
+                      opacity="0.4"
                     />
                   );
                 })}
@@ -141,18 +141,17 @@ const EcosystemSection: React.FC = () => {
 
               {/* Center - Logo */}
               <div className="absolute inset-0 flex items-center justify-center z-10">
-                <div className="w-28 h-28 md:w-40 md:h-40 rounded-full bg-gradient-to-br from-card via-card to-secondary border-2 border-primary/30 flex flex-col items-center justify-center shadow-[0_0_50px_hsl(349_100%_62%/0.2)] gap-2">
-                  <img src={meteoraLogo} alt="Meteora" className="h-10 md:h-14 object-contain" />
-                  <span className="font-display font-bold text-primary text-xs md:text-sm tracking-wider uppercase">Ecosistema</span>
+                <div className="w-24 h-24 md:w-36 md:h-36 rounded-full bg-gradient-to-br from-card via-card to-secondary border-2 border-primary/30 flex flex-col items-center justify-center shadow-[0_0_50px_hsl(349_100%_62%/0.2)] gap-1.5">
+                  <img src={meteoraLogo} alt="Meteora" className="h-8 md:h-12 object-contain" />
+                  <span className="font-display font-bold text-primary text-[10px] md:text-xs tracking-wider uppercase">Ecosistema</span>
                 </div>
               </div>
 
-              {/* Orbital Items */}
+              {/* Orbital Items - positioned absolutely with fixed pixel offsets for perfect alignment */}
               {ecosystemItems.map((item, i) => {
                 const rad = (item.angle - 90) * (Math.PI / 180);
-                const rPercent = 42;
-                const x = 50 + rPercent * Math.cos(rad);
-                const y = 50 + rPercent * Math.sin(rad);
+                const x = 50 + 42 * Math.cos(rad);
+                const y = 50 + 42 * Math.sin(rad);
                 const Icon = item.icon;
                 return (
                   <motion.div
@@ -161,14 +160,14 @@ const EcosystemSection: React.FC = () => {
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.3 + i * 0.12, duration: 0.5, type: 'spring', stiffness: 200 }}
-                    className="absolute flex flex-col items-center gap-1.5"
+                    className="absolute flex flex-col items-center gap-1"
                     style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
                   >
-                    <div className="w-14 h-14 md:w-[72px] md:h-[72px] rounded-2xl bg-card border border-border/60 flex items-center justify-center shadow-[0_4px_20px_hsl(0_0%_0%/0.3)] hover:border-primary/50 hover:shadow-[0_0_25px_hsl(349_100%_62%/0.2)] transition-all duration-300 group cursor-default">
-                      <Icon className="w-6 h-6 md:w-7 md:h-7 text-primary group-hover:scale-110 transition-transform duration-300" />
+                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-card border border-border/60 flex items-center justify-center shadow-[0_4px_20px_hsl(0_0%_0%/0.3)] hover:border-primary/50 hover:shadow-[0_0_25px_hsl(349_100%_62%/0.2)] transition-all duration-300 group cursor-default">
+                      <Icon className="w-5 h-5 md:w-6 md:h-6 text-primary group-hover:scale-110 transition-transform duration-300" />
                     </div>
-                    <span className="text-[11px] md:text-sm font-display font-semibold text-foreground whitespace-nowrap">{item.label}</span>
-                    <span className="text-[9px] md:text-xs text-muted-foreground whitespace-nowrap hidden md:block">{item.desc}</span>
+                    <span className="text-[10px] md:text-sm font-display font-semibold text-foreground whitespace-nowrap">{item.label}</span>
+                    <span className="text-[8px] md:text-xs text-muted-foreground whitespace-nowrap hidden md:block">{item.desc}</span>
                   </motion.div>
                 );
               })}
