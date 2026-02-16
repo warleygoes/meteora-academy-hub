@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Play, ChevronLeft, ChevronRight, ArrowRight, Quote, Globe, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -78,7 +78,7 @@ const VideoCard: React.FC<{ testimonial: Testimonial; featured?: boolean }> = ({
 
 const TestimonialsSection: React.FC = () => {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     const fetch = async () => {
@@ -93,14 +93,15 @@ const TestimonialsSection: React.FC = () => {
     fetch();
   }, []);
 
-  const featured = testimonials.slice(0, 3);
-  const carousel = testimonials.slice(3);
-
-  const scroll = (dir: 'left' | 'right') => {
-    scrollRef.current?.scrollBy({ left: dir === 'left' ? -340 : 340, behavior: 'smooth' });
-  };
-
   if (testimonials.length === 0) return null;
+
+  const perPage = 3;
+  const totalPages = Math.ceil(testimonials.length / perPage);
+  const showArrows = testimonials.length > perPage;
+  const visibleItems = testimonials.slice(page * perPage, page * perPage + perPage);
+
+  const prev = () => setPage(p => (p - 1 + totalPages) % totalPages);
+  const next = () => setPage(p => (p + 1) % totalPages);
 
   return (
     <section className="py-24 px-6">
@@ -116,33 +117,33 @@ const TestimonialsSection: React.FC = () => {
           </p>
         </motion.div>
 
-        {/* Part 1: 3 Featured Videos */}
-        {featured.length > 0 && (
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            {featured.map((t, i) => (
+        {/* Video Carousel - 3 per page */}
+        <div className="relative mb-12">
+          {showArrows && (
+            <button onClick={prev} className="absolute -left-4 md:-left-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {visibleItems.map((t, i) => (
               <motion.div key={t.id} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i}>
                 <VideoCard testimonial={t} featured />
               </motion.div>
             ))}
           </div>
-        )}
+          {showArrows && (
+            <button onClick={next} className="absolute -right-4 md:-right-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
+        </div>
 
-        {/* Part 2: Carousel */}
-        {carousel.length > 0 && (
-          <div className="relative mb-12 group/carousel">
-            <button onClick={() => scroll('left')} className="absolute left-0 top-0 bottom-0 z-10 w-12 flex items-center justify-center bg-gradient-to-r from-background to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity">
-              <ChevronLeft className="w-6 h-6 text-foreground" />
-            </button>
-            <div ref={scrollRef} className="flex gap-6 overflow-x-auto scrollbar-hide pb-4 px-1">
-              {carousel.map(t => (
-                <div key={t.id} className="flex-shrink-0 w-[320px]">
-                  <VideoCard testimonial={t} />
-                </div>
-              ))}
-            </div>
-            <button onClick={() => scroll('right')} className="absolute right-0 top-0 bottom-0 z-10 w-12 flex items-center justify-center bg-gradient-to-l from-background to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity">
-              <ChevronRight className="w-6 h-6 text-foreground" />
-            </button>
+        {/* Page dots */}
+        {totalPages > 1 && (
+          <div className="flex justify-center gap-2 mb-12">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button key={i} onClick={() => setPage(i)} className={`w-2 h-2 rounded-full transition-colors ${i === page ? 'bg-primary' : 'bg-border'}`} />
+            ))}
           </div>
         )}
 
@@ -153,7 +154,7 @@ const TestimonialsSection: React.FC = () => {
           </p>
         </motion.div>
 
-        {/* Part 3: Transition + CTA */}
+        {/* Transition + CTA */}
         <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center">
           <p className="text-2xl md:text-3xl font-display font-bold text-foreground mb-8">
             Si ellos pudieron estructurar su ISP,<br />
