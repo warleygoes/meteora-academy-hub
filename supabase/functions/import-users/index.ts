@@ -22,7 +22,56 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  try {
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  // Verify caller is admin
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "No authorization" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const { data: { user: caller } } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+  if (!caller) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const { data: roleData } = await supabaseAdmin
+    .from("user_roles").select("role").eq("user_id", caller.id).eq("role", "admin").maybeSingle();
+  if (!roleData) {
+    return new Response(JSON.stringify({ error: "Not admin" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Handle DELETE - remove auth user so email can be re-registered
+  if (req.method === "DELETE") {
+    try {
+      const { user_id } = await req.json();
+      if (!user_id) {
+        return new Response(JSON.stringify({ error: "user_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(user_id);
+      if (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -55,6 +104,8 @@ Deno.serve(async (req) => {
       });
     }
 
+  // Handle POST - import users
+  try {
     const { users, defaultPassword } = await req.json() as { users: ImportRow[]; defaultPassword: string };
 
     if (!users || !Array.isArray(users) || users.length === 0) {
@@ -71,7 +122,6 @@ Deno.serve(async (req) => {
 
     const results: { email: string; status: "created" | "exists" | "error"; message?: string }[] = [];
 
-    // Process users in parallel batches of 5
     const BATCH_SIZE = 5;
     for (let i = 0; i < users.length; i += BATCH_SIZE) {
       const batch = users.slice(i, i + BATCH_SIZE);

@@ -277,9 +277,23 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setRejectedUsers(prev => prev.filter(u => u.user_id !== actionUserId));
     setApprovedUsers(prev => prev.filter(u => u.user_id !== actionUserId));
     setSelectedUser(null);
+    // Delete profile first
     const { error } = await supabase.from('profiles').delete().eq('user_id', actionUserId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers(); }
-    else { logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning' }); toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' }); fetchAllUsers(); }
+    else {
+      // Also delete auth user via edge function so email can be re-registered
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-users`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ user_id: actionUserId }),
+        });
+      } catch {}
+      logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning' });
+      toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
+      fetchAllUsers();
+    }
     setShowDeleteConfirm(false); setActionUserId(null);
   };
 
@@ -880,20 +894,20 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">{t('fullName')} *</label>
-              <Input value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder={t('fullName')} className="bg-secondary border-border" />
+              <label className="text-sm font-medium text-foreground mb-1 block">{t('displayName')} *</label>
+              <Input value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder={t('displayName')} className="bg-secondary border-border" autoComplete="off" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">{t('email')} *</label>
-              <Input type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="usuario@email.com" className="bg-secondary border-border" />
+              <Input type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="usuario@email.com" className="bg-secondary border-border" autoComplete="off" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">{t('password')} *</label>
-              <Input type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder={t('passwordMinChars') || 'Mínimo 6 caracteres'} className="bg-secondary border-border" />
+              <Input type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder={t('passwordMinChars')} className="bg-secondary border-border" autoComplete="new-password" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">{t('phone')}</label>
-              <Input value={newUser.phone} onChange={e => setNewUser(p => ({ ...p, phone: e.target.value }))} placeholder="+55 11 99999-9999" className="bg-secondary border-border" />
+              <Input value={newUser.phone} onChange={e => setNewUser(p => ({ ...p, phone: e.target.value }))} placeholder="+55 11 99999-9999" className="bg-secondary border-border" autoComplete="off" />
             </div>
             <Button onClick={createUser} disabled={creatingUser} className="w-full gap-2">
               {creatingUser ? <Clock className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
