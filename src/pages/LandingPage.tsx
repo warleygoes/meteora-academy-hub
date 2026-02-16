@@ -106,8 +106,8 @@ const LandingPage: React.FC = () => {
 
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3}>
               <Link to={DIAGNOSTIC_URL}>
-                <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
-                  <ArrowRight className="w-5 h-5" /> {t('lpHeroCta')}
+                <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-base px-8">
+                  <ArrowRight className="w-5 h-5" /> Evaluar Mi ISP — Gratis
                 </Button>
               </Link>
             </motion.div>
@@ -137,7 +137,7 @@ const LandingPage: React.FC = () => {
                 {t('lpDiagDesc')}{' '}
                 <span className="line-through text-muted-foreground/60 font-semibold">{t('lpDiagPrice')}</span>.
               </p>
-              <p className="text-primary font-bold text-xl mb-8">
+              <p className="text-green-500 font-bold text-xl mb-8">
                 {t('lpDiagFree')}
               </p>
 
@@ -152,8 +152,8 @@ const LandingPage: React.FC = () => {
               </div>
 
               <Link to={DIAGNOSTIC_URL}>
-                <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8 w-full sm:w-auto">
-                  <ArrowRight className="w-5 h-5" /> {t('lpDiagCta')}
+                <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-base px-8 w-full sm:w-auto">
+                  <ArrowRight className="w-5 h-5" /> Hacer Mi Evaluación Gratuitamente
                 </Button>
               </Link>
 
@@ -226,8 +226,8 @@ const LandingPage: React.FC = () => {
               🎯 {t('lpCompareClosing')}
             </p>
             <Link to={DIAGNOSTIC_URL}>
-              <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
-                <ArrowRight className="w-5 h-5" /> {t('lpCompareCta')}
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-base px-8">
+                <ArrowRight className="w-5 h-5" /> Evaluar Mi ISP Gratuitamente
               </Button>
             </Link>
           </motion.div>
@@ -272,34 +272,45 @@ const LandingPage: React.FC = () => {
 
           <div className="text-center">
             <Link to={DIAGNOSTIC_URL}>
-              <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
-                <ArrowRight className="w-5 h-5" /> {t('lpSupportCta')}
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-base px-8">
+                <ArrowRight className="w-5 h-5" /> Evaluar Mi ISP Gratuitamente
               </Button>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* 6️⃣ GUARANTEE */}
+      {/* 6️⃣ GUARANTEE — Psychological */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-            <div className="bg-gradient-to-br from-primary/10 via-card to-card rounded-3xl p-12 md:p-16 border border-primary/20 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl" />
+            <div className="bg-gradient-to-br from-green-500/10 via-card to-card rounded-3xl p-12 md:p-16 border border-green-500/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-green-500/5 rounded-full blur-3xl" />
               <div className="relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                  <Shield className="w-8 h-8 text-primary" />
+                <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto mb-6">
+                  <Shield className="w-8 h-8 text-green-500" />
                 </div>
-                <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-6">
-                  {t('lpGuaranteeTitle')}
+                <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-6">
+                  Sin riesgo. Sin compromiso. Solo claridad.
                 </h2>
-                <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto leading-relaxed">
-                  {t('lpGuaranteeText')}
-                </p>
+                <div className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto leading-relaxed space-y-4">
+                  <p className="text-green-400 font-semibold text-xl">La claridad nunca es un riesgo.</p>
+                  <p>
+                    Lo único que puede ser riesgoso<br />
+                    es seguir creciendo sin saber dónde estás parado.
+                  </p>
+                  <p>
+                    Haz la evaluación.<br />
+                    <span className="text-foreground font-medium">Lo peor que puede pasar</span> es que confirmes que vas bien.
+                  </p>
+                  <p>
+                    <span className="text-green-400 font-semibold">Lo mejor que puede pasar</span> es que descubras cómo mejorar.
+                  </p>
+                </div>
                 <Link to={DIAGNOSTIC_URL}>
-                  <Button size="lg" className="glow-primary font-bold gap-2 text-base px-10">
-                    <ArrowRight className="w-5 h-5" /> {t('lpGuaranteeCta')}
+                  <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-base px-10">
+                    <ArrowRight className="w-5 h-5" /> Evaluar Mi ISP Gratuitamente
                   </Button>
                 </Link>
               </div>
@@ -340,25 +351,33 @@ const LandingPage: React.FC = () => {
               Falla por falta de claridad estructural.
             </p>
             <Link to={DIAGNOSTIC_URL}>
-              <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
-                <ArrowRight className="w-5 h-5" /> 👉 Hacer Evaluación Estratégica
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-base px-8">
+                <ArrowRight className="w-5 h-5" /> 👉 Hacer Evaluación Estratégica — Gratis
               </Button>
             </Link>
           </motion.div>
         </div>
       </section>
 
-      {/* 7️⃣ FINAL CTA */}
-      <section className="py-24 px-6">
+      {/* 7️⃣ FINAL CTA DOMINANTE */}
+      <section className="py-28 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
             <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
-              {t('lpFinalTitle')}
+              Tu ISP va a crecer.
             </h2>
-            <p className="text-muted-foreground text-lg mb-10 max-w-xl mx-auto">{t('lpFinalText')}</p>
+            <p className="text-xl md:text-2xl text-muted-foreground mb-2 max-w-2xl mx-auto">
+              La única pregunta es:
+            </p>
+            <p className="text-xl md:text-2xl font-display font-bold text-foreground mb-10 max-w-2xl mx-auto">
+              ¿Va a crecer <span className="text-destructive">fuerte</span> o va a crecer <span className="text-muted-foreground">frágil</span>?
+            </p>
+            <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
+              Haz la Evaluación Estratégica y descúbrelo ahora.
+            </p>
             <Link to={DIAGNOSTIC_URL}>
-              <Button size="lg" className="glow-primary font-bold gap-2 text-lg px-12 py-6 h-auto">
-                <ArrowRight className="w-6 h-6" /> {t('lpFinalCta')}
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-lg px-12 py-6 h-auto">
+                <ArrowRight className="w-6 h-6" /> 👉 Evaluar Mi ISP Gratuitamente
               </Button>
             </Link>
           </motion.div>
