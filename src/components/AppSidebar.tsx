@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Video, Link2, ExternalLink, Headphones, Calendar, Star, Zap, Rocket, FileText, Settings, MessageSquare, LayoutDashboard, BookOpenCheck, Code } from 'lucide-react';
+import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Video, Link2, ExternalLink, Headphones, Calendar, Star, Zap, Rocket, FileText, Settings, MessageSquare, LayoutDashboard, BookOpenCheck, Code, Link, Mail, Phone, Bell, Heart, Image, Map, Music, Play, Target, Award, Coffee, Compass, Database, Download, Eye, Flag, Gift, Hash, Key, Layers, LifeBuoy, Lightbulb, Lock, MapPin, Megaphone, Mic, Monitor, Package, PieChart, Radio, Send, Server, Share2, ShoppingCart, Smartphone, Speaker, Tag, ThumbsUp, Tv, Upload, Wifi, Wrench, Activity, Cpu } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/lib/i18n';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,11 +10,22 @@ import meteoraLogo from '@/assets/logo-white-pink.png';
 const languageLabels: Record<Language, string> = { pt: 'PT', en: 'EN', es: 'ES' };
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
-  'link': Link2, 'external-link': ExternalLink, 'globe': Globe,
-  'video': Video, 'book-open': BookOpen, 'headphones': Headphones,
-  'message-square': MessageSquare, 'calendar': Calendar, 'star': Star,
-  'zap': Zap, 'rocket': Rocket, 'shield': Shield, 'settings': Settings,
-  'users': Users, 'layout-dashboard': LayoutDashboard, 'file-text': FileText,
+  link: Link, 'link-2': Link2, 'external-link': ExternalLink, globe: Globe,
+  video: Video, 'book-open': BookOpen, headphones: Headphones,
+  'message-square': MessageSquare, calendar: Calendar, star: Star,
+  zap: Zap, rocket: Rocket, shield: Shield, settings: Settings,
+  users: Users, 'layout-dashboard': LayoutDashboard, 'file-text': FileText,
+  home: Home, mail: Mail, phone: Phone, bell: Bell, search: Search,
+  heart: Heart, image: Image, map: Map, music: Music, play: Play,
+  target: Target, award: Award, coffee: Coffee, compass: Compass,
+  database: Database, download: Download, eye: Eye, flag: Flag,
+  gift: Gift, hash: Hash, key: Key, layers: Layers, 'life-buoy': LifeBuoy,
+  lightbulb: Lightbulb, lock: Lock, 'map-pin': MapPin, megaphone: Megaphone,
+  mic: Mic, monitor: Monitor, package: Package, 'pie-chart': PieChart,
+  radio: Radio, send: Send, server: Server, 'share-2': Share2,
+  'shopping-cart': ShoppingCart, smartphone: Smartphone, speaker: Speaker,
+  tag: Tag, 'thumbs-up': ThumbsUp, tv: Tv, upload: Upload, wifi: Wifi,
+  wrench: Wrench, activity: Activity, cpu: Cpu,
 };
 
 interface CustomLink {
