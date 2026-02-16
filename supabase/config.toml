@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.generate-product-content]
 verify_jwt = false
+
+[functions.generate-sales-page-content]
+verify_jwt = false

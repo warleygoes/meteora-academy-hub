@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon, BookOpen, Sparkles, X, Loader2 } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon, BookOpen, Sparkles, X, Loader2, FileText } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { logSystemEvent } from '@/lib/systemLog';
+import SalesPageEditor from './SalesPageEditor';
 
 interface Offer {
   id: string; name: string; price: number; currency: string;
@@ -42,6 +43,7 @@ const AdminProducts: React.FC = () => {
   const [editing, setEditing] = useState<Product | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [salesPageProduct, setSalesPageProduct] = useState<{ id: string; name: string } | null>(null);
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [showOfferEditor, setShowOfferEditor] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
@@ -344,6 +346,10 @@ const AdminProducts: React.FC = () => {
   const deleteProductName = deleteId ? products.find(p => p.id === deleteId)?.name : '';
   const deleteOfferName = deleteOfferId ? products.flatMap(p => p.offers).find(o => o.id === deleteOfferId)?.name : '';
 
+  if (salesPageProduct) {
+    return <SalesPageEditor productId={salesPageProduct.id} productName={salesPageProduct.name} onClose={() => setSalesPageProduct(null)} />;
+  }
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -403,6 +409,7 @@ const AdminProducts: React.FC = () => {
                   )}
 
                   <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setSalesPageProduct({ id: p.id, name: p.name })} title="Página de Ventas"><FileText className="w-4 h-4" /></Button>
                     <Switch checked={p.active} onCheckedChange={() => toggleActive(p)} />
                     <Button variant="ghost" size="sm" onClick={() => openEdit(p)}><Edit className="w-4 h-4" /></Button>
                     <Button variant="ghost" size="sm" onClick={() => confirmDelete(p.id)} className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
