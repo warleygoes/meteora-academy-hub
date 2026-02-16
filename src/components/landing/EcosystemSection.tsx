@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { BookOpen, Users, Monitor, Calendar, Wrench, MessageCircle, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import meteoraLogo from '@/assets/logo-white.png';
+import ecosystemDiagram from '@/assets/diagrama-ecossistema.png';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -15,46 +15,6 @@ const fadeUp = {
 };
 
 const DIAGNOSTIC_URL = '/diagnostico';
-
-/* ── Ecosystem wheel data ─────────────────────────────── */
-const segments = [
-  {
-    icon: BookOpen,
-    label: 'Cursos',
-    color: 'hsl(349, 100%, 62%)',   // primary / rosa
-    branches: ['Formación técnica', 'Estrategia de red', 'Gestión ISP'],
-  },
-  {
-    icon: Users,
-    label: 'Mentorías',
-    color: 'hsl(349, 80%, 50%)',
-    branches: ['Acompañamiento 1:1', 'Sesiones grupales', 'Plan de acción'],
-  },
-  {
-    icon: Monitor,
-    label: 'Softwares',
-    color: 'hsl(207, 60%, 40%)',
-    branches: ['Herramientas exclusivas', 'Automatización', 'Monitoreo'],
-  },
-  {
-    icon: MessageCircle,
-    label: 'Comunidad',
-    color: 'hsl(207, 50%, 30%)',
-    branches: ['Red de ISPs', 'Networking', 'Soporte mutuo'],
-  },
-  {
-    icon: Calendar,
-    label: 'Eventos',
-    color: 'hsl(207, 70%, 25%)',
-    branches: ['Presenciales', 'Virtuales', 'Workshops'],
-  },
-  {
-    icon: Wrench,
-    label: 'Implementaciones',
-    color: 'hsl(349, 60%, 45%)',
-    branches: ['Ejecución directa', 'Infraestructura', 'Optimización'],
-  },
-];
 
 const pillars = [
   {
@@ -96,203 +56,17 @@ interface HomeProduct {
   thumbnail_vertical_url: string | null;
 }
 
-/* ── SVG donut arc helper ──────────────────────────────── */
-function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-  const start = ((startAngle - 90) * Math.PI) / 180;
-  const end = ((endAngle - 90) * Math.PI) / 180;
-  const x1 = cx + r * Math.cos(start);
-  const y1 = cy + r * Math.sin(start);
-  const x2 = cx + r * Math.cos(end);
-  const y2 = cy + r * Math.sin(end);
-  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
-}
-
-/* ── Donut Wheel Component ─────────────────────────────── */
-const EcosystemWheel: React.FC = () => {
-  const cx = 300, cy = 300;
-  const outerR = 200, innerR = 110;
-  const midR = (outerR + innerR) / 2;
-  const segAngle = 360 / segments.length;
-  const gap = 3;
-
-  // Pre-calculated fixed positions for branches to avoid overlap
-  // Each segment gets branches positioned radially outward with enough spacing
-  const branchPositions: { x: number; y: number }[][] = segments.map((_, i) => {
-    const startA = i * segAngle + gap / 2;
-    const endA = (i + 1) * segAngle - gap / 2;
-    const midA = (startA + endA) / 2;
-    
-    // Spread branches along the arc direction with wide spacing
-    return [0, 1, 2].map((bi) => {
-      const spreadAngle = (bi - 1) * 24; // 24 degrees apart (wider spread)
-      const bAngle = (midA + spreadAngle - 90) * (Math.PI / 180);
-      const bR = outerR + 85 + Math.abs(bi - 1) * 18; // pushed further out
-      return {
-        x: cx + bR * Math.cos(bAngle),
-        y: cy + bR * Math.sin(bAngle),
-      };
-    });
-  });
-
-  return (
-    <div className="relative w-full max-w-[750px] mx-auto" style={{ aspectRatio: '1 / 1.2' }}>
-      {/* SVG viewBox expanded to fit branches */}
-      <svg viewBox="-80 -80 760 800" className="w-full h-full">
-        {/* Segments */}
-        {segments.map((seg, i) => {
-          const startA = i * segAngle + gap / 2;
-          const endA = (i + 1) * segAngle - gap / 2;
-
-          const startOuter = ((startA - 90) * Math.PI) / 180;
-          const endOuter = ((endA - 90) * Math.PI) / 180;
-          const startInner = ((endA - 90) * Math.PI) / 180;
-          const endInner = ((startA - 90) * Math.PI) / 180;
-
-          const ox1 = cx + outerR * Math.cos(startOuter);
-          const oy1 = cy + outerR * Math.sin(startOuter);
-          const ox2 = cx + outerR * Math.cos(endOuter);
-          const oy2 = cy + outerR * Math.sin(endOuter);
-          const ix1 = cx + innerR * Math.cos(startInner);
-          const iy1 = cy + innerR * Math.sin(startInner);
-          const ix2 = cx + innerR * Math.cos(endInner);
-          const iy2 = cy + innerR * Math.sin(endInner);
-
-          const largeArc = endA - startA > 180 ? 1 : 0;
-
-          const d = [
-            `M ${ox1} ${oy1}`,
-            `A ${outerR} ${outerR} 0 ${largeArc} 1 ${ox2} ${oy2}`,
-            `L ${ix1} ${iy1}`,
-            `A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2}`,
-            'Z',
-          ].join(' ');
-
-          const midAngle = ((startA + endA) / 2 - 90) * (Math.PI / 180);
-          const iconX = cx + midR * Math.cos(midAngle);
-          const iconY = cy + midR * Math.sin(midAngle);
-
-          // Label position
-          const labelR = outerR + 30;
-          const labelX = cx + labelR * Math.cos(midAngle);
-          const labelY = cy + labelR * Math.sin(midAngle);
-
-          // Connector lines from segment edge to branches
-          const edgeX = cx + (outerR + 5) * Math.cos(midAngle);
-          const edgeY = cy + (outerR + 5) * Math.sin(midAngle);
-
-          return (
-            <g key={seg.label}>
-              <path d={d} fill={seg.color} opacity="0.9" className="transition-opacity duration-300 hover:opacity-100" />
-              <circle cx={iconX} cy={iconY} r="22" fill="hsl(207, 94%, 6%)" fillOpacity="0.6" />
-
-              {/* Connector lines to branches */}
-              {branchPositions[i].map((bp, bi) => (
-                <line
-                  key={bi}
-                  x1={edgeX} y1={edgeY}
-                  x2={bp.x} y2={bp.y}
-                  stroke="hsl(207, 30%, 20%)"
-                  strokeWidth="1"
-                  strokeDasharray="3 3"
-                  opacity="0.4"
-                />
-              ))}
-            </g>
-          );
-        })}
-
-        {/* Center circle */}
-        <circle cx={cx} cy={cy} r={innerR - 8} fill="hsl(207, 60%, 9%)" stroke="hsl(349, 100%, 62%)" strokeWidth="2" opacity="0.95" />
-
-        {/* Branch labels as SVG text for precise positioning */}
-        {segments.map((seg, i) =>
-          seg.branches.map((branch, bi) => {
-            const bp = branchPositions[i][bi];
-            return (
-              <g key={`${seg.label}-branch-${bi}`}>
-                <rect
-                  x={bp.x - 55} y={bp.y - 10}
-                  width="110" height="20"
-                  rx="4"
-                  fill="hsl(207, 40%, 14%)"
-                  fillOpacity="0.7"
-                  stroke="hsl(207, 30%, 20%)"
-                  strokeWidth="0.5"
-                />
-                <text
-                  x={bp.x} y={bp.y + 4}
-                  textAnchor="middle"
-                  fill="hsl(207, 15%, 60%)"
-                  fontSize="10"
-                  fontFamily="Inter, sans-serif"
-                >
-                  {branch}
-                </text>
-              </g>
-            );
-          })
-        )}
-      </svg>
-
-      {/* Center content (HTML overlay) — smaller logo */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '-6%' }}>
-        <div className="flex flex-col items-center gap-1">
-          <img src={meteoraLogo} alt="Meteora" className="h-6 md:h-9 object-contain" />
-          <span className="font-display font-bold text-primary text-[8px] md:text-[11px] tracking-widest uppercase">Ecosistema</span>
-        </div>
-      </div>
-
-      {/* Segment icons + large category labels (HTML overlay) */}
-      {segments.map((seg, i) => {
-        const startA = i * segAngle + gap / 2;
-        const endA = (i + 1) * segAngle - gap / 2;
-        const midAngle = ((startA + endA) / 2 - 90) * (Math.PI / 180);
-        const iconX = cx + midR * Math.cos(midAngle);
-        const iconY = cy + midR * Math.sin(midAngle);
-        const Icon = seg.icon;
-
-        const labelR = outerR + 30;
-        const labelX = cx + labelR * Math.cos(midAngle);
-        const labelY = cy + labelR * Math.sin(midAngle);
-
-        // Convert to percentage of the expanded viewBox (-80 to 680 = 760 wide, -80 to 720 = 800 tall)
-        const toPercX = (v: number) => ((v + 80) / 760) * 100;
-        const toPercY = (v: number) => ((v + 80) / 800) * 100;
-
-        return (
-          <React.Fragment key={seg.label + '-overlay'}>
-            {/* Icon on segment */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: `${toPercX(iconX)}%`,
-                top: `${toPercY(iconY)}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              <Icon className="w-5 h-5 md:w-6 md:h-6 text-foreground drop-shadow-lg" />
-            </div>
-
-            {/* Category Label — LARGE */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: `${toPercX(labelX)}%`,
-                top: `${toPercY(labelY)}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              <span className="font-display font-bold text-foreground text-sm md:text-base whitespace-nowrap">
-                {seg.label}
-              </span>
-            </div>
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-};
+/* ── Ecosystem diagram — static image ─────────────────── */
+const EcosystemWheel: React.FC = () => (
+  <div className="flex justify-center">
+    <img
+      src={ecosystemDiagram}
+      alt="Ecosistema Meteora Academy — Cursos, Mentorías, Softwares, Comunidad, Eventos, Implementaciones"
+      className="w-full max-w-[700px] h-auto"
+      loading="lazy"
+    />
+  </div>
+);
 
 /* ── Main Section ──────────────────────────────────────── */
 const EcosystemSection: React.FC = () => {
