@@ -7,10 +7,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { languageNames, Language } from '@/lib/i18n';
 import meteoraLogo from '@/assets/logo-white-pink.png';
 import landingHero from '@/assets/landing-hero.jpg';
-import testimonial1 from '@/assets/testimonial-1.jpg';
-import testimonial2 from '@/assets/testimonial-2.jpg';
-import testimonial3 from '@/assets/testimonial-3.jpg';
 import vinheta from '@/assets/vinheta.mp4';
+import TestimonialsSection from '@/components/landing/TestimonialsSection';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -33,12 +31,6 @@ const LandingPage: React.FC = () => {
   const afterItems = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => t(`lpAfter${n}`)).filter(Boolean);
   const diagItems = [1, 2, 3, 4, 5].map(n => t(`lpDiagItem${n}`)).filter(Boolean);
   const supportItems = [1, 2, 3, 4, 5].map(n => t(`lpSupport${n}`));
-
-  const testimonials = [
-    { text: t('lpTestimonial1'), name: t('lpTestimonial1Name'), role: t('lpTestimonial1Role'), img: testimonial1 },
-    { text: t('lpTestimonial2'), name: t('lpTestimonial2Name'), role: t('lpTestimonial2Role'), img: testimonial2 },
-    { text: t('lpTestimonial3'), name: t('lpTestimonial3Name'), role: t('lpTestimonial3Role'), img: testimonial3 },
-  ];
 
   const proofStats = [
     { value: t('lpProofStat1'), label: t('lpProofStat1Label') },
@@ -185,7 +177,7 @@ const LandingPage: React.FC = () => {
                 <div className="space-y-4">
                   {beforeItems.map((item, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <XCircle className="w-5 h-5 text-destructive/60 shrink-0 mt-0.5" />
+                      <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                       <span className="text-muted-foreground leading-relaxed">{item}</span>
                     </div>
                   ))}
@@ -194,19 +186,22 @@ const LandingPage: React.FC = () => {
             </motion.div>
 
             {/* STRUCTURED GROWTH */}
-            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={1} className="bg-card rounded-2xl p-8 md:p-10 border border-primary/30 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={1} className="bg-card rounded-2xl p-8 md:p-10 border border-green-500/30 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent" />
               <div className="relative z-10">
-                <h3 className="text-xl font-display font-bold text-primary mb-6 flex items-center gap-2">
+                <h3 className="text-xl font-display font-bold text-green-500 mb-6 flex items-center gap-2">
                   <span className="text-2xl">🟢</span> {t('lpAfterTitle')}
                 </h3>
                 <div className="space-y-4">
                   {afterItems.map((item, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-foreground leading-relaxed">{item}</span>
+                      <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                      <span className="text-foreground leading-relaxed font-medium">{item}</span>
                     </div>
                   ))}
+                </div>
+                <div className="mt-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <p className="text-green-500 font-semibold text-sm text-center">✨ Este es el futuro de tu ISP — organizado, rentable y listo para escalar.</p>
                 </div>
               </div>
             </motion.div>
@@ -226,55 +221,8 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 4️⃣ SOCIAL PROOF */}
-      <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground">
-              {t('lpProofTitle')}
-            </h2>
-          </motion.div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-6 md:gap-8 mb-16 max-w-3xl mx-auto">
-            {proofStats.map((stat, i) => (
-              <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} className="text-center">
-                <p className="text-4xl md:text-5xl font-display font-bold text-primary">{stat.value}</p>
-                <p className="text-sm text-muted-foreground mt-2">{stat.label}</p>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Testimonials */}
-          <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map((item, i) => (
-              <motion.div key={item.name} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} className="bg-card rounded-2xl p-8 border border-border">
-                <div className="flex items-center gap-1 mb-4">
-                  {[...Array(5)].map((_, j) => (
-                    <Star key={j} className="w-4 h-4 text-primary fill-primary" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground leading-relaxed mb-6 text-sm">"{item.text}"</p>
-                <div className="flex items-center gap-3">
-                  <img src={item.img} alt={item.name} className="w-11 h-11 rounded-full object-cover" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.role}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mt-12">
-            <Link to={DIAGNOSTIC_URL}>
-              <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
-                <ArrowRight className="w-5 h-5" /> {t('lpProofCta')}
-              </Button>
-            </Link>
-          </motion.div>
-        </div>
-      </section>
+      {/* 4️⃣ SOCIAL PROOF — Dynamic from DB */}
+      <TestimonialsSection />
 
       {/* 5️⃣ SUPPORT / NOT ALONE */}
       <section className="py-24 px-6 bg-card/30">

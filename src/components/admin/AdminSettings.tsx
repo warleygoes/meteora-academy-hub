@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Bell, Shield, Key } from 'lucide-react';
+import { Globe, Bell, Shield, Key, ChevronDown } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,29 @@ import { useToast } from '@/hooks/use-toast';
 import { logSystemEvent } from '@/lib/systemLog';
 import { supabase } from '@/integrations/supabase/client';
 import AdminWebhooks from './AdminWebhooks';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
+const SettingsSection: React.FC<{ icon: React.ReactNode; title: string; defaultOpen?: boolean; children: React.ReactNode }> = ({ icon, title, defaultOpen = false, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-6 hover:bg-secondary/30 transition-colors">
+          <div className="flex items-center gap-2">
+            {icon}
+            <h3 className="font-display font-semibold text-foreground">{title}</h3>
+          </div>
+          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-6 pb-6 pt-0">
+            {children}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+};
 
 const AdminSettings: React.FC = () => {
   const { t } = useLanguage();
@@ -69,13 +92,9 @@ const AdminSettings: React.FC = () => {
       <h2 className="text-xl font-display font-bold text-foreground mb-2">{t('settingsTitle')}</h2>
       <p className="text-sm text-muted-foreground mb-6">{t('settingsDesc')}</p>
 
-      <div className="space-y-6 max-w-2xl">
+      <div className="space-y-3 max-w-2xl">
         {/* OpenAI Integration */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Key className="w-5 h-5 text-primary" />
-            <h3 className="font-display font-semibold text-foreground">OpenAI API</h3>
-          </div>
+        <SettingsSection icon={<Key className="w-5 h-5 text-primary" />} title="OpenAI API">
           <p className="text-xs text-muted-foreground mb-3">
             Chave utilizada para tradução automática de categorias e outros recursos de IA da plataforma.
           </p>
@@ -97,14 +116,10 @@ const AdminSettings: React.FC = () => {
               {savingKey ? 'Salvando...' : 'Salvar Chave OpenAI'}
             </Button>
           </div>
-        </div>
+        </SettingsSection>
 
         {/* General */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-5 h-5 text-primary" />
-            <h3 className="font-display font-semibold text-foreground">{t('generalSettings')}</h3>
-          </div>
+        <SettingsSection icon={<Globe className="w-5 h-5 text-primary" />} title={t('generalSettings')}>
           <div className="space-y-4">
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">{t('platformName')}</label>
@@ -115,14 +130,10 @@ const AdminSettings: React.FC = () => {
               <Input value={settings.supportEmail} onChange={e => updateSetting('supportEmail', e.target.value)} className="bg-secondary border-border" />
             </div>
           </div>
-        </div>
+        </SettingsSection>
 
         {/* Notifications */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Bell className="w-5 h-5 text-primary" />
-            <h3 className="font-display font-semibold text-foreground">{t('notifications')}</h3>
-          </div>
+        <SettingsSection icon={<Bell className="w-5 h-5 text-primary" />} title={t('notifications')}>
           <div className="space-y-4">
             {[
               { key: 'emailNotifications', label: t('emailNotifications') },
@@ -135,14 +146,10 @@ const AdminSettings: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
+        </SettingsSection>
 
         {/* Security */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5 text-primary" />
-            <h3 className="font-display font-semibold text-foreground">{t('security')}</h3>
-          </div>
+        <SettingsSection icon={<Shield className="w-5 h-5 text-primary" />} title={t('security')}>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -159,7 +166,7 @@ const AdminSettings: React.FC = () => {
               <Switch checked={settings.maintenanceMode} onCheckedChange={v => updateSetting('maintenanceMode', v)} />
             </div>
           </div>
-        </div>
+        </SettingsSection>
 
         <Button onClick={saveSettings} className="w-full">{t('saveSettings')}</Button>
 

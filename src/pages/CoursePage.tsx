@@ -108,9 +108,11 @@ const CoursePage: React.FC = () => {
     const lastProgress = progressData && progressData.length > 0 ? progressData[0] : null;
 
     if (isResume) {
-      // Find the first uncompleted lesson (the "next" lesson to watch)
-      const firstUncompleted = allL.find(l => !completed.has(l.id));
-      const targetLesson = firstUncompleted || allL[allL.length - 1];
+      // Find the last completed lesson index, then pick the next one
+      let lastCompletedIdx = -1;
+      allL.forEach((l, idx) => { if (completed.has(l.id)) lastCompletedIdx = idx; });
+      const nextIdx = lastCompletedIdx + 1;
+      const targetLesson = nextIdx < allL.length ? allL[nextIdx] : allL[allL.length - 1];
       if (targetLesson) {
         setActiveLessonId(targetLesson.id);
         const parentMod = builtModules.find(m => m.lessons.some(l => l.id === targetLesson.id));

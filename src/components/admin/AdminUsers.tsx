@@ -58,6 +58,55 @@ interface AdminUsersProps {
   onStatsUpdate: (stats: { total: number; approved: number; pending: number; rejected: number }) => void;
 }
 
+// Isolated component to prevent parent re-renders on every keystroke
+const CreateUserForm: React.FC<{
+  newUser: { name: string; email: string; password: string; phone: string };
+  setNewUser: React.Dispatch<React.SetStateAction<{ name: string; email: string; password: string; phone: string }>>;
+  createUser: () => void;
+  creatingUser: boolean;
+  t: (key: string) => string;
+}> = React.memo(({ newUser, setNewUser, createUser, creatingUser, t }) => {
+  const [localName, setLocalName] = useState(newUser.name);
+  const [localEmail, setLocalEmail] = useState(newUser.email);
+  const [localPassword, setLocalPassword] = useState(newUser.password);
+  const [localPhone, setLocalPhone] = useState(newUser.phone);
+
+  // Sync back to parent only on blur or submit
+  const syncToParent = useCallback(() => {
+    setNewUser({ name: localName, email: localEmail, password: localPassword, phone: localPhone });
+  }, [localName, localEmail, localPassword, localPhone, setNewUser]);
+
+  const handleSubmit = () => {
+    setNewUser({ name: localName, email: localEmail, password: localPassword, phone: localPhone });
+    setTimeout(createUser, 0);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-sm font-medium text-foreground mb-1 block">{t('displayName')} *</label>
+        <Input value={localName} onChange={e => setLocalName(e.target.value)} onBlur={syncToParent} placeholder={t('displayName')} className="bg-secondary border-border" autoComplete="off" />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-foreground mb-1 block">{t('email')} *</label>
+        <Input type="email" value={localEmail} onChange={e => setLocalEmail(e.target.value)} onBlur={syncToParent} placeholder="usuario@email.com" className="bg-secondary border-border" autoComplete="off" />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-foreground mb-1 block">{t('password')} *</label>
+        <Input type="password" value={localPassword} onChange={e => setLocalPassword(e.target.value)} onBlur={syncToParent} placeholder={t('passwordMinChars')} className="bg-secondary border-border" autoComplete="new-password" />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-foreground mb-1 block">{t('phone')}</label>
+        <Input value={localPhone} onChange={e => setLocalPhone(e.target.value)} onBlur={syncToParent} placeholder="+55 11 99999-9999" className="bg-secondary border-border" autoComplete="off" />
+      </div>
+      <Button onClick={handleSubmit} disabled={creatingUser} className="w-full gap-2">
+        {creatingUser ? <Clock className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+        {creatingUser ? (t('creating') || 'Creando...') : (t('createUser') || 'Crear Usuario')}
+      </Button>
+    </div>
+  );
+});
+
 const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -892,28 +941,13 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               <Plus className="w-5 h-5 text-primary" /> {t('addUser') || 'Agregar Usuario'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">{t('displayName')} *</label>
-              <Input value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder={t('displayName')} className="bg-secondary border-border" autoComplete="off" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">{t('email')} *</label>
-              <Input type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="usuario@email.com" className="bg-secondary border-border" autoComplete="off" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">{t('password')} *</label>
-              <Input type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder={t('passwordMinChars')} className="bg-secondary border-border" autoComplete="new-password" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">{t('phone')}</label>
-              <Input value={newUser.phone} onChange={e => setNewUser(p => ({ ...p, phone: e.target.value }))} placeholder="+55 11 99999-9999" className="bg-secondary border-border" autoComplete="off" />
-            </div>
-            <Button onClick={createUser} disabled={creatingUser} className="w-full gap-2">
-              {creatingUser ? <Clock className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              {creatingUser ? (t('creating') || 'Creando...') : (t('createUser') || 'Crear Usuario')}
-            </Button>
-          </div>
+          <CreateUserForm
+            newUser={newUser}
+            setNewUser={setNewUser}
+            createUser={createUser}
+            creatingUser={creatingUser}
+            t={t}
+          />
         </DialogContent>
       </Dialog>
     </div>
