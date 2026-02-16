@@ -31,7 +31,8 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
 
 interface CustomLink {
   id: string; title: string; icon: string; url: string;
-  open_mode: string; sort_order: number;
+  open_mode: string; sort_order: number; auto_translate: boolean;
+  translatedTitle?: string;
 }
 
 export const AppSidebar: React.FC = () => {
@@ -95,10 +96,43 @@ export const AppSidebar: React.FC = () => {
         return reqPkgs.some(id => userPkgIds.has(id)) || reqProds.some(id => userProdIds.has(id));
       });
 
-      setCustomLinks(visible);
+      const mapped: CustomLink[] = visible.map(l => ({
+        id: l.id, title: l.title, icon: l.icon, url: l.url,
+        open_mode: l.open_mode, sort_order: l.sort_order,
+        auto_translate: (l as any).auto_translate || false,
+      }));
+
+      setCustomLinks(mapped);
+
+      // Translate links that have auto_translate enabled
+      const langNames: Record<string, string> = { pt: 'Portuguese', en: 'English', es: 'Spanish' };
+      const targetLang = langNames[language] || 'English';
+      
+      // Only translate if not default language (es)
+      if (language !== 'es') {
+        const toTranslate = mapped.filter(l => l.auto_translate);
+        if (toTranslate.length > 0) {
+          const translations = await Promise.all(
+            toTranslate.map(async (l) => {
+              try {
+                const { data } = await supabase.functions.invoke('translate-category', {
+                  body: { text: l.title, targetLanguage: targetLang },
+                });
+                return { id: l.id, translated: data?.translated || l.title };
+              } catch {
+                return { id: l.id, translated: l.title };
+              }
+            })
+          );
+          setCustomLinks(prev => prev.map(l => {
+            const t = translations.find(tr => tr.id === l.id);
+            return t ? { ...l, translatedTitle: t.translated } : l;
+          }));
+        }
+      }
     };
     fetchLinks();
-  }, [user, isAdmin]);
+  }, [user, isAdmin, language]);
 
   const navItems = [
     { to: '/app', icon: Home, label: t('home') },
@@ -178,7 +212,7 @@ export const AppSidebar: React.FC = () => {
                 }`}
               >
                 <IconComp className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span>{link.title}</span>}
+                {!collapsed && <span>{link.translatedTitle || link.title}</span>}
               </NavLink>
             );
           }
@@ -194,7 +228,7 @@ export const AppSidebar: React.FC = () => {
               <IconComp className="w-5 h-5 flex-shrink-0" />
               {!collapsed && (
                 <>
-                  <span className="flex-1">{link.title}</span>
+                  <span className="flex-1">{link.translatedTitle || link.title}</span>
                   {link.open_mode === 'new_tab' && <ExternalLink className="w-3 h-3 text-muted-foreground" />}
                 </>
               )}
