@@ -256,7 +256,7 @@ const CoursePage: React.FC = () => {
 
             {activeLesson.description && <p className="text-muted-foreground">{activeLesson.description}</p>}
 
-            {activeLesson.video_url && activeLesson.contents.length === 0 && <VideoPlayer url={activeLesson.video_url} />}
+            {activeLesson.video_url && <VideoPlayer url={activeLesson.video_url} />}
 
             {activeLesson.contents.map(cont => (
               <div key={cont.id} className="space-y-2">

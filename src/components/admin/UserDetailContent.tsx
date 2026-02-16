@@ -61,7 +61,7 @@ interface Props {
 const UserDetailContent: React.FC<Props> = ({
   user, t, getStatusBadge, approveUser, rejectUser, confirmSuspend, confirmDelete, fetchActivePlansCounts
 }) => {
-  const [diagnostic, setDiagnostic] = useState<DiagnosticData | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticData[]>([]);
   const [loadingDiag, setLoadingDiag] = useState(false);
   const [diagChecked, setDiagChecked] = useState(false);
 
@@ -71,27 +71,22 @@ const UserDetailContent: React.FC<Props> = ({
   const [showLogs, setShowLogs] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
 
-  // Check for matching diagnostic by email + phone
-  const fetchDiagnostic = useCallback(async () => {
+  // Check for matching diagnostics by email only
+  const fetchDiagnostics = useCallback(async () => {
     if (diagChecked) return;
     setLoadingDiag(true);
-    let query = supabase.from('diagnostics').select('*');
 
-    if (user.email && user.phone) {
-      query = query.eq('email', user.email).eq('phone', user.phone);
-    } else if (user.email) {
-      query = query.eq('email', user.email);
-    } else {
+    if (!user.email) {
       setDiagChecked(true);
       setLoadingDiag(false);
       return;
     }
 
-    const { data } = await query.order('created_at', { ascending: false }).limit(1);
-    setDiagnostic(data && data.length > 0 ? data[0] : null);
+    const { data } = await supabase.from('diagnostics').select('*').eq('email', user.email).order('created_at', { ascending: false });
+    setDiagnostics(data || []);
     setDiagChecked(true);
     setLoadingDiag(false);
-  }, [user.email, user.phone, diagChecked]);
+  }, [user.email, diagChecked]);
 
   // Fetch user activity logs
   const fetchLogs = useCallback(async () => {
@@ -107,8 +102,8 @@ const UserDetailContent: React.FC<Props> = ({
   }, [user.user_id]);
 
   useEffect(() => {
-    fetchDiagnostic();
-  }, [fetchDiagnostic]);
+    fetchDiagnostics();
+  }, [fetchDiagnostics]);
 
   useEffect(() => {
     if (showLogs && logs.length === 0) fetchLogs();
@@ -146,36 +141,39 @@ const UserDetailContent: React.FC<Props> = ({
         >
           <ClipboardList className="w-4 h-4 text-primary" />
           Diagnóstico
-          {diagnostic && <Badge className="text-xs bg-green-500/10 text-green-500 border-green-500/20 ml-auto">Vinculado</Badge>}
-          {diagChecked && !diagnostic && <Badge variant="secondary" className="text-xs ml-auto">No encontrado</Badge>}
+          {diagnostics.length > 0 && <Badge className="text-xs bg-green-500/10 text-green-500 border-green-500/20 ml-auto">{diagnostics.length} vinculado(s)</Badge>}
+          {diagChecked && diagnostics.length === 0 && <Badge variant="secondary" className="text-xs ml-auto">No encontrado</Badge>}
         </button>
         {showDiag && (
-          <div className="mt-2">
+          <div className="mt-2 space-y-3">
             {loadingDiag ? (
               <p className="text-xs text-muted-foreground">{t('loading')}...</p>
-            ) : diagnostic ? (
-              <div className="p-3 rounded-lg bg-secondary/50 border border-border space-y-2 text-xs">
-                <div className="grid grid-cols-2 gap-2">
-                  <div><span className="text-muted-foreground">Nombre:</span> <span className="text-foreground">{diagnostic.name}</span></div>
-                  <div><span className="text-muted-foreground">Email:</span> <span className="text-foreground">{diagnostic.email}</span></div>
-                  <div><span className="text-muted-foreground">Teléfono:</span> <span className="text-foreground">{diagnostic.phone || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Empresa:</span> <span className="text-foreground">{diagnostic.company_name || '—'}</span></div>
-                  <div><span className="text-muted-foreground">País:</span> <span className="text-foreground">{diagnostic.country || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Clientes:</span> <span className="text-foreground">{diagnostic.client_count || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Red:</span> <span className="text-foreground">{diagnostic.network_type || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Plan más barato:</span> <span className="text-foreground">{diagnostic.cheapest_plan ? `U$ ${diagnostic.cheapest_plan}` : '—'}</span></div>
-                  <div><span className="text-muted-foreground">Conocimiento:</span> <span className="text-foreground">{diagnostic.tech_knowledge || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Fecha:</span> <span className="text-foreground">{formatDate(diagnostic.created_at)}</span></div>
+            ) : diagnostics.length > 0 ? (
+              diagnostics.map((diagnostic, idx) => (
+                <div key={diagnostic.id} className="p-3 rounded-lg bg-secondary/50 border border-border space-y-2 text-xs">
+                  {diagnostics.length > 1 && <p className="text-xs font-medium text-primary">Diagnóstico #{idx + 1} — {formatDate(diagnostic.created_at)}</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><span className="text-muted-foreground">Nombre:</span> <span className="text-foreground">{diagnostic.name}</span></div>
+                    <div><span className="text-muted-foreground">Email:</span> <span className="text-foreground">{diagnostic.email}</span></div>
+                    <div><span className="text-muted-foreground">Teléfono:</span> <span className="text-foreground">{diagnostic.phone || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Empresa:</span> <span className="text-foreground">{diagnostic.company_name || '—'}</span></div>
+                    <div><span className="text-muted-foreground">País:</span> <span className="text-foreground">{diagnostic.country || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Clientes:</span> <span className="text-foreground">{diagnostic.client_count || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Red:</span> <span className="text-foreground">{diagnostic.network_type || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Plan más barato:</span> <span className="text-foreground">{diagnostic.cheapest_plan ? `U$ ${diagnostic.cheapest_plan}` : '—'}</span></div>
+                    <div><span className="text-muted-foreground">Conocimiento:</span> <span className="text-foreground">{diagnostic.tech_knowledge || '—'}</span></div>
+                    {diagnostics.length === 1 && <div><span className="text-muted-foreground">Fecha:</span> <span className="text-foreground">{formatDate(diagnostic.created_at)}</span></div>}
+                  </div>
+                  {diagnostic.main_problems && (
+                    <div><span className="text-muted-foreground">Problemas:</span><p className="text-foreground mt-0.5">{diagnostic.main_problems}</p></div>
+                  )}
+                  {diagnostic.main_goals && (
+                    <div><span className="text-muted-foreground">Objetivos:</span><p className="text-foreground mt-0.5">{diagnostic.main_goals}</p></div>
+                  )}
                 </div>
-                {diagnostic.main_problems && (
-                  <div><span className="text-muted-foreground">Problemas:</span><p className="text-foreground mt-0.5">{diagnostic.main_problems}</p></div>
-                )}
-                {diagnostic.main_goals && (
-                  <div><span className="text-muted-foreground">Objetivos:</span><p className="text-foreground mt-0.5">{diagnostic.main_goals}</p></div>
-                )}
-              </div>
+              ))
             ) : (
-              <p className="text-xs text-muted-foreground p-2">No se encontró diagnóstico para este email{user.phone ? ' + teléfono' : ''}.</p>
+              <p className="text-xs text-muted-foreground p-2">No se encontró diagnóstico para este email.</p>
             )}
           </div>
         )}
