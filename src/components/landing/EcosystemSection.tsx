@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { BookOpen, Users, Monitor, Calendar, Wrench, MessageCircle, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import meteoraLogo from '@/assets/logo-white.png';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -16,12 +17,12 @@ const fadeUp = {
 const DIAGNOSTIC_URL = '/diagnostico';
 
 const ecosystemItems = [
-  { icon: BookOpen, label: 'Cursos', angle: 0 },
-  { icon: Users, label: 'Mentorías', angle: 60 },
-  { icon: Monitor, label: 'Softwares', angle: 120 },
-  { icon: MessageCircle, label: 'Comunidad', angle: 180 },
-  { icon: Calendar, label: 'Eventos', angle: 240 },
-  { icon: Wrench, label: 'Implementaciones', angle: 300 },
+  { icon: BookOpen, label: 'Cursos', angle: 0, desc: 'Formación técnica y estratégica' },
+  { icon: Users, label: 'Mentorías', angle: 60, desc: 'Acompañamiento personalizado' },
+  { icon: Monitor, label: 'Softwares', angle: 120, desc: 'Herramientas exclusivas' },
+  { icon: MessageCircle, label: 'Comunidad', angle: 180, desc: 'Red de ISPs conectados' },
+  { icon: Calendar, label: 'Eventos', angle: 240, desc: 'Presenciales y virtuales' },
+  { icon: Wrench, label: 'Implementaciones', angle: 300, desc: 'Ejecución directa en tu red' },
 ];
 
 const pillars = [
@@ -93,7 +94,7 @@ const EcosystemSection: React.FC = () => {
   return (
     <>
       {/* ECOSYSTEM DIAGRAM */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6 bg-secondary/30">
         <div className="max-w-6xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
@@ -104,21 +105,49 @@ const EcosystemSection: React.FC = () => {
             </p>
           </motion.div>
 
-          {/* Circular diagram */}
+          {/* Professional Circular Ecosystem Diagram */}
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="flex justify-center mb-20">
-            <div className="relative w-[320px] h-[320px] md:w-[420px] md:h-[420px]">
-              {/* Center */}
+            <div className="relative w-[340px] h-[340px] md:w-[520px] md:h-[520px]">
+              {/* Outer decorative ring */}
+              <div className="absolute inset-0 rounded-full border border-border/20" />
+              {/* Middle ring */}
+              <div className="absolute inset-8 md:inset-12 rounded-full border border-border/30" />
+              {/* Inner glow ring */}
+              <div className="absolute inset-16 md:inset-24 rounded-full border border-primary/20 shadow-[0_0_60px_hsl(349_100%_62%/0.08)]" />
+              
+              {/* Connecting lines from center to each node */}
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 520 520">
+                {ecosystemItems.map((item) => {
+                  const rad = (item.angle - 90) * (Math.PI / 180);
+                  const r = 220;
+                  const x = 260 + r * Math.cos(rad);
+                  const y = 260 + r * Math.sin(rad);
+                  return (
+                    <line
+                      key={item.label + '-line'}
+                      x1="260" y1="260"
+                      x2={x} y2={y}
+                      stroke="hsl(207 30% 16%)"
+                      strokeWidth="1"
+                      strokeDasharray="4 4"
+                      opacity="0.5"
+                    />
+                  );
+                })}
+              </svg>
+
+              {/* Center - Logo */}
               <div className="absolute inset-0 flex items-center justify-center z-10">
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center shadow-[0_0_40px_hsl(349_100%_62%/0.3)]">
-                  <span className="font-display font-bold text-foreground text-sm md:text-lg text-center leading-tight">Meteora</span>
+                <div className="w-28 h-28 md:w-40 md:h-40 rounded-full bg-gradient-to-br from-card via-card to-secondary border-2 border-primary/30 flex flex-col items-center justify-center shadow-[0_0_50px_hsl(349_100%_62%/0.2)] gap-2">
+                  <img src={meteoraLogo} alt="Meteora" className="h-8 md:h-12 object-contain" />
+                  <span className="font-display font-bold text-foreground text-xs md:text-sm tracking-wider uppercase">Ecosistema</span>
                 </div>
               </div>
-              {/* Orbit ring */}
-              <div className="absolute inset-4 md:inset-6 rounded-full border border-border/40" />
-              {/* Items */}
+
+              {/* Orbital Items */}
               {ecosystemItems.map((item, i) => {
                 const rad = (item.angle - 90) * (Math.PI / 180);
-                const r = 45; // percentage from center
+                const r = 42;
                 const x = 50 + r * Math.cos(rad);
                 const y = 50 + r * Math.sin(rad);
                 const Icon = item.icon;
@@ -128,14 +157,15 @@ const EcosystemSection: React.FC = () => {
                     initial={{ opacity: 0, scale: 0 }}
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
-                    transition={{ delay: 0.3 + i * 0.1, duration: 0.4 }}
-                    className="absolute flex flex-col items-center gap-1"
+                    transition={{ delay: 0.3 + i * 0.12, duration: 0.5, type: 'spring', stiffness: 200 }}
+                    className="absolute flex flex-col items-center gap-1.5"
                     style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
                   >
-                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-card border border-border flex items-center justify-center shadow-lg hover:border-primary/50 hover:shadow-[0_0_20px_hsl(349_100%_62%/0.15)] transition-all duration-300">
-                      <Icon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                    <div className="w-14 h-14 md:w-[72px] md:h-[72px] rounded-2xl bg-card border border-border/60 flex items-center justify-center shadow-[0_4px_20px_hsl(0_0%_0%/0.3)] hover:border-primary/50 hover:shadow-[0_0_25px_hsl(349_100%_62%/0.2)] transition-all duration-300 group cursor-default">
+                      <Icon className="w-6 h-6 md:w-7 md:h-7 text-primary group-hover:scale-110 transition-transform duration-300" />
                     </div>
-                    <span className="text-[10px] md:text-xs font-semibold text-foreground whitespace-nowrap">{item.label}</span>
+                    <span className="text-[11px] md:text-sm font-display font-semibold text-foreground whitespace-nowrap">{item.label}</span>
+                    <span className="text-[9px] md:text-xs text-muted-foreground whitespace-nowrap hidden md:block">{item.desc}</span>
                   </motion.div>
                 );
               })}
@@ -162,7 +192,7 @@ const EcosystemSection: React.FC = () => {
 
       {/* PRODUCT CAROUSEL BY TYPE */}
       {Object.keys(productsByType).length > 0 && (
-        <section className="py-16 px-6 bg-card/30">
+        <section className="py-16 px-6 bg-card/50">
           <div className="max-w-6xl mx-auto">
             {Object.entries(productsByType).map(([type, products]) => (
               <div key={type} className="mb-10 group/carousel">
