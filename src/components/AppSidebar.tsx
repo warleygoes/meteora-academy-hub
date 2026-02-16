@@ -6,6 +6,7 @@ import { Language } from '@/lib/i18n';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import meteoraLogo from '@/assets/logo-white-pink.png';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const languageLabels: Record<Language, string> = { pt: 'PT', en: 'EN', es: 'ES' };
 
@@ -40,7 +41,17 @@ export const AppSidebar: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  // Fetch user profile avatar
+  useEffect(() => {
+    if (!user) return;
+    const fetchAvatar = async () => {
+      const { data } = await supabase.from('profiles').select('avatar_url').eq('user_id', user.id).maybeSingle();
+      if (data?.avatar_url) setAvatarUrl(data.avatar_url);
+    };
+    fetchAvatar();
+  }, [user]);
   useEffect(() => {
     if (!user) return;
     const fetchLinks = async () => {
@@ -220,9 +231,12 @@ export const AppSidebar: React.FC = () => {
             isActive('/app/profile') ? 'bg-primary/10' : ''
           }`}
         >
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <User className="w-4 h-4 text-primary" />
-          </div>
+          <Avatar className="w-8 h-8">
+            <AvatarImage src={avatarUrl || undefined} alt={user?.user_metadata?.display_name || 'User'} />
+            <AvatarFallback className="bg-primary/20 text-primary text-sm font-medium">
+              {(user?.user_metadata?.display_name || user?.email || 'U').slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">{user?.user_metadata?.display_name || 'Aluno'}</p>

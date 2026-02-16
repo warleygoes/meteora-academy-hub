@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useContentProducts } from '@/hooks/useContentProducts';
 import { useTranslateCategory } from '@/hooks/useTranslateCategory';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'framer-motion';
 import { BookOpen, Users, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -20,16 +21,17 @@ const CoursesPage: React.FC = () => {
   const navigate = useNavigate();
   const { products, loading } = useContentProducts();
   const { translateText } = useTranslateCategory();
+  const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeType, setActiveType] = useState('all');
   const [allCategories, setAllCategories] = useState<{ id: string; name: string; translatedName?: string }[]>([]);
+  const [accessibleProductIds, setAccessibleProductIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
       const { data } = await supabase.from('course_categories').select('id, name').order('name');
       if (data) {
         setAllCategories(data.map(c => ({ ...c, translatedName: undefined })));
-        // Translate if not Spanish
         if (language !== 'es') {
           const translated = await Promise.all(data.map(async c => ({
             ...c,
@@ -42,16 +44,48 @@ const CoursesPage: React.FC = () => {
     fetchCategories();
   }, [language, translateText]);
 
+  // Fetch accessible product IDs for current user
+  useEffect(() => {
+    if (!user) return;
+    const fetchAccess = async () => {
+      const accessSet = new Set<string>();
+
+      // Direct product access
+      const { data: userProducts } = await supabase.from('user_products').select('product_id').eq('user_id', user.id);
+      (userProducts || []).forEach(d => accessSet.add(d.product_id));
+
+      // Package-based access
+      const { data: userPlans } = await supabase.from('user_plans').select('package_id').eq('user_id', user.id).eq('status', 'active');
+      const packageIds = (userPlans || []).map(d => d.package_id);
+      if (packageIds.length > 0) {
+        const { data: pkgProducts } = await supabase.from('package_products').select('product_id').in('package_id', packageIds);
+        (pkgProducts || []).forEach(pp => accessSet.add(pp.product_id));
+      }
+
+      // Free products
+      const { data: freeOffers } = await supabase.from('offers').select('product_id').eq('price', 0).not('product_id', 'is', null);
+      (freeOffers || []).forEach(o => { if (o.product_id) accessSet.add(o.product_id); });
+
+      setAccessibleProductIds(accessSet);
+    };
+    fetchAccess();
+  }, [user]);
+
   const productTypes = [...new Set(products.map(p => p.type))];
   const typeLabels = PRODUCT_TYPE_LABELS[language] || PRODUCT_TYPE_LABELS.es;
 
-  const filtered = products.filter(p => {
+  // Filter: only show products user has access to
+  const accessibleProducts = accessibleProductIds !== null
+    ? products.filter(p => accessibleProductIds.has(p.id))
+    : products;
+
+  const filtered = accessibleProducts.filter(p => {
     if (activeType !== 'all' && p.type !== activeType) return false;
     if (activeCategory !== 'all' && !(p.category_names || []).includes(activeCategory)) return false;
     return true;
   });
 
-  if (loading) return <div className="flex items-center justify-center min-h-[40vh] text-muted-foreground">{t('loading')}...</div>;
+  if (loading || accessibleProductIds === null) return <div className="flex items-center justify-center min-h-[40vh] text-muted-foreground">{t('loading')}...</div>;
 
   return (
     <div className="px-6 md:px-12 py-8">
