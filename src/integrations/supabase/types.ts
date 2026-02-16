@@ -1173,6 +1173,191 @@ export type Database = {
           },
         ]
       }
+      product_sales_pages: {
+        Row: {
+          active: boolean
+          after_points: Json | null
+          anchor_comparison_text: string | null
+          anchor_items: Json | null
+          anchor_total_value: string | null
+          before_points: Json | null
+          bonuses: Json | null
+          core_benefits: Json | null
+          countdown_enabled: boolean | null
+          created_at: string
+          final_cta_button_text: string | null
+          final_cta_link: string | null
+          final_cta_text: string | null
+          final_cta_title: string | null
+          guarantee_days: number | null
+          guarantee_description: string | null
+          guarantee_title: string | null
+          guarantee_type: string | null
+          hero_background_image: string | null
+          hero_badge_text: string | null
+          hero_context_line: string | null
+          hero_cta_link: string | null
+          hero_cta_text: string | null
+          hero_headline: string | null
+          hero_social_proof_micro: string | null
+          hero_subheadline: string | null
+          hero_video_url: string | null
+          id: string
+          modules: Json | null
+          objections: Json | null
+          price_currency: string | null
+          price_display: string | null
+          price_highlight_text: string | null
+          price_installments: string | null
+          price_original: string | null
+          price_stripe_link: string | null
+          problem_bullet_points: Json | null
+          problem_explanation_text: string | null
+          problem_explanation_title: string | null
+          problem_title: string | null
+          product_id: string
+          program_access_time: string | null
+          program_duration: string | null
+          program_format: string | null
+          program_name: string | null
+          selected_testimonials: Json | null
+          slug: string
+          social_micro_badge: string | null
+          social_micro_number: string | null
+          social_micro_text: string | null
+          transformation_title: string | null
+          updated_at: string
+          urgency_date: string | null
+          urgency_spots_remaining: number | null
+          urgency_text: string | null
+          urgency_type: string | null
+        }
+        Insert: {
+          active?: boolean
+          after_points?: Json | null
+          anchor_comparison_text?: string | null
+          anchor_items?: Json | null
+          anchor_total_value?: string | null
+          before_points?: Json | null
+          bonuses?: Json | null
+          core_benefits?: Json | null
+          countdown_enabled?: boolean | null
+          created_at?: string
+          final_cta_button_text?: string | null
+          final_cta_link?: string | null
+          final_cta_text?: string | null
+          final_cta_title?: string | null
+          guarantee_days?: number | null
+          guarantee_description?: string | null
+          guarantee_title?: string | null
+          guarantee_type?: string | null
+          hero_background_image?: string | null
+          hero_badge_text?: string | null
+          hero_context_line?: string | null
+          hero_cta_link?: string | null
+          hero_cta_text?: string | null
+          hero_headline?: string | null
+          hero_social_proof_micro?: string | null
+          hero_subheadline?: string | null
+          hero_video_url?: string | null
+          id?: string
+          modules?: Json | null
+          objections?: Json | null
+          price_currency?: string | null
+          price_display?: string | null
+          price_highlight_text?: string | null
+          price_installments?: string | null
+          price_original?: string | null
+          price_stripe_link?: string | null
+          problem_bullet_points?: Json | null
+          problem_explanation_text?: string | null
+          problem_explanation_title?: string | null
+          problem_title?: string | null
+          product_id: string
+          program_access_time?: string | null
+          program_duration?: string | null
+          program_format?: string | null
+          program_name?: string | null
+          selected_testimonials?: Json | null
+          slug: string
+          social_micro_badge?: string | null
+          social_micro_number?: string | null
+          social_micro_text?: string | null
+          transformation_title?: string | null
+          updated_at?: string
+          urgency_date?: string | null
+          urgency_spots_remaining?: number | null
+          urgency_text?: string | null
+          urgency_type?: string | null
+        }
+        Update: {
+          active?: boolean
+          after_points?: Json | null
+          anchor_comparison_text?: string | null
+          anchor_items?: Json | null
+          anchor_total_value?: string | null
+          before_points?: Json | null
+          bonuses?: Json | null
+          core_benefits?: Json | null
+          countdown_enabled?: boolean | null
+          created_at?: string
+          final_cta_button_text?: string | null
+          final_cta_link?: string | null
+          final_cta_text?: string | null
+          final_cta_title?: string | null
+          guarantee_days?: number | null
+          guarantee_description?: string | null
+          guarantee_title?: string | null
+          guarantee_type?: string | null
+          hero_background_image?: string | null
+          hero_badge_text?: string | null
+          hero_context_line?: string | null
+          hero_cta_link?: string | null
+          hero_cta_text?: string | null
+          hero_headline?: string | null
+          hero_social_proof_micro?: string | null
+          hero_subheadline?: string | null
+          hero_video_url?: string | null
+          id?: string
+          modules?: Json | null
+          objections?: Json | null
+          price_currency?: string | null
+          price_display?: string | null
+          price_highlight_text?: string | null
+          price_installments?: string | null
+          price_original?: string | null
+          price_stripe_link?: string | null
+          problem_bullet_points?: Json | null
+          problem_explanation_text?: string | null
+          problem_explanation_title?: string | null
+          problem_title?: string | null
+          product_id?: string
+          program_access_time?: string | null
+          program_duration?: string | null
+          program_format?: string | null
+          program_name?: string | null
+          selected_testimonials?: Json | null
+          slug?: string
+          social_micro_badge?: string | null
+          social_micro_number?: string | null
+          social_micro_text?: string | null
+          transformation_title?: string | null
+          updated_at?: string
+          urgency_date?: string | null
+          urgency_spots_remaining?: number | null
+          urgency_text?: string | null
+          urgency_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sales_pages_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean

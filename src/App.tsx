@@ -20,6 +20,7 @@ import NetworkTopology from "./pages/NetworkTopology";
 import Meetings from "./pages/Meetings";
 import CoursePage from "./pages/CoursePage";
 import EmbedPage from "./pages/EmbedPage";
+import SalesPage from "./pages/SalesPage";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/diagnostico" element={<Diagnostico />} />
+              <Route path="/sales/:slug" element={<SalesPage />} />
 
               {/* Member area */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
