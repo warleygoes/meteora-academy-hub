@@ -114,19 +114,36 @@ const EcosystemWheel: React.FC = () => {
   const outerR = 200, innerR = 110;
   const midR = (outerR + innerR) / 2;
   const segAngle = 360 / segments.length;
-  const gap = 3; // degrees gap between segments
+  const gap = 3;
+
+  // Pre-calculated fixed positions for branches to avoid overlap
+  // Each segment gets branches positioned radially outward with enough spacing
+  const branchPositions: { x: number; y: number }[][] = segments.map((_, i) => {
+    const startA = i * segAngle + gap / 2;
+    const endA = (i + 1) * segAngle - gap / 2;
+    const midA = (startA + endA) / 2;
+    
+    // Spread branches along the arc direction with wide spacing
+    return [0, 1, 2].map((bi) => {
+      const spreadAngle = (bi - 1) * 24; // 24 degrees apart (wider spread)
+      const bAngle = (midA + spreadAngle - 90) * (Math.PI / 180);
+      const bR = outerR + 85 + Math.abs(bi - 1) * 18; // pushed further out
+      return {
+        x: cx + bR * Math.cos(bAngle),
+        y: cy + bR * Math.sin(bAngle),
+      };
+    });
+  });
 
   return (
-    <div className="relative w-full max-w-[600px] mx-auto aspect-square">
-      <svg viewBox="0 0 600 600" className="w-full h-full">
+    <div className="relative w-full max-w-[750px] mx-auto" style={{ aspectRatio: '1 / 1.2' }}>
+      {/* SVG viewBox expanded to fit branches */}
+      <svg viewBox="-80 -80 760 800" className="w-full h-full">
         {/* Segments */}
         {segments.map((seg, i) => {
           const startA = i * segAngle + gap / 2;
           const endA = (i + 1) * segAngle - gap / 2;
-          const outerPath = describeArc(cx, cy, outerR, startA, endA);
-          const innerPath = describeArc(cx, cy, innerR, endA, startA); // reverse for closed shape
 
-          // Build a closed donut segment
           const startOuter = ((startA - 90) * Math.PI) / 180;
           const endOuter = ((endA - 90) * Math.PI) / 180;
           const startInner = ((endA - 90) * Math.PI) / 180;
@@ -151,33 +168,82 @@ const EcosystemWheel: React.FC = () => {
             'Z',
           ].join(' ');
 
-          // Icon position on the arc midpoint
           const midAngle = ((startA + endA) / 2 - 90) * (Math.PI / 180);
           const iconX = cx + midR * Math.cos(midAngle);
           const iconY = cy + midR * Math.sin(midAngle);
 
+          // Label position
+          const labelR = outerR + 30;
+          const labelX = cx + labelR * Math.cos(midAngle);
+          const labelY = cy + labelR * Math.sin(midAngle);
+
+          // Connector lines from segment edge to branches
+          const edgeX = cx + (outerR + 5) * Math.cos(midAngle);
+          const edgeY = cy + (outerR + 5) * Math.sin(midAngle);
+
           return (
             <g key={seg.label}>
               <path d={d} fill={seg.color} opacity="0.9" className="transition-opacity duration-300 hover:opacity-100" />
-              {/* Icon circle */}
               <circle cx={iconX} cy={iconY} r="22" fill="hsl(207, 94%, 6%)" fillOpacity="0.6" />
+
+              {/* Connector lines to branches */}
+              {branchPositions[i].map((bp, bi) => (
+                <line
+                  key={bi}
+                  x1={edgeX} y1={edgeY}
+                  x2={bp.x} y2={bp.y}
+                  stroke="hsl(207, 30%, 20%)"
+                  strokeWidth="1"
+                  strokeDasharray="3 3"
+                  opacity="0.4"
+                />
+              ))}
             </g>
           );
         })}
 
         {/* Center circle */}
         <circle cx={cx} cy={cy} r={innerR - 8} fill="hsl(207, 60%, 9%)" stroke="hsl(349, 100%, 62%)" strokeWidth="2" opacity="0.95" />
+
+        {/* Branch labels as SVG text for precise positioning */}
+        {segments.map((seg, i) =>
+          seg.branches.map((branch, bi) => {
+            const bp = branchPositions[i][bi];
+            return (
+              <g key={`${seg.label}-branch-${bi}`}>
+                <rect
+                  x={bp.x - 55} y={bp.y - 10}
+                  width="110" height="20"
+                  rx="4"
+                  fill="hsl(207, 40%, 14%)"
+                  fillOpacity="0.7"
+                  stroke="hsl(207, 30%, 20%)"
+                  strokeWidth="0.5"
+                />
+                <text
+                  x={bp.x} y={bp.y + 4}
+                  textAnchor="middle"
+                  fill="hsl(207, 15%, 60%)"
+                  fontSize="10"
+                  fontFamily="Inter, sans-serif"
+                >
+                  {branch}
+                </text>
+              </g>
+            );
+          })
+        )}
       </svg>
 
-      {/* Center content (HTML overlay) */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="flex flex-col items-center gap-2">
-          <img src={meteoraLogo} alt="Meteora" className="h-10 md:h-14 object-contain" />
-          <span className="font-display font-bold text-primary text-[10px] md:text-sm tracking-widest uppercase">Ecosistema</span>
+      {/* Center content (HTML overlay) — smaller logo */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '-6%' }}>
+        <div className="flex flex-col items-center gap-1">
+          <img src={meteoraLogo} alt="Meteora" className="h-6 md:h-9 object-contain" />
+          <span className="font-display font-bold text-primary text-[8px] md:text-[11px] tracking-widest uppercase">Ecosistema</span>
         </div>
       </div>
 
-      {/* Segment labels + icons (HTML overlay for crisp text) */}
+      {/* Segment icons + large category labels (HTML overlay) */}
       {segments.map((seg, i) => {
         const startA = i * segAngle + gap / 2;
         const endA = (i + 1) * segAngle - gap / 2;
@@ -186,14 +252,13 @@ const EcosystemWheel: React.FC = () => {
         const iconY = cy + midR * Math.sin(midAngle);
         const Icon = seg.icon;
 
-        // Label position — further out
-        const labelR = outerR + 28;
+        const labelR = outerR + 30;
         const labelX = cx + labelR * Math.cos(midAngle);
         const labelY = cy + labelR * Math.sin(midAngle);
 
-        // Branch positions — even further out
-        const branchStartR = outerR + 50;
-        const branchSpread = 12; // degrees spread between branches
+        // Convert to percentage of the expanded viewBox (-80 to 680 = 760 wide, -80 to 720 = 800 tall)
+        const toPercX = (v: number) => ((v + 80) / 760) * 100;
+        const toPercY = (v: number) => ((v + 80) / 800) * 100;
 
         return (
           <React.Fragment key={seg.label + '-overlay'}>
@@ -201,55 +266,27 @@ const EcosystemWheel: React.FC = () => {
             <div
               className="absolute pointer-events-none"
               style={{
-                left: `${(iconX / 600) * 100}%`,
-                top: `${(iconY / 600) * 100}%`,
+                left: `${toPercX(iconX)}%`,
+                top: `${toPercY(iconY)}%`,
                 transform: 'translate(-50%, -50%)',
               }}
             >
               <Icon className="w-5 h-5 md:w-6 md:h-6 text-foreground drop-shadow-lg" />
             </div>
 
-            {/* Label */}
+            {/* Category Label — LARGE */}
             <div
               className="absolute pointer-events-none"
               style={{
-                left: `${(labelX / 600) * 100}%`,
-                top: `${(labelY / 600) * 100}%`,
+                left: `${toPercX(labelX)}%`,
+                top: `${toPercY(labelY)}%`,
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              <span className="font-display font-bold text-foreground text-[10px] md:text-sm whitespace-nowrap bg-card/80 px-2 py-0.5 rounded-md border border-border/40 backdrop-blur-sm">
+              <span className="font-display font-bold text-foreground text-sm md:text-base whitespace-nowrap">
                 {seg.label}
               </span>
             </div>
-
-            {/* Branch items */}
-            {seg.branches.map((branch, bi) => {
-              const bAngle = ((startA + endA) / 2 + (bi - 1) * branchSpread - 90) * (Math.PI / 180);
-              const bR = branchStartR + bi * 22;
-              const bX = cx + bR * Math.cos(bAngle);
-              const bY = cy + bR * Math.sin(bAngle);
-
-              return (
-                <motion.div
-                  key={branch}
-                  initial={{ opacity: 0, scale: 0.7 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.4 + i * 0.1 + bi * 0.05 }}
-                  className="absolute pointer-events-none hidden md:block"
-                  style={{
-                    left: `${(bX / 600) * 100}%`,
-                    top: `${(bY / 600) * 100}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  <span className="text-[9px] md:text-xs text-muted-foreground whitespace-nowrap bg-secondary/60 px-2 py-0.5 rounded border border-border/30">
-                    {branch}
-                  </span>
-                </motion.div>
-              );
-            })}
           </React.Fragment>
         );
       })}
