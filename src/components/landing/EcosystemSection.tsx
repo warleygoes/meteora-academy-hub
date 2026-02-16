@@ -30,16 +30,19 @@ const pillars = [
     title: 'Estabilidad Técnica',
     lines: ['Menos cortes.', 'Mejor arquitectura.', 'Red preparada para expansión.'],
     icon: '🛡️',
+    pillar: 'Pilar 01',
   },
   {
     title: 'Control Financiero',
     lines: ['Claridad real de margen.', 'Estructura de costos organizada.', 'Decisiones basadas en números.'],
     icon: '📊',
+    pillar: 'Pilar 02',
   },
   {
     title: 'Escala Comercial',
     lines: ['Procesos replicables.', 'Marketing estructurado.', 'Crecimiento planificado.'],
     icon: '🚀',
+    pillar: 'Pilar 03',
   },
 ];
 
@@ -139,17 +142,17 @@ const EcosystemSection: React.FC = () => {
               {/* Center - Logo */}
               <div className="absolute inset-0 flex items-center justify-center z-10">
                 <div className="w-28 h-28 md:w-40 md:h-40 rounded-full bg-gradient-to-br from-card via-card to-secondary border-2 border-primary/30 flex flex-col items-center justify-center shadow-[0_0_50px_hsl(349_100%_62%/0.2)] gap-2">
-                  <img src={meteoraLogo} alt="Meteora" className="h-8 md:h-12 object-contain" />
-                  <span className="font-display font-bold text-foreground text-xs md:text-sm tracking-wider uppercase">Ecosistema</span>
+                  <img src={meteoraLogo} alt="Meteora" className="h-10 md:h-14 object-contain" />
+                  <span className="font-display font-bold text-primary text-xs md:text-sm tracking-wider uppercase">Ecosistema</span>
                 </div>
               </div>
 
               {/* Orbital Items */}
               {ecosystemItems.map((item, i) => {
                 const rad = (item.angle - 90) * (Math.PI / 180);
-                const r = 42;
-                const x = 50 + r * Math.cos(rad);
-                const y = 50 + r * Math.sin(rad);
+                const rPercent = 42;
+                const x = 50 + rPercent * Math.cos(rad);
+                const y = 50 + rPercent * Math.sin(rad);
                 const Icon = item.icon;
                 return (
                   <motion.div
@@ -177,6 +180,7 @@ const EcosystemSection: React.FC = () => {
             {pillars.map((p, i) => (
               <motion.div key={p.title} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i}
                 className="bg-card rounded-2xl p-8 border border-border hover:border-primary/30 transition-colors">
+                <span className="text-xs font-semibold uppercase tracking-widest text-primary mb-3 block">{p.pillar}</span>
                 <span className="text-3xl mb-4 block">{p.icon}</span>
                 <h3 className="font-display font-bold text-foreground text-lg mb-4">{p.title}</h3>
                 <div className="space-y-2">

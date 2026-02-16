@@ -401,38 +401,38 @@ const LandingPage: React.FC = () => {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link to={DIAGNOSTIC_URL} className="hover:text-foreground transition-colors">{t('lpDiagCta')}</Link></li>
                 <li><Link to="/login" className="hover:text-foreground transition-colors">{t('community')}</Link></li>
-                <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
+                <li><a href="#objections" className="hover:text-foreground transition-colors">FAQ</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-display font-semibold text-foreground mb-4 text-sm">{t('institutional')}</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">{t('termsOfUse')}</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">{t('privacyPolicy')}</a></li>
+                <li><Link to="/terminos" className="hover:text-foreground transition-colors">{t('termsOfUse')}</Link></li>
+                <li><Link to="/privacidad" className="hover:text-foreground transition-colors">{t('privacyPolicy')}</Link></li>
+                <li><Link to="/cookies" className="hover:text-foreground transition-colors">Política de Cookies</Link></li>
                 <li><a href="https://forms.gle/AUMjzehP8guXcYLXA" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">{t('workWithUs')}</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-display font-semibold text-foreground mb-4 text-sm">{t('socialMedia')}</h4>
               <div className="flex gap-3">
-                <a href="#" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                <a href="https://www.instagram.com/meteora.academy/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
                   <Instagram className="w-5 h-5" />
                 </a>
-                <a href="#" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
-                  <Youtube className="w-5 h-5" />
+                <a href="https://www.facebook.com/meteora.academy" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                  <Globe className="w-5 h-5" />
                 </a>
-                <a href="#" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                <a href="https://www.linkedin.com/in/warley-goes-95250a33a/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
                   <Linkedin className="w-5 h-5" />
                 </a>
-                <a href="#" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                <a href="mailto:soporte@meteora.academy" className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
                   <Mail className="w-5 h-5" />
                 </a>
               </div>
             </div>
           </div>
-          <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">© 2025 Meteora Academy. {t('allRightsReserved')}</p>
-            <p className="text-xs text-muted-foreground">MISP - Mastering Internet Service Provider</p>
+          <div className="border-t border-border pt-8 text-center">
+            <p className="text-xs text-muted-foreground">© 2026 Meteora Academy. {t('allRightsReserved')}</p>
           </div>
         </div>
       </footer>

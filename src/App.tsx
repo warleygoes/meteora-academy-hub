@@ -21,6 +21,9 @@ import Meetings from "./pages/Meetings";
 import CoursePage from "./pages/CoursePage";
 import EmbedPage from "./pages/EmbedPage";
 import SalesPage from "./pages/SalesPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfUse from "./pages/TermsOfUse";
+import CookiesPolicy from "./pages/CookiesPolicy";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,6 +72,9 @@ const App = () => (
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/diagnostico" element={<Diagnostico />} />
               <Route path="/sales/:slug" element={<SalesPage />} />
+              <Route path="/privacidad" element={<PrivacyPolicy />} />
+              <Route path="/terminos" element={<TermsOfUse />} />
+              <Route path="/cookies" element={<CookiesPolicy />} />
 
               {/* Member area */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
