@@ -25,6 +25,19 @@ const LandingPage: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  const objections = [
+    { q: "Mi ISP es pequeño, esto es para proveedores más grandes.", a: "La falta de estructura afecta más a los ISPs pequeños que a los grandes.\nCuanto antes ordenes tu base técnica y financiera, más fácil será crecer sin errores costosos." },
+    { q: "Yo ya sé bastante de redes.", a: "Saber configurar no es lo mismo que tener una arquitectura preparada para escalar.\nLa mayoría de los problemas no vienen por falta de conocimiento, sino por falta de estructura." },
+    { q: "Mi problema es solo técnico, no financiero.", a: "Red, dinero y crecimiento están conectados.\nPuedes tener buena red y aún así perder margen por falta de claridad financiera." },
+    { q: "Solo necesito más dinero para crecer.", a: "Más dinero sin estructura no resuelve el problema, lo amplifica.\n\nSi tu red, tus números y tus procesos no están organizados, más ingresos solo traerán más presión.\n\nEl crecimiento sostenible empieza con claridad, no con capital." },
+    { q: "Cuando tenga más clientes, lo hago.", a: "Es justo al revés.\nSi creces sin orden, el desorden crece contigo." },
+    { q: "No tengo tiempo ahora.", a: "El caos consume más tiempo que la estructura.\nCinco minutos para evaluar tu ISP pueden ahorrarte meses de correcciones." },
+    { q: "Mi mercado es diferente.", a: "Todos creen eso al inicio.\nPero los problemas estructurales se repiten en toda América Latina: red reactiva, margen confuso y crecimiento improvisado." },
+    { q: "Ya intenté otros cursos y no funcionó.", a: "La diferencia no está en acumular información.\nEstá en aplicar un método completo que conecta red, finanzas y escala." },
+    { q: "Mi competencia está creciendo más rápido que yo.", a: "La velocidad sin estructura suele terminar en problemas mayores.\nLo importante no es crecer primero, sino crecer sólido." },
+    { q: "¿Y si descubro que estoy haciendo muchas cosas mal?", a: "Mejor descubrirlo ahora que cuando el crecimiento lo haga evidente.\nLa claridad siempre es el primer paso hacia el control." },
+  ];
+
   const faqKeys = [1, 2, 3, 4, 5, 6];
 
   const beforeItems = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => t(`lpBefore${n}`)).filter(Boolean);
@@ -295,29 +308,43 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section id="faq" className="py-24 px-6 bg-card/30">
+      {/* OBJEÇÕES */}
+      <section id="objections" className="py-24 px-6 bg-card/30">
         <div className="max-w-3xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-12">
-            <span className="text-primary text-sm font-semibold uppercase tracking-wider">{t('faqLabel')}</span>
-            <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground mt-3">
-              {t('faqTitle')} <span className="text-gradient">{t('faqHighlight')}</span>
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
+              Antes de hacer la evaluación, puede que estés pensando esto…
             </h2>
           </motion.div>
 
           <div className="space-y-3">
-            {faqKeys.map((num, i) => (
-              <motion.div key={num} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} className="bg-card rounded-xl border border-border overflow-hidden">
+            {objections.map((obj, i) => (
+              <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} className="bg-card rounded-xl border border-border overflow-hidden">
                 <button onClick={() => setOpenFaq(openFaq === i ? null : i)} className="w-full flex items-center justify-between px-6 py-5 text-left">
-                  <span className="font-display font-medium text-foreground pr-4">{t(`faq${num}q`)}</span>
+                  <span className="font-display font-medium text-foreground pr-4">"{obj.q}"</span>
                   <ChevronDown className={`w-5 h-5 text-muted-foreground shrink-0 transition-transform duration-300 ${openFaq === i ? 'rotate-180' : ''}`} />
                 </button>
-                <div className={`overflow-hidden transition-all duration-300 ${openFaq === i ? 'max-h-40 pb-5' : 'max-h-0'}`}>
-                  <p className="px-6 text-sm text-muted-foreground leading-relaxed">{t(`faq${num}a`)}</p>
+                <div className={`overflow-hidden transition-all duration-300 ${openFaq === i ? 'max-h-60 pb-5' : 'max-h-0'}`}>
+                  <p className="px-6 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{obj.a}</p>
                 </div>
               </motion.div>
             ))}
           </div>
+
+          {/* Frase final + CTA */}
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mt-14">
+            <p className="text-lg md:text-xl text-muted-foreground mb-2 italic">
+              La mayoría no falla por falta de esfuerzo.
+            </p>
+            <p className="text-lg md:text-xl font-display font-bold text-foreground mb-8">
+              Falla por falta de claridad estructural.
+            </p>
+            <Link to={DIAGNOSTIC_URL}>
+              <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
+                <ArrowRight className="w-5 h-5" /> 👉 Hacer Evaluación Estratégica
+              </Button>
+            </Link>
+          </motion.div>
         </div>
       </section>
 
