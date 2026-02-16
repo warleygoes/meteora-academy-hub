@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { logSystemEvent } from '@/lib/systemLog';
 import { supabase } from '@/integrations/supabase/client';
+import AdminWebhooks from './AdminWebhooks';
 
 const AdminSettings: React.FC = () => {
   const { t } = useLanguage();
@@ -161,6 +162,9 @@ const AdminSettings: React.FC = () => {
         </div>
 
         <Button onClick={saveSettings} className="w-full">{t('saveSettings')}</Button>
+
+        {/* Webhooks & Events */}
+        <AdminWebhooks />
       </div>
     </div>
   );

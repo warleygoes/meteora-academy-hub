@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +42,7 @@ const CONTENT_ICONS: Record<string, React.ReactNode> = {
 
 const CoursePage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -56,6 +57,8 @@ const CoursePage: React.FC = () => {
 
   const allLessons = modules.flatMap(m => m.lessons);
   const activeLesson = allLessons.find(l => l.id === activeLessonId) || null;
+
+  const isResume = searchParams.get('resume') === 'true';
 
   const fetchData = useCallback(async () => {
     if (!courseId || !user) return;
@@ -104,7 +107,18 @@ const CoursePage: React.FC = () => {
     const allL = builtModules.flatMap(m => m.lessons);
     const lastProgress = progressData && progressData.length > 0 ? progressData[0] : null;
 
-    if (lastProgress) {
+    if (isResume) {
+      // Find the first uncompleted lesson (the "next" lesson to watch)
+      const firstUncompleted = allL.find(l => !completed.has(l.id));
+      const targetLesson = firstUncompleted || allL[allL.length - 1];
+      if (targetLesson) {
+        setActiveLessonId(targetLesson.id);
+        const parentMod = builtModules.find(m => m.lessons.some(l => l.id === targetLesson.id));
+        if (parentMod) setExpandedModules(new Set([parentMod.id]));
+      }
+      // Clear the resume param so refreshing doesn't re-trigger
+      setSearchParams({}, { replace: true });
+    } else if (lastProgress) {
       setActiveLessonId(lastProgress.lesson_id);
       const parentMod = builtModules.find(m => m.lessons.some(l => l.id === lastProgress.lesson_id));
       if (parentMod) setExpandedModules(new Set([parentMod.id]));
@@ -114,7 +128,7 @@ const CoursePage: React.FC = () => {
     }
 
     setLoading(false);
-  }, [courseId, user]);
+  }, [courseId, user, isResume]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

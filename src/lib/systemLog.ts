@@ -6,6 +6,8 @@ export async function logSystemEvent(params: {
   entity_id?: string;
   details?: string;
   level?: 'info' | 'success' | 'warning' | 'error';
+  webhookEvent?: string;
+  webhookData?: Record<string, any>;
 }) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -18,6 +20,20 @@ export async function logSystemEvent(params: {
       performed_by: user?.id || null,
       performer_email: user?.email || null,
     });
+
+    // Dispatch webhook if event specified
+    if (params.webhookEvent) {
+      supabase.functions.invoke('dispatch-webhook', {
+        body: {
+          event: params.webhookEvent,
+          data: {
+            ...params.webhookData,
+            performed_by: user?.email || null,
+            timestamp: new Date().toISOString(),
+          },
+        },
+      }).catch(e => console.error('Webhook dispatch failed:', e));
+    }
   } catch (e) {
     console.error('Failed to log system event:', e);
   }

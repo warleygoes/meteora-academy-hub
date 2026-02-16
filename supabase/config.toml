@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.translate-category]
 verify_jwt = false
+
+[functions.dispatch-webhook]
+verify_jwt = false
