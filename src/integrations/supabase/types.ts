@@ -193,18 +193,21 @@ export type Database = {
       }
       course_categories: {
         Row: {
+          auto_translate: boolean
           created_at: string
           description: string | null
           id: string
           name: string
         }
         Insert: {
+          auto_translate?: boolean
           created_at?: string
           description?: string | null
           id?: string
           name: string
         }
         Update: {
+          auto_translate?: boolean
           created_at?: string
           description?: string | null
           id?: string
@@ -682,6 +685,7 @@ export type Database = {
       menu_links: {
         Row: {
           active: boolean
+          auto_translate: boolean
           created_at: string
           icon: string
           id: string
@@ -693,6 +697,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          auto_translate?: boolean
           created_at?: string
           icon?: string
           id?: string
@@ -704,6 +709,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          auto_translate?: boolean
           created_at?: string
           icon?: string
           id?: string

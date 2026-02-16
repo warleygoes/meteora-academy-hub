@@ -94,6 +94,13 @@ const Diagnostico: React.FC = () => {
 
       if (error) throw error;
 
+      // Dispatch webhook for diagnostic submission
+      try {
+        await supabase.functions.invoke('dispatch-webhook', {
+          body: { event: 'diagnostic.submitted', data: { name, email, company_name: companyName, country, role_type: roleType } },
+        });
+      } catch (e) { console.error('Webhook dispatch failed:', e); }
+
       // Try to notify via edge function
       try {
         await supabase.functions.invoke('notify-new-registration', {

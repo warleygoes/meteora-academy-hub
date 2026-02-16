@@ -146,7 +146,7 @@ const AdminCourses: React.FC = () => {
 
   const [editingContent, setEditingContent] = useState<string | null>(null);
   const [contentForm, setContentForm] = useState({ title: '', type: 'video' as LessonContent['type'], content: '' });
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', auto_translate: true });
 
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [imageEditorCourseId, setImageEditorCourseId] = useState<string | null>(null);
@@ -274,8 +274,8 @@ const AdminCourses: React.FC = () => {
   };
 
   // Category CRUD
-  const openNewCategory = () => { setEditingCategory(null); setCategoryForm({ name: '', description: '' }); setShowCategoryEditor(true); };
-  const openEditCategory = (cat: Category) => { setEditingCategory(cat); setCategoryForm({ name: cat.name, description: cat.description || '' }); setShowCategoryEditor(true); };
+  const openNewCategory = () => { setEditingCategory(null); setCategoryForm({ name: '', description: '', auto_translate: true }); setShowCategoryEditor(true); };
+  const openEditCategory = (cat: Category) => { setEditingCategory(cat); setCategoryForm({ name: cat.name, description: cat.description || '', auto_translate: (cat as any).auto_translate ?? true }); setShowCategoryEditor(true); };
   const saveCategory = async () => {
     if (!categoryForm.name.trim()) return;
     if (editingCategory) { await supabase.from('course_categories').update(categoryForm).eq('id', editingCategory.id); }
@@ -774,6 +774,10 @@ const AdminCourses: React.FC = () => {
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">{t('courseDescription')}</label>
               <Input value={categoryForm.description} onChange={e => setCategoryForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={categoryForm.auto_translate} onCheckedChange={v => setCategoryForm(f => ({ ...f, auto_translate: v }))} />
+              <label className="text-sm">{t('autoTranslateAI') || 'Traducir con IA'}</label>
             </div>
             <Button onClick={saveCategory} className="w-full">{t('save')}</Button>
           </div>

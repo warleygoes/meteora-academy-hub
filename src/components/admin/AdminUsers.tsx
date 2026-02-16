@@ -279,7 +279,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: true, status: 'approved' } : prev);
     const { error } = await supabase.from('profiles').update({ approved: true, status: 'approved' }).eq('user_id', userId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers(); }
-    else { logSystemEvent({ action: 'Usuario aprobado', entity_type: 'user', entity_id: userId, level: 'success' }); toast({ title: t('userApproved') }); fetchApprovedUsers(); fetchAllUsers(); }
+    else { logSystemEvent({ action: 'Usuario aprobado', entity_type: 'user', entity_id: userId, level: 'success', webhookEvent: 'user.approved', webhookData: { user_id: userId } }); toast({ title: t('userApproved') }); fetchApprovedUsers(); fetchAllUsers(); }
   };
 
   
@@ -303,7 +303,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false, status: 'rejected' } : prev);
     const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', userId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers(); }
-    else { toast({ title: t('userRejected') }); fetchApprovedUsers(); fetchAllUsers(); }
+    else { logSystemEvent({ action: 'Usuario rechazado', entity_type: 'user', entity_id: userId, level: 'warning', webhookEvent: 'user.rejected', webhookData: { user_id: userId } }); toast({ title: t('userRejected') }); fetchApprovedUsers(); fetchAllUsers(); }
   };
 
   const confirmSuspend = (userId: string) => { setActionUserId(userId); setShowSuspendConfirm(true); };
@@ -339,7 +339,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
           body: JSON.stringify({ user_id: actionUserId }),
         });
       } catch {}
-      logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning' });
+      logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning', webhookEvent: 'user.deleted', webhookData: { user_id: actionUserId } });
       toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
       fetchAllUsers();
     }
@@ -427,7 +427,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       if (!res.ok) throw new Error(result.error || 'Error');
       if (result.created > 0) {
         toast({ title: t('userCreatedSuccess') || 'Usuario creado exitosamente.' });
-        logSystemEvent({ action: 'Usuario creado manualmente', entity_type: 'user', details: newUser.email, level: 'success' });
+        logSystemEvent({ action: 'Usuario creado manualmente', entity_type: 'user', details: newUser.email, level: 'success', webhookEvent: 'user.registered', webhookData: { email: newUser.email, name: newUser.name } });
       } else if (result.exists > 0) {
         toast({ title: t('userAlreadyExists') || 'Este email ya está registrado.', variant: 'destructive' });
       } else {
