@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Star, Users, ChevronRight, Zap, Target, Globe, MessageCircle, ChevronDown, Instagram, Youtube, Linkedin, Mail, CheckCircle2, XCircle, Shield, ArrowRight, Headphones, Heart } from 'lucide-react';
+import { Star, Users, ChevronRight, Zap, Target, Globe, MessageCircle, ChevronDown, Instagram, Youtube, Linkedin, Mail, CheckCircle2, XCircle, Shield, ArrowRight, Headphones, Heart, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { languageNames, Language } from '@/lib/i18n';
@@ -29,9 +29,9 @@ const LandingPage: React.FC = () => {
 
   const faqKeys = [1, 2, 3, 4, 5, 6];
 
-  const beforeItems = [1, 2, 3, 4, 5, 6].map(n => t(`lpBefore${n}`));
-  const afterItems = [1, 2, 3, 4, 5, 6].map(n => t(`lpAfter${n}`));
-  const diagItems = [1, 2, 3, 4, 5, 6].map(n => t(`lpDiagItem${n}`));
+  const beforeItems = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => t(`lpBefore${n}`)).filter(Boolean);
+  const afterItems = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => t(`lpAfter${n}`)).filter(Boolean);
+  const diagItems = [1, 2, 3, 4, 5].map(n => t(`lpDiagItem${n}`)).filter(Boolean);
   const supportItems = [1, 2, 3, 4, 5].map(n => t(`lpSupport${n}`));
 
   const testimonials = [
@@ -73,8 +73,8 @@ const LandingPage: React.FC = () => {
         </div>
       </nav>
 
-      {/* 1️⃣ HERO SECTION */}
-      <section className="relative min-h-screen flex items-center pt-16">
+      {/* 1️⃣ HERO SECTION — video constrained to viewport height */}
+      <section className="relative h-screen max-h-[900px] min-h-[600px] flex items-center pt-16">
         <div className="absolute inset-0">
           <video autoPlay loop muted playsInline className="w-full h-full object-cover" poster={landingHero}>
             <source src={vinheta} type="video/mp4" />
@@ -83,7 +83,7 @@ const LandingPage: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-background/70" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 w-full">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
           <div className="max-w-2xl">
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}>
               <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
@@ -110,74 +110,101 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 2️⃣ DIAGNOSTIC BLOCK */}
+      {/* 2️⃣ DIAGNOSTIC BLOCK — Persuasive with pricing & urgency */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="bg-card rounded-3xl p-10 md:p-16 border border-border relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl" />
             <div className="relative z-10">
               <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
                 <Target className="w-7 h-7 text-primary" />
               </div>
-              <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
+
+              <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-2">
                 {t('lpDiagTitle')}
               </h2>
-              <p className="text-muted-foreground text-lg mb-6">{t('lpDiagDesc')}</p>
-              <div className="grid sm:grid-cols-2 gap-3 mb-10">
+              <p className="text-2xl md:text-3xl font-display font-bold text-primary mb-8">
+                {t('lpDiagSubtitle')}
+              </p>
+
+              <p className="text-muted-foreground text-lg mb-1">
+                {t('lpDiagDesc')}{' '}
+                <span className="line-through text-muted-foreground/60 font-semibold">{t('lpDiagPrice')}</span>.
+              </p>
+              <p className="text-primary font-bold text-xl mb-8">
+                {t('lpDiagFree')}
+              </p>
+
+              <p className="text-foreground font-semibold mb-4">{t('lpDiagListIntro')}</p>
+              <div className="space-y-3 mb-10">
                 {diagItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-                    <span className="text-foreground text-sm">{item}</span>
+                  <div key={i} className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <span className="text-foreground">{item}</span>
                   </div>
                 ))}
               </div>
+
               <Link to={DIAGNOSTIC_URL}>
-                <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
+                <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8 w-full sm:w-auto">
                   <ArrowRight className="w-5 h-5" /> {t('lpDiagCta')}
                 </Button>
               </Link>
+
+              {/* Urgency warning */}
+              <div className="mt-8 flex items-start gap-3 bg-destructive/10 border border-destructive/20 rounded-xl px-5 py-4">
+                <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive font-medium">{t('lpDiagWarning')}</p>
+              </div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* 3️⃣ BEFORE vs AFTER */}
+      {/* 3️⃣ BEFORE vs AFTER — Survival vs Structured */}
       <section className="py-24 px-6 bg-card/30">
         <div className="max-w-6xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground">
               {t('lpCompareTitle')}
             </h2>
+            <p className="text-2xl md:text-4xl font-display font-bold text-primary mt-2">
+              {t('lpCompareSubtitle')}
+            </p>
           </motion.div>
 
           <div className="grid md:grid-cols-2 gap-6 md:gap-8">
-            {/* BEFORE */}
-            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={0} className="bg-card rounded-2xl p-8 md:p-10 border border-border">
-              <h3 className="text-xl font-display font-bold text-destructive mb-6 flex items-center gap-2">
-                <XCircle className="w-6 h-6" /> {t('lpBeforeTitle')}
-              </h3>
-              <div className="space-y-4">
-                {beforeItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <XCircle className="w-5 h-5 text-destructive/60 shrink-0" />
-                    <span className="text-muted-foreground">{item}</span>
-                  </div>
-                ))}
+            {/* SURVIVAL MODE */}
+            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={0} className="bg-card rounded-2xl p-8 md:p-10 border border-destructive/30 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 to-transparent" />
+              <div className="relative z-10">
+                <h3 className="text-xl font-display font-bold text-destructive mb-6 flex items-center gap-2">
+                  <span className="text-2xl">🔴</span> {t('lpBeforeTitle')}
+                </h3>
+                <div className="space-y-4">
+                  {beforeItems.map((item, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <XCircle className="w-5 h-5 text-destructive/60 shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground leading-relaxed">{item}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
 
-            {/* AFTER */}
+            {/* STRUCTURED GROWTH */}
             <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={1} className="bg-card rounded-2xl p-8 md:p-10 border border-primary/30 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
               <div className="relative z-10">
                 <h3 className="text-xl font-display font-bold text-primary mb-6 flex items-center gap-2">
-                  <CheckCircle2 className="w-6 h-6" /> {t('lpAfterTitle')}
+                  <span className="text-2xl">🟢</span> {t('lpAfterTitle')}
                 </h3>
                 <div className="space-y-4">
                   {afterItems.map((item, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-                      <span className="text-foreground">{item}</span>
+                    <div key={i} className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-foreground leading-relaxed">{item}</span>
                     </div>
                   ))}
                 </div>
@@ -185,7 +212,11 @@ const LandingPage: React.FC = () => {
             </motion.div>
           </div>
 
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mt-12">
+          {/* Closing phrase + CTA */}
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mt-16">
+            <p className="text-2xl md:text-3xl font-display font-bold text-foreground mb-8">
+              🎯 {t('lpCompareClosing')}
+            </p>
             <Link to={DIAGNOSTIC_URL}>
               <Button size="lg" className="glow-primary font-bold gap-2 text-base px-8">
                 <ArrowRight className="w-5 h-5" /> {t('lpCompareCta')}
