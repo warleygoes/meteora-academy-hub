@@ -107,7 +107,7 @@ const LandingPage: React.FC = () => {
 
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3}>
               <Link to={DIAGNOSTIC_URL}>
-                <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 text-base px-8">
+                <Button size="lg" className="font-bold gap-2 text-base px-8">
                   <ArrowRight className="w-5 h-5" /> Evaluar Mi ISP — Gratis
                 </Button>
               </Link>
@@ -117,7 +117,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* 2️⃣ DIAGNOSTIC BLOCK — Persuasive with pricing & urgency */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6 bg-secondary/20">
         <div className="max-w-4xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="bg-card rounded-3xl p-10 md:p-16 border border-border relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
@@ -169,7 +169,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* 3️⃣ BEFORE vs AFTER — Survival vs Structured */}
-      <section className="py-24 px-6 bg-card/30">
+      <section className="py-24 px-6 bg-card/60">
         <div className="max-w-6xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground">
@@ -242,7 +242,7 @@ const LandingPage: React.FC = () => {
       <TestimonialsSection />
 
       {/* 5️⃣ SUPPORT / NOT ALONE */}
-      <section className="py-24 px-6 bg-card/30">
+      <section className="py-24 px-6 bg-card/60">
         <div className="max-w-4xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
@@ -285,7 +285,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* 6️⃣ GUARANTEE — Psychological */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6 bg-secondary/20">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
             <div className="bg-gradient-to-br from-green-500/10 via-card to-card rounded-3xl p-12 md:p-16 border border-green-500/20 relative overflow-hidden">
@@ -324,7 +324,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* OBJEÇÕES */}
-      <section id="objections" className="py-24 px-6 bg-card/30">
+      <section id="objections" className="py-24 px-6 bg-card/60">
         <div className="max-w-3xl mx-auto">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
@@ -364,7 +364,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* 7️⃣ FINAL CTA DOMINANTE */}
-      <section className="py-28 px-6">
+      <section className="py-28 px-6 bg-secondary/20">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
             <h2 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
