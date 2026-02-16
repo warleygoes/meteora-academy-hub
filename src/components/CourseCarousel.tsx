@@ -16,9 +16,10 @@ interface CourseCarouselProps {
   variant?: 'horizontal' | 'vertical';
   accessibleProductIds?: Set<string>;
   productOffers?: Record<string, Offer[]>;
+  resumeOnClick?: boolean;
 }
 
-export const CourseCarousel: React.FC<CourseCarouselProps> = ({ title, products, variant = 'horizontal', accessibleProductIds, productOffers }) => {
+export const CourseCarousel: React.FC<CourseCarouselProps> = ({ title, products, variant = 'horizontal', accessibleProductIds, productOffers, resumeOnClick = false }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cardWidth = variant === 'vertical' ? 200 : 280;
 
@@ -54,6 +55,7 @@ export const CourseCarousel: React.FC<CourseCarouselProps> = ({ title, products,
                 variant={variant}
                 hasAccess={!accessibleProductIds || accessibleProductIds.has(product.id)}
                 offers={productOffers?.[product.id]}
+                resumeOnClick={resumeOnClick}
               />
             </div>
           ))}

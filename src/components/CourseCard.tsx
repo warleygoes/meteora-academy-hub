@@ -21,9 +21,10 @@ interface CourseCardProps {
   variant?: 'horizontal' | 'vertical';
   hasAccess?: boolean;
   offers?: Offer[];
+  resumeOnClick?: boolean;
 }
 
-export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'horizontal', hasAccess = true, offers }) => {
+export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'horizontal', hasAccess = true, offers, resumeOnClick = false }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
@@ -37,8 +38,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
 
   const isSaas = product.type === 'saas' && !!product.saas_url;
 
-  const goToCourse = () => {
-    if (product.course_id) navigate(`/app/courses/${product.course_id}`);
+  const goToCourse = (resume?: boolean) => {
+    if (product.course_id) {
+      const path = `/app/courses/${product.course_id}${resume ? '?resume=true' : ''}`;
+      navigate(path);
+    }
   };
 
   const openSaas = (e: React.MouseEvent) => {
@@ -48,7 +52,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ product, variant = 'hori
 
   const handleCardClick = () => {
     if (hasAccess) {
-      goToCourse();
+      goToCourse(resumeOnClick);
     } else {
       setShowPurchase(true);
     }

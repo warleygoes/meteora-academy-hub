@@ -1519,6 +1519,57 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_endpoints: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      webhook_event_types: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          event_key: string
+          id: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          event_key: string
+          id?: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          event_key?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -173,7 +173,7 @@ const Index: React.FC = () => {
       <HeroBanner />
       <div className="px-6 md:px-12 -mt-8 relative z-10 pb-12">
         {continueWatching.length > 0 && (
-          <CourseCarousel title={t('continueWatching')} products={continueWatching} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+          <CourseCarousel title={t('continueWatching')} products={continueWatching} accessibleProductIds={accessibleProductIds} productOffers={productOffers} resumeOnClick />
         )}
         {myCourses.length > 0 && (
           <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
