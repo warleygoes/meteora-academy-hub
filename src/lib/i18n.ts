@@ -358,7 +358,7 @@ export const translations: Record<Language, Record<string, string>> = {
     noApprovedUsersDesc: 'Aún no se han aprobado clientes.',
     adminEmailPlaceholder: 'Email del usuario...',
     // Landing v2 - Sales page
-    lpHeroHeadline: 'Aceleramos el crecimiento de tu ISP con calidad — sin comprometer tu estructura.',
+    lpHeroHeadline: 'Aceleramos el crecimiento de tu ISP con altísima calidad',
     lpHeroSub: 'Si quieres crecer de forma organizada, rentable y técnicamente sólida, estás en el lugar correcto.',
     lpHeroCta: 'Hacer Diagnóstico Gratuito de Mi ISP',
     lpNavCommunity: 'Entrar a la Comunidad Gratuita',
