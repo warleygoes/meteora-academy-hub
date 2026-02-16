@@ -326,22 +326,27 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setRejectedUsers(prev => prev.filter(u => u.user_id !== actionUserId));
     setApprovedUsers(prev => prev.filter(u => u.user_id !== actionUserId));
     setSelectedUser(null);
-    // Delete profile first
-    const { error } = await supabase.from('profiles').delete().eq('user_id', actionUserId);
-    if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers(); }
-    else {
-      // Also delete auth user via edge function so email can be re-registered
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-users`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ user_id: actionUserId }),
-        });
-      } catch {}
-      logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning', webhookEvent: 'user.deleted', webhookData: { user_id: actionUserId } });
-      toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
-      fetchAllUsers();
+    
+    // Delete user completely via edge function (profile + auth + related data)
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-users`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ user_id: actionUserId }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.error) {
+        toast({ title: result.error || 'Error al eliminar usuario', variant: 'destructive' });
+        fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
+      } else {
+        logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning', webhookEvent: 'user.deleted', webhookData: { user_id: actionUserId } });
+        toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
+        fetchAllUsers();
+      }
+    } catch (err) {
+      toast({ title: 'Error al eliminar usuario', variant: 'destructive' });
+      fetchPendingUsers(); fetchRejectedUsers(); fetchAllUsers();
     }
     setShowDeleteConfirm(false); setActionUserId(null);
   };
