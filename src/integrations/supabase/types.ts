@@ -1377,6 +1377,7 @@ export type Database = {
           payment_type: string
           recurring_type: string | null
           saas_url: string | null
+          show_on_home: boolean
           sort_order: number
           thumbnail_url: string | null
           thumbnail_vertical_url: string | null
@@ -1397,6 +1398,7 @@ export type Database = {
           payment_type?: string
           recurring_type?: string | null
           saas_url?: string | null
+          show_on_home?: boolean
           sort_order?: number
           thumbnail_url?: string | null
           thumbnail_vertical_url?: string | null
@@ -1417,6 +1419,7 @@ export type Database = {
           payment_type?: string
           recurring_type?: string | null
           saas_url?: string | null
+          show_on_home?: boolean
           sort_order?: number
           thumbnail_url?: string | null
           thumbnail_vertical_url?: string | null
