@@ -34,10 +34,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          // Verify user still exists in profiles before checking admin
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (!profile) {
+            // User was deleted from DB but still has a session token
+            await supabase.auth.signOut();
+            setUser(null);
+            setSession(null);
+            setIsAdmin(false);
+            setLoading(false);
+            return;
+          }
+          
           setTimeout(() => checkAdminRole(session.user.id), 0);
         } else {
           setIsAdmin(false);
@@ -46,10 +63,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        // Verify user still exists in profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        if (!profile) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setSession(null);
+          setIsAdmin(false);
+          setLoading(false);
+          return;
+        }
+        
         checkAdminRole(session.user.id);
       }
       setLoading(false);

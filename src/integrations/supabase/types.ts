@@ -1391,6 +1391,63 @@ export type Database = {
         }
         Relationships: []
       }
+      testimonials: {
+        Row: {
+          active: boolean
+          country: string | null
+          created_at: string
+          description: string | null
+          destinations: string[] | null
+          id: string
+          isp_size: string | null
+          person_name: string
+          product_ids: string[] | null
+          result_text: string | null
+          role: string | null
+          sort_order: number
+          tags: string[] | null
+          title: string | null
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          active?: boolean
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          destinations?: string[] | null
+          id?: string
+          isp_size?: string | null
+          person_name: string
+          product_ids?: string[] | null
+          result_text?: string | null
+          role?: string | null
+          sort_order?: number
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          active?: boolean
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          destinations?: string[] | null
+          id?: string
+          isp_size?: string | null
+          person_name?: string
+          product_ids?: string[] | null
+          result_text?: string | null
+          role?: string | null
+          sort_order?: number
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       user_lesson_access: {
         Row: {
           granted_at: string
