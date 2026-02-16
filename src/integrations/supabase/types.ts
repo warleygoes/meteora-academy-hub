@@ -1179,14 +1179,18 @@ export type Database = {
           course_id: string | null
           created_at: string
           description: string | null
+          features_list: Json | null
           has_content: boolean
           id: string
           name: string
           payment_type: string
+          recurring_type: string | null
           saas_url: string | null
           sort_order: number
           thumbnail_url: string | null
           thumbnail_vertical_url: string | null
+          trial_days: number | null
+          trial_enabled: boolean
           type: Database["public"]["Enums"]["product_type"]
           updated_at: string
         }
@@ -1195,14 +1199,18 @@ export type Database = {
           course_id?: string | null
           created_at?: string
           description?: string | null
+          features_list?: Json | null
           has_content?: boolean
           id?: string
           name: string
           payment_type?: string
+          recurring_type?: string | null
           saas_url?: string | null
           sort_order?: number
           thumbnail_url?: string | null
           thumbnail_vertical_url?: string | null
+          trial_days?: number | null
+          trial_enabled?: boolean
           type: Database["public"]["Enums"]["product_type"]
           updated_at?: string
         }
@@ -1211,14 +1219,18 @@ export type Database = {
           course_id?: string | null
           created_at?: string
           description?: string | null
+          features_list?: Json | null
           has_content?: boolean
           id?: string
           name?: string
           payment_type?: string
+          recurring_type?: string | null
           saas_url?: string | null
           sort_order?: number
           thumbnail_url?: string | null
           thumbnail_vertical_url?: string | null
+          trial_days?: number | null
+          trial_enabled?: boolean
           type?: Database["public"]["Enums"]["product_type"]
           updated_at?: string
         }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon, BookOpen } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon, BookOpen, Sparkles, X, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,9 @@ interface Product {
   payment_type: string; active: boolean; course_id: string | null;
   thumbnail_url: string | null; thumbnail_vertical_url: string | null;
   sort_order: number; offers: Offer[]; has_content: boolean;
+  trial_enabled: boolean; trial_days: number | null;
+  recurring_type: string | null; features_list: string[];
+  saas_url: string | null;
 }
 
 const AdminProducts: React.FC = () => {
@@ -63,7 +66,10 @@ const AdminProducts: React.FC = () => {
   const [form, setForm] = useState({
     name: '', description: '', type: 'service' as string, payment_type: 'one_time',
     thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '',
+    trial_enabled: false, trial_days: '', recurring_type: '', features_list: [] as string[],
   });
+  const [newFeature, setNewFeature] = useState('');
+  const [generatingAI, setGeneratingAI] = useState<Record<string, boolean>>({});
 
   const [offerForm, setOfferForm] = useState({
     name: t('defaultOffer'), price: '', currency: 'USD', stripe_price_id: '',
@@ -108,9 +114,50 @@ const AdminProducts: React.FC = () => {
     toast({ title: t('imageUploaded') });
   };
 
+  const generateWithAI = async (section: string) => {
+    if (!form.name.trim()) {
+      toast({ title: 'Ingresa el nombre del producto primero', variant: 'destructive' });
+      return;
+    }
+    setGeneratingAI(prev => ({ ...prev, [section]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-product-content', {
+        body: { section, productName: form.name, productDescription: form.description, productType: form.type },
+      });
+      if (error) throw error;
+      if (data?.error) { toast({ title: data.error, variant: 'destructive' }); return; }
+
+      const content = data?.content || '';
+      if (section === 'description') {
+        setForm(f => ({ ...f, description: content }));
+      } else if (section === 'features') {
+        try {
+          const features = JSON.parse(content);
+          if (Array.isArray(features)) setForm(f => ({ ...f, features_list: features }));
+        } catch { toast({ title: 'Error al parsear features', variant: 'destructive' }); }
+      } else if (section === 'trial_days') {
+        try {
+          const parsed = JSON.parse(content);
+          setForm(f => ({
+            ...f,
+            trial_days: parsed.trial_days?.toString() || '',
+            recurring_type: parsed.recurring_type || '',
+            trial_enabled: true,
+          }));
+        } catch { toast({ title: 'Error al parsear sugerencia', variant: 'destructive' }); }
+      }
+      toast({ title: 'Contenido generado con IA ✨' });
+    } catch (e: any) {
+      toast({ title: 'Error al generar', description: e.message, variant: 'destructive' });
+    } finally {
+      setGeneratingAI(prev => ({ ...prev, [section]: false }));
+    }
+  };
+
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '' });
+    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '', trial_enabled: false, trial_days: '', recurring_type: '', features_list: [] });
+    setNewFeature('');
     setShowEditor(true);
   };
 
@@ -120,8 +167,13 @@ const AdminProducts: React.FC = () => {
       name: p.name, description: p.description || '', type: p.type,
       payment_type: p.payment_type,
       thumbnail_url: p.thumbnail_url || '', thumbnail_vertical_url: p.thumbnail_vertical_url || '',
-      has_content: p.has_content, saas_url: (p as any).saas_url || '',
+      has_content: p.has_content, saas_url: p.saas_url || '',
+      trial_enabled: p.trial_enabled || false,
+      trial_days: p.trial_days?.toString() || '',
+      recurring_type: p.recurring_type || '',
+      features_list: Array.isArray(p.features_list) ? p.features_list : [],
     });
+    setNewFeature('');
     setShowEditor(true);
   };
 
@@ -132,6 +184,10 @@ const AdminProducts: React.FC = () => {
       payment_type: form.payment_type, thumbnail_url: form.thumbnail_url || null,
       thumbnail_vertical_url: form.thumbnail_vertical_url || null,
       has_content: form.has_content, saas_url: form.saas_url || null,
+      trial_enabled: form.trial_enabled,
+      trial_days: form.trial_days ? parseInt(form.trial_days) : null,
+      recurring_type: form.recurring_type || null,
+      features_list: form.features_list,
     };
 
     if (editing) {
@@ -444,8 +500,13 @@ const AdminProducts: React.FC = () => {
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="bg-secondary border-border" />
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">{t('productDescription')}</label>
-              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" rows={4} placeholder="Descrição detalhada do produto..." />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm text-muted-foreground">{t('productDescription')}</label>
+                <Button variant="ghost" size="sm" onClick={() => generateWithAI('description')} disabled={generatingAI.description} className="gap-1 text-xs h-7 text-primary">
+                  {generatingAI.description ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Generar con IA
+                </Button>
+              </div>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" rows={4} placeholder="Descripción detallada del producto..." />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -478,7 +539,91 @@ const AdminProducts: React.FC = () => {
               </div>
             )}
 
-            {/* Has content toggle */}
+            {/* SaaS Advanced Fields */}
+            {form.type === 'saas' && (
+              <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-4">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" /> Variables Avanzadas SaaS
+                </h4>
+
+                {/* Trial */}
+                <div className="flex items-center gap-3">
+                  <Switch checked={form.trial_enabled} onCheckedChange={v => setForm(f => ({ ...f, trial_enabled: v }))} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">Trial gratuito</p>
+                    <p className="text-xs text-muted-foreground">Permitir periodo de prueba antes de cobrar</p>
+                  </div>
+                </div>
+
+                {form.trial_enabled && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">Días de trial</label>
+                      <Input type="number" value={form.trial_days} onChange={e => setForm(f => ({ ...f, trial_days: e.target.value }))} className="bg-secondary border-border" placeholder="7" />
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">Tipo de recurrencia</label>
+                      <Select value={form.recurring_type || ''} onValueChange={v => setForm(f => ({ ...f, recurring_type: v }))}>
+                        <SelectTrigger className="bg-secondary border-border"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Mensual</SelectItem>
+                          <SelectItem value="quarterly">Trimestral</SelectItem>
+                          <SelectItem value="semi_annual">Semestral</SelectItem>
+                          <SelectItem value="annual">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => generateWithAI('trial_days')} disabled={generatingAI.trial_days} className="gap-1 text-xs h-7 text-primary">
+                    {generatingAI.trial_days ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Sugerir trial y recurrencia con IA
+                  </Button>
+                </div>
+
+                {/* Features list */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-foreground">Lista de funcionalidades</label>
+                    <Button variant="ghost" size="sm" onClick={() => generateWithAI('features')} disabled={generatingAI.features} className="gap-1 text-xs h-7 text-primary">
+                      {generatingAI.features ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Generar con IA
+                    </Button>
+                  </div>
+                  <div className="flex gap-2 mb-2">
+                    <Input
+                      value={newFeature}
+                      onChange={e => setNewFeature(e.target.value)}
+                      className="bg-secondary border-border flex-1"
+                      placeholder="Nueva funcionalidad..."
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newFeature.trim()) {
+                          e.preventDefault();
+                          setForm(f => ({ ...f, features_list: [...f.features_list, newFeature.trim()] }));
+                          setNewFeature('');
+                        }
+                      }}
+                    />
+                    <Button variant="outline" size="sm" onClick={() => { if (newFeature.trim()) { setForm(f => ({ ...f, features_list: [...f.features_list, newFeature.trim()] })); setNewFeature(''); } }}>
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {form.features_list.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {form.features_list.map((feat, idx) => (
+                        <Badge key={idx} variant="secondary" className="gap-1 text-xs">
+                          {feat}
+                          <button onClick={() => setForm(f => ({ ...f, features_list: f.features_list.filter((_, i) => i !== idx) }))} className="ml-1 hover:text-destructive">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
               <Switch checked={form.has_content} onCheckedChange={v => setForm(f => ({ ...f, has_content: v }))} />
               <div>
