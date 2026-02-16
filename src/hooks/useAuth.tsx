@@ -46,7 +46,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .maybeSingle();
           
           if (!profile) {
-            // User was deleted from DB but still has a session token
             await supabase.auth.signOut();
             setUser(null);
             setSession(null);
@@ -55,7 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             return;
           }
           
-          setTimeout(() => checkAdminRole(session.user.id), 0);
+          await checkAdminRole(session.user.id);
         } else {
           setIsAdmin(false);
         }
@@ -67,7 +66,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        // Verify user still exists in profiles
         const { data: profile } = await supabase
           .from('profiles')
           .select('id')
@@ -83,7 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
         
-        checkAdminRole(session.user.id);
+        await checkAdminRole(session.user.id);
       }
       setLoading(false);
     });
