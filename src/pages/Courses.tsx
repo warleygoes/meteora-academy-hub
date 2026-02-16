@@ -29,13 +29,13 @@ const CoursesPage: React.FC = () => {
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const { data } = await supabase.from('course_categories').select('id, name').order('name');
+      const { data } = await supabase.from('course_categories').select('id, name, auto_translate').order('name');
       if (data) {
-        setAllCategories(data.map(c => ({ ...c, translatedName: undefined })));
+        setAllCategories(data.map((c: any) => ({ ...c, translatedName: undefined })));
         if (language !== 'es') {
-          const translated = await Promise.all(data.map(async c => ({
+          const translated = await Promise.all(data.map(async (c: any) => ({
             ...c,
-            translatedName: await translateText(c.name),
+            translatedName: c.auto_translate ? await translateText(c.name) : undefined,
           })));
           setAllCategories(translated);
         }

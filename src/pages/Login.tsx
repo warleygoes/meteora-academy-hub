@@ -123,6 +123,12 @@ const Login: React.FC = () => {
       });
       if (!result.error) {
         setSignupComplete(true);
+        // Dispatch webhook for new user registration
+        try {
+          await supabase.functions.invoke('dispatch-webhook', {
+            body: { event: 'user.registered', data: { email, name: displayName, company_name: companyName, country, role_type: roleType } },
+          });
+        } catch (e) { console.error('Webhook dispatch failed:', e); }
         // Trigger n8n workflow notification
         try {
           await supabase.functions.invoke('notify-new-registration', {

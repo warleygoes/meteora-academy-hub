@@ -59,7 +59,7 @@ const AdminMenuLinks: React.FC = () => {
 
   const [form, setForm] = useState({
     title: '', icon: 'link', url: '', open_mode: 'same_tab',
-    sort_order: 0, active: true, package_ids: [] as string[], product_ids: [] as string[],
+    sort_order: 0, active: true, auto_translate: false, package_ids: [] as string[], product_ids: [] as string[],
   });
 
   const OPEN_MODE_OPTIONS = [
@@ -105,10 +105,10 @@ const AdminMenuLinks: React.FC = () => {
   const openEditor = (link?: MenuLink) => {
     if (link) {
       setEditing(link);
-      setForm({ title: link.title, icon: link.icon, url: link.url, open_mode: link.open_mode, sort_order: link.sort_order, active: link.active, package_ids: [...link.package_ids], product_ids: [...link.product_ids] });
+      setForm({ title: link.title, icon: link.icon, url: link.url, open_mode: link.open_mode, sort_order: link.sort_order, active: link.active, auto_translate: (link as any).auto_translate || false, package_ids: [...link.package_ids], product_ids: [...link.product_ids] });
     } else {
       setEditing(null);
-      setForm({ title: '', icon: 'link', url: '', open_mode: 'same_tab', sort_order: 0, active: true, package_ids: [], product_ids: [] });
+      setForm({ title: '', icon: 'link', url: '', open_mode: 'same_tab', sort_order: 0, active: true, auto_translate: false, package_ids: [], product_ids: [] });
     }
     setShowEditor(true);
   };
@@ -117,7 +117,7 @@ const AdminMenuLinks: React.FC = () => {
     if (!form.title.trim() || !form.url.trim()) {
       toast({ title: t('menuLinkFillRequired'), variant: 'destructive' }); return;
     }
-    const payload = { title: form.title.trim(), icon: form.icon, url: form.url.trim(), open_mode: form.open_mode, sort_order: form.sort_order, active: form.active };
+    const payload = { title: form.title.trim(), icon: form.icon, url: form.url.trim(), open_mode: form.open_mode, sort_order: form.sort_order, active: form.active, auto_translate: form.auto_translate };
     let linkId = editing?.id;
     if (editing) {
       const { error } = await supabase.from('menu_links').update(payload).eq('id', editing.id);
@@ -252,10 +252,14 @@ const AdminMenuLinks: React.FC = () => {
                 <label className="text-sm font-medium">{t('menuLinkOrder')}</label>
                 <Input type="number" value={form.sort_order} onChange={e => setForm(f => ({ ...f, sort_order: parseInt(e.target.value) || 0 }))} />
               </div>
-              <div className="flex items-end pb-2">
+              <div className="flex items-end gap-4 pb-2">
                 <label className="flex items-center gap-2 text-sm">
                   <Switch checked={form.active} onCheckedChange={v => setForm(f => ({ ...f, active: v }))} />
                   {t('active')}
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={form.auto_translate} onCheckedChange={v => setForm(f => ({ ...f, auto_translate: v }))} />
+                  {t('autoTranslateAI') || 'Traducir con IA'}
                 </label>
               </div>
             </div>

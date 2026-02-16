@@ -58,7 +58,13 @@ const CoursePage: React.FC = () => {
   const allLessons = modules.flatMap(m => m.lessons);
   const activeLesson = allLessons.find(l => l.id === activeLessonId) || null;
 
-  const isResume = searchParams.get('resume') === 'true';
+  // Capture resume flag once on mount, then clear it
+  const resumeRef = React.useRef(searchParams.get('resume') === 'true');
+  useEffect(() => {
+    if (resumeRef.current) {
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!courseId || !user) return;
@@ -105,9 +111,9 @@ const CoursePage: React.FC = () => {
     setCompletedLessons(completed);
 
     const allL = builtModules.flatMap(m => m.lessons);
-    const lastProgress = progressData && progressData.length > 0 ? progressData[0] : null;
 
-    if (isResume) {
+    if (resumeRef.current) {
+      resumeRef.current = false; // consume the flag
       // Find the last completed lesson index, then pick the next one
       let lastCompletedIdx = -1;
       allL.forEach((l, idx) => { if (completed.has(l.id)) lastCompletedIdx = idx; });
@@ -118,19 +124,14 @@ const CoursePage: React.FC = () => {
         const parentMod = builtModules.find(m => m.lessons.some(l => l.id === targetLesson.id));
         if (parentMod) setExpandedModules(new Set([parentMod.id]));
       }
-      // Clear the resume param so refreshing doesn't re-trigger
-      setSearchParams({}, { replace: true });
-    } else if (lastProgress) {
-      setActiveLessonId(lastProgress.lesson_id);
-      const parentMod = builtModules.find(m => m.lessons.some(l => l.id === lastProgress.lesson_id));
-      if (parentMod) setExpandedModules(new Set([parentMod.id]));
     } else if (allL.length > 0) {
+      // Default: open the first lesson
       setActiveLessonId(allL[0].id);
       if (builtModules.length > 0) setExpandedModules(new Set([builtModules[0].id]));
     }
 
     setLoading(false);
-  }, [courseId, user, isResume]);
+  }, [courseId, user]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
