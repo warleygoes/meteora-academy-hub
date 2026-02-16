@@ -9,6 +9,7 @@ import meteoraLogo from '@/assets/logo-white-pink.png';
 import landingHero from '@/assets/landing-hero.jpg';
 import vinheta from '@/assets/vinheta.mp4';
 import TestimonialsSection from '@/components/landing/TestimonialsSection';
+import EcosystemSection from '@/components/landing/EcosystemSection';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -233,6 +234,9 @@ const LandingPage: React.FC = () => {
           </motion.div>
         </div>
       </section>
+
+      {/* ECOSYSTEM */}
+      <EcosystemSection />
 
       {/* 4️⃣ SOCIAL PROOF — Dynamic from DB */}
       <TestimonialsSection />

@@ -69,6 +69,7 @@ const AdminProducts: React.FC = () => {
     name: '', description: '', type: 'service' as string, payment_type: 'one_time',
     thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '',
     trial_enabled: false, trial_days: '', recurring_type: '', features_list: [] as string[],
+    show_on_home: false,
   });
   const [newFeature, setNewFeature] = useState('');
   const [generatingAI, setGeneratingAI] = useState<Record<string, boolean>>({});
@@ -158,7 +159,7 @@ const AdminProducts: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '', trial_enabled: false, trial_days: '', recurring_type: '', features_list: [] });
+    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '', trial_enabled: false, trial_days: '', recurring_type: '', features_list: [], show_on_home: false });
     setNewFeature('');
     setShowEditor(true);
   };
@@ -174,6 +175,7 @@ const AdminProducts: React.FC = () => {
       trial_days: p.trial_days?.toString() || '',
       recurring_type: p.recurring_type || '',
       features_list: Array.isArray(p.features_list) ? p.features_list : [],
+      show_on_home: (p as any).show_on_home || false,
     });
     setNewFeature('');
     setShowEditor(true);
@@ -190,6 +192,7 @@ const AdminProducts: React.FC = () => {
       trial_days: form.trial_days ? parseInt(form.trial_days) : null,
       recurring_type: form.recurring_type || null,
       features_list: form.features_list,
+      show_on_home: form.show_on_home,
     };
 
     if (editing) {
@@ -636,6 +639,14 @@ const AdminProducts: React.FC = () => {
               <div>
                 <p className="text-sm font-medium text-foreground">{t('hasContent')}</p>
                 <p className="text-xs text-muted-foreground">{t('hasContentDesc')}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/50">
+              <Switch checked={form.show_on_home} onCheckedChange={v => setForm(f => ({ ...f, show_on_home: v }))} />
+              <div>
+                <p className="text-sm font-medium text-foreground">Mostrar na Home</p>
+                <p className="text-xs text-muted-foreground">Exibir este produto na landing page pública</p>
               </div>
             </div>
 
