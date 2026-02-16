@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logSystemEvent } from '@/lib/systemLog';
 import type { User, Session } from '@supabase/supabase-js';
@@ -22,72 +22,74 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const checkAdminRole = async (userId: string) => {
-    const { data } = await supabase
+  const validateAndSetUser = useCallback(async (currentSession: Session | null) => {
+    if (!currentSession?.user) {
+      setSession(null);
+      setUser(null);
+      setIsAdmin(false);
+      setLoading(false);
+      return;
+    }
+
+    // Verify user still exists in profiles
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', currentSession.user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      // User was deleted from DB but still has a session token
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setIsAdmin(false);
+      setLoading(false);
+      return;
+    }
+
+    // Check admin role
+    const { data: roleData } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', userId)
+      .eq('user_id', currentSession.user.id)
       .eq('role', 'admin')
       .maybeSingle();
-    setIsAdmin(!!data);
-  };
+
+    setSession(currentSession);
+    setUser(currentSession.user);
+    setIsAdmin(!!roleData);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          // Verify user still exists in profiles before checking admin
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          
-          if (!profile) {
-            await supabase.auth.signOut();
-            setUser(null);
-            setSession(null);
-            setIsAdmin(false);
-            setLoading(false);
-            return;
-          }
-          
-          await checkAdminRole(session.user.id);
-        } else {
-          setIsAdmin(false);
-        }
-        setLoading(false);
-      }
-    );
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      validateAndSetUser(initialSession);
+    });
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        // Set session/user immediately for responsiveness
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
         
-        if (!profile) {
-          await supabase.auth.signOut();
-          setUser(null);
-          setSession(null);
+        if (!newSession?.user) {
           setIsAdmin(false);
           setLoading(false);
           return;
         }
-        
-        await checkAdminRole(session.user.id);
+
+        // Defer DB calls to avoid deadlocks in onAuthStateChange
+        setTimeout(() => {
+          validateAndSetUser(newSession);
+        }, 0);
       }
-      setLoading(false);
-    });
+    );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [validateAndSetUser]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
