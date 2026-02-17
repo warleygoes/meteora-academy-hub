@@ -112,6 +112,14 @@ const CoursePage: React.FC = () => {
 
     const allL = builtModules.flatMap(m => m.lessons);
 
+    // Build accessible private lessons set from fetched data
+    const accessibleSet = new Set((accessData || []).map(a => a.lesson_id));
+
+    const canAccess = (lesson: Lesson) => {
+      if (!lesson.is_private) return true;
+      return accessibleSet.has(lesson.id);
+    };
+
     if (resumeRef.current) {
       resumeRef.current = false; // consume the flag
       // Find the last completed lesson index, then pick the next one
@@ -119,14 +127,23 @@ const CoursePage: React.FC = () => {
       allL.forEach((l, idx) => { if (completed.has(l.id)) lastCompletedIdx = idx; });
       const nextIdx = lastCompletedIdx + 1;
       const targetLesson = nextIdx < allL.length ? allL[nextIdx] : allL[allL.length - 1];
-      if (targetLesson) {
+      if (targetLesson && canAccess(targetLesson)) {
         setActiveLessonId(targetLesson.id);
         const parentMod = builtModules.find(m => m.lessons.some(l => l.id === targetLesson.id));
         if (parentMod) setExpandedModules(new Set([parentMod.id]));
+      } else if (targetLesson) {
+        // Find next accessible lesson
+        const nextAccessible = allL.find((l, i) => i >= nextIdx && canAccess(l));
+        if (nextAccessible) {
+          setActiveLessonId(nextAccessible.id);
+          const parentMod = builtModules.find(m => m.lessons.some(l => l.id === nextAccessible.id));
+          if (parentMod) setExpandedModules(new Set([parentMod.id]));
+        }
       }
     } else if (allL.length > 0) {
-      // Default: open the first lesson
-      setActiveLessonId(allL[0].id);
+      // Default: open the first ACCESSIBLE lesson
+      const firstAccessible = allL.find(l => canAccess(l)) || allL[0];
+      setActiveLessonId(canAccess(firstAccessible) ? firstAccessible.id : null);
       if (builtModules.length > 0) setExpandedModules(new Set([builtModules[0].id]));
     }
 

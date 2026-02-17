@@ -330,9 +330,14 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     // Delete user completely via edge function (profile + auth + related data)
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-users?user_id=${actionUserId}`, {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-users`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: actionUserId }),
       });
       const result = await res.json();
       if (!res.ok || result.error) {
