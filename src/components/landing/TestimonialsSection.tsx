@@ -78,7 +78,7 @@ const VideoCard: React.FC<{ testimonial: Testimonial; featured?: boolean }> = ({
 
 const TestimonialsSection: React.FC = () => {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
-  const [page, setPage] = useState(0);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetch = async () => {
@@ -95,13 +95,13 @@ const TestimonialsSection: React.FC = () => {
 
   if (testimonials.length === 0) return null;
 
-  const perPage = 3;
-  const totalPages = Math.ceil(testimonials.length / perPage);
-  const showArrows = testimonials.length > perPage;
-  const visibleItems = testimonials.slice(page * perPage, page * perPage + perPage);
+  const showArrows = testimonials.length > 3;
 
-  const prev = () => setPage(p => (p - 1 + totalPages) % totalPages);
-  const next = () => setPage(p => (p + 1) % totalPages);
+  const scrollCarousel = (dir: 'left' | 'right') => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: dir === 'left' ? -400 : 400, behavior: 'smooth' });
+    }
+  };
 
   return (
     <section className="py-24 px-6">
@@ -117,35 +117,30 @@ const TestimonialsSection: React.FC = () => {
           </p>
         </motion.div>
 
-        {/* Video Carousel - 3 per page */}
+        {/* Video Carousel - single scrollable row */}
         <div className="relative mb-12">
           {showArrows && (
-            <button onClick={prev} className="absolute -left-4 md:-left-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
+            <button onClick={() => scrollCarousel('left')} className="absolute -left-4 md:-left-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {visibleItems.map((t, i) => (
-              <motion.div key={t.id} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i}>
+          <div
+            ref={scrollRef}
+            className="flex gap-6 overflow-x-auto scrollbar-hide pb-4"
+          >
+            {testimonials.map((t, i) => (
+              <motion.div key={t.id} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i}
+                className="flex-shrink-0 w-[calc(33.333%-16px)] min-w-[300px]">
                 <VideoCard testimonial={t} featured />
               </motion.div>
             ))}
           </div>
           {showArrows && (
-            <button onClick={next} className="absolute -right-4 md:-right-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
+            <button onClick={() => scrollCarousel('right')} className="absolute -right-4 md:-right-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
               <ChevronRight className="w-5 h-5" />
             </button>
           )}
         </div>
-
-        {/* Page dots */}
-        {totalPages > 1 && (
-          <div className="flex justify-center gap-2 mb-12">
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <button key={i} onClick={() => setPage(i)} className={`w-2 h-2 rounded-full transition-colors ${i === page ? 'bg-primary' : 'bg-border'}`} />
-            ))}
-          </div>
-        )}
 
         {/* Stats bar */}
         <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-10">

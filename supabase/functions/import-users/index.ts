@@ -51,7 +51,22 @@ Deno.serve(async (req) => {
   // Handle DELETE - remove auth user so email can be re-registered
   if (req.method === "DELETE") {
     try {
-      const { user_id } = await req.json();
+      let user_id: string | null = null;
+      
+      // Try reading from body first, then URL params
+      try {
+        const body = await req.text();
+        if (body) {
+          const parsed = JSON.parse(body);
+          user_id = parsed.user_id;
+        }
+      } catch { /* ignore parse errors */ }
+      
+      if (!user_id) {
+        const url = new URL(req.url);
+        user_id = url.searchParams.get("user_id");
+      }
+      
       if (!user_id) {
         return new Response(JSON.stringify({ error: "user_id required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
