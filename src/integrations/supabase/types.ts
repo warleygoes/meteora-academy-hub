@@ -373,6 +373,134 @@ export type Database = {
           },
         ]
       }
+      diagnostic_answers: {
+        Row: {
+          answer_value: Json
+          created_at: string | null
+          diagnostic_id: string | null
+          id: string
+          question_id: string | null
+          score_contribution: number | null
+        }
+        Insert: {
+          answer_value: Json
+          created_at?: string | null
+          diagnostic_id?: string | null
+          id?: string
+          question_id?: string | null
+          score_contribution?: number | null
+        }
+        Update: {
+          answer_value?: Json
+          created_at?: string | null
+          diagnostic_id?: string | null
+          id?: string
+          question_id?: string | null
+          score_contribution?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnostic_answers_diagnostic_id_fkey"
+            columns: ["diagnostic_id"]
+            isOneToOne: false
+            referencedRelation: "diagnostics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "diagnostic_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diagnostic_questions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          options: Json | null
+          question_text: string
+          section: string
+          sort_order: number | null
+          type: string
+          updated_at: string | null
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          options?: Json | null
+          question_text: string
+          section: string
+          sort_order?: number | null
+          type: string
+          updated_at?: string | null
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          options?: Json | null
+          question_text?: string
+          section?: string
+          sort_order?: number | null
+          type?: string
+          updated_at?: string | null
+          weight?: number | null
+        }
+        Relationships: []
+      }
+      diagnostic_recommendation_rules: {
+        Row: {
+          condition_field: string
+          condition_operator: string
+          condition_value: number
+          created_at: string | null
+          cta_text: string | null
+          description: string | null
+          id: string
+          priority: number | null
+          recommended_product_id: string | null
+          title: string | null
+        }
+        Insert: {
+          condition_field: string
+          condition_operator: string
+          condition_value: number
+          created_at?: string | null
+          cta_text?: string | null
+          description?: string | null
+          id?: string
+          priority?: number | null
+          recommended_product_id?: string | null
+          title?: string | null
+        }
+        Update: {
+          condition_field?: string
+          condition_operator?: string
+          condition_value?: number
+          created_at?: string | null
+          cta_text?: string | null
+          description?: string | null
+          id?: string
+          priority?: number | null
+          recommended_product_id?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnostic_recommendation_rules_recommended_product_id_fkey"
+            columns: ["recommended_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diagnostics: {
         Row: {
           cheapest_plan: number | null
@@ -387,8 +515,12 @@ export type Database = {
           name: string
           network_type: string | null
           phone: string | null
+          results: Json | null
           role_type: string | null
+          scores: Json | null
+          status: string | null
           tech_knowledge: string | null
+          user_id: string | null
         }
         Insert: {
           cheapest_plan?: number | null
@@ -403,8 +535,12 @@ export type Database = {
           name: string
           network_type?: string | null
           phone?: string | null
+          results?: Json | null
           role_type?: string | null
+          scores?: Json | null
+          status?: string | null
           tech_knowledge?: string | null
+          user_id?: string | null
         }
         Update: {
           cheapest_plan?: number | null
@@ -419,8 +555,12 @@ export type Database = {
           name?: string
           network_type?: string | null
           phone?: string | null
+          results?: Json | null
           role_type?: string | null
+          scores?: Json | null
+          status?: string | null
           tech_knowledge?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
