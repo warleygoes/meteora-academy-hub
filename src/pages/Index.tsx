@@ -143,9 +143,54 @@ const Index: React.FC = () => {
     }
   }, [user]);
 
+  const [showcaseProducts, setShowcaseProducts] = useState<ContentProduct[]>([]);
+  const [freeProducts, setFreeProducts] = useState<ContentProduct[]>([]);
+
+  // Fetch products with show_on_home=true for showcase
+  useEffect(() => {
+    const fetchShowcase = async () => {
+      const { data: prods } = await supabase
+        .from('products')
+        .select('id, name, description, type, thumbnail_url, thumbnail_vertical_url, course_id, saas_url, active, show_on_home')
+        .eq('show_on_home', true)
+        .eq('active', true)
+        .order('sort_order');
+      if (prods) {
+        setShowcaseProducts(prods.map((p: any) => ({
+          id: p.id, name: p.name, description: p.description, type: p.type,
+          thumbnail_url: p.thumbnail_url, thumbnail_vertical_url: p.thumbnail_vertical_url,
+          course_id: p.course_id, saas_url: p.saas_url, lesson_count: 0, enrollment_count: 0,
+        })));
+      }
+    };
+    fetchShowcase();
+  }, []);
+
+  // Fetch ALL free products (not just content ones)
+  useEffect(() => {
+    const fetchFreeProducts = async () => {
+      const { data: freeOffers } = await supabase.from('offers').select('product_id').eq('price', 0).not('product_id', 'is', null);
+      const freeIds = [...new Set((freeOffers || []).map(o => o.product_id!))];
+      if (freeIds.length === 0) { setFreeProducts([]); return; }
+      const { data: prods } = await supabase
+        .from('products')
+        .select('id, name, description, type, thumbnail_url, thumbnail_vertical_url, course_id, saas_url, active')
+        .in('id', freeIds)
+        .eq('active', true)
+        .order('sort_order');
+      if (prods) {
+        setFreeProducts(prods.map((p: any) => ({
+          id: p.id, name: p.name, description: p.description, type: p.type,
+          thumbnail_url: p.thumbnail_url, thumbnail_vertical_url: p.thumbnail_vertical_url,
+          course_id: p.course_id, saas_url: p.saas_url, lesson_count: 0, enrollment_count: 0,
+        })));
+      }
+    };
+    fetchFreeProducts();
+  }, []);
+
   const continueWatching = products.filter(p => p.progress !== undefined && p.progress > 0 && p.progress < 100);
   const myCourses = products.filter(p => p.course_id && enrolledCourseIds.has(p.course_id));
-  const freeCourses = products.filter(p => freeProductIds.has(p.id));
   const allProducts = products;
 
   if (loading) {
@@ -178,11 +223,14 @@ const Index: React.FC = () => {
         {myCourses.length > 0 && (
           <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         )}
+        {showcaseProducts.length > 0 && (
+          <CourseCarousel title={`⭐ ${t('featuredProducts') || 'Productos Destacados'}`} products={showcaseProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+        )}
         {packageShowcases.map(pkg => (
           <CourseCarousel key={pkg.id} title={`📦 ${pkg.name}`} products={pkg.products} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         ))}
-        {freeCourses.length > 0 && (
-          <CourseCarousel title={`🆓 ${t('freeCourses') || 'Cursos Gratuitos'}`} products={freeCourses} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+        {freeProducts.length > 0 && (
+          <CourseCarousel title={`🆓 ${t('freeProducts') || 'Productos Gratuitos'}`} products={freeProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
         )}
         {allProducts.length > 0 && (
           <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />

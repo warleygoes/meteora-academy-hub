@@ -165,6 +165,76 @@ const AdminCourses: React.FC = () => {
   const [accessSearch, setAccessSearch] = useState('');
   const [loadingAccess, setLoadingAccess] = useState(false);
 
+  // Bulk access grant
+  const grantBulkAccess = async (userId: string, lessonIds: string[]) => {
+    if (lessonIds.length === 0) return;
+    const existing = await supabase.from('user_lesson_access').select('lesson_id').eq('user_id', userId).in('lesson_id', lessonIds);
+    const existingIds = new Set((existing.data || []).map(e => e.lesson_id));
+    const toInsert = lessonIds.filter(id => !existingIds.has(id)).map(lesson_id => ({ lesson_id, user_id: userId }));
+    if (toInsert.length > 0) {
+      await supabase.from('user_lesson_access').insert(toInsert);
+    }
+    return toInsert.length;
+  };
+
+  const grantModuleAccessToUser = async (userId: string, moduleId: string) => {
+    const mod = Object.values(courseModules).flat().find(m => m.id === moduleId);
+    if (!mod) return;
+    const privateLessonIds = mod.lessons.filter(l => l.is_private).map(l => l.id);
+    const count = await grantBulkAccess(userId, privateLessonIds);
+    toast({ title: `${count || 0} aulas privadas liberadas neste módulo` });
+  };
+
+  const grantProductAccessToUser = async (userId: string, courseId: string) => {
+    const modules = courseModules[courseId] || [];
+    const privateLessonIds = modules.flatMap(m => m.lessons.filter(l => l.is_private).map(l => l.id));
+    const count = await grantBulkAccess(userId, privateLessonIds);
+    toast({ title: `${count || 0} aulas privadas liberadas neste conteúdo` });
+  };
+
+  // Bulk access manager state
+  const [showBulkAccessManager, setShowBulkAccessManager] = useState(false);
+  const [bulkAccessMode, setBulkAccessMode] = useState<'module' | 'product'>('module');
+  const [bulkAccessModuleId, setBulkAccessModuleId] = useState<string | null>(null);
+  const [bulkAccessCourseId, setBulkAccessCourseId] = useState<string | null>(null);
+  const [bulkAccessTitle, setBulkAccessTitle] = useState('');
+  const [bulkAccessSearch, setBulkAccessSearch] = useState('');
+  const [bulkAccessProfiles, setBulkAccessProfiles] = useState<UserProfile[]>([]);
+  const [loadingBulkAccess, setLoadingBulkAccess] = useState(false);
+
+  const openBulkAccessManager = async (mode: 'module' | 'product', courseId: string, moduleId?: string) => {
+    setBulkAccessMode(mode);
+    setBulkAccessCourseId(courseId);
+    setBulkAccessModuleId(moduleId || null);
+    setBulkAccessSearch('');
+    setLoadingBulkAccess(true);
+    setShowBulkAccessManager(true);
+    const course = courses.find(c => c.id === courseId);
+    if (mode === 'module' && moduleId) {
+      const mod = (courseModules[courseId] || []).find(m => m.id === moduleId);
+      setBulkAccessTitle(`Módulo: ${mod?.title || ''}`);
+    } else {
+      setBulkAccessTitle(`Conteúdo: ${course?.title || ''}`);
+    }
+    const { data: profilesData } = await supabase.from('profiles').select('user_id, display_name, email, company_name').eq('approved', true).order('display_name');
+    setBulkAccessProfiles(profilesData || []);
+    setLoadingBulkAccess(false);
+  };
+
+  const executeBulkGrant = async (userId: string) => {
+    if (bulkAccessMode === 'module' && bulkAccessModuleId) {
+      await grantModuleAccessToUser(userId, bulkAccessModuleId);
+    } else if (bulkAccessMode === 'product' && bulkAccessCourseId) {
+      await grantProductAccessToUser(userId, bulkAccessCourseId);
+    }
+  };
+
+  const filteredBulkProfiles = bulkAccessProfiles.filter(p => {
+    if (!bulkAccessSearch) return true;
+    const s = bulkAccessSearch.toLowerCase();
+    return (p.display_name || '').toLowerCase().includes(s) || (p.email || '').toLowerCase().includes(s) || (p.company_name || '').toLowerCase().includes(s);
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -591,6 +661,12 @@ const AdminCourses: React.FC = () => {
                     <p className="text-sm text-muted-foreground text-center py-4">{t('loading')}...</p>
                   ) : (
                     <>
+                      {/* Bulk access for entire product */}
+                      {(courseModules[course.id] || []).some(m => m.lessons.some(l => l.is_private)) && (
+                        <Button variant="outline" size="sm" onClick={() => openBulkAccessManager('product', course.id)} className="gap-1 mb-2 text-xs">
+                          <Lock className="w-3 h-3" /> Liberar acceso a todo el conteúdo privado
+                        </Button>
+                      )}
                       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleModuleDragEnd(e, course.id)}>
                         <SortableContext items={(courseModules[course.id] || []).map(m => m.id)} strategy={verticalListSortingStrategy}>
                           {(courseModules[course.id] || []).map((mod, mi) => (
@@ -607,6 +683,7 @@ const AdminCourses: React.FC = () => {
                                       <span className="font-medium text-foreground text-sm">{mi + 1}. {mod.title}</span>
                                     )}
                                     <Badge variant="secondary" className="text-xs">{mod.lessons.length} {t('lessons')}</Badge>
+                                    {mod.lessons.some(l => l.is_private) && <Badge variant="outline" className="text-xs border-yellow-500/30 text-yellow-500">🔒 {mod.lessons.filter(l => l.is_private).length} privadas</Badge>}
                                   </button>
                                   <div className="flex gap-1">
                                     {inlineEditingModule === mod.id ? (
@@ -618,6 +695,11 @@ const AdminCourses: React.FC = () => {
                                       <>
                                         <Button variant="ghost" size="sm" onClick={() => startEditModule(mod)} className="h-7"><Edit className="w-3 h-3" /></Button>
                                         <Button variant="ghost" size="sm" onClick={() => deleteModuleInline(mod)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
+                                        {mod.lessons.some(l => l.is_private) && (
+                                          <Button variant="ghost" size="sm" onClick={() => openBulkAccessManager('module', course.id, mod.id)} className="h-7 text-yellow-500" title="Liberar acceso a todas las aulas privadas del módulo">
+                                            <Lock className="w-3 h-3" />
+                                          </Button>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -915,19 +997,59 @@ const AdminCourses: React.FC = () => {
             <p className="text-sm text-muted-foreground text-center py-6">{t('loading')}...</p>
           ) : (
             <div className="space-y-1 max-h-[50vh] overflow-y-auto">
-              {filteredProfiles.map(p => (
-                <label key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer transition-colors">
+              {/* Show associated users first, then the rest */}
+              {[...filteredProfiles].sort((a, b) => {
+                const aHas = accessUsers.includes(a.user_id) ? 0 : 1;
+                const bHas = accessUsers.includes(b.user_id) ? 0 : 1;
+                return aHas - bHas;
+              }).map(p => (
+                <label key={p.user_id} className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${accessUsers.includes(p.user_id) ? 'border-primary/30 bg-primary/5' : 'border-border hover:bg-secondary/50'}`}>
                   <Checkbox checked={accessUsers.includes(p.user_id)} onCheckedChange={() => toggleUserAccess(p.user_id)} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
                     <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
                   </div>
+                  {accessUsers.includes(p.user_id) && <Badge variant="secondary" className="text-xs shrink-0">✓ Con acceso</Badge>}
                 </label>
               ))}
               {filteredProfiles.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t('noUsersFound')}</p>}
             </div>
           )}
           <p className="text-xs text-muted-foreground mt-2">{accessUsers.length} {t('usersWithAccess') || 'usuarios con acceso'}</p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Access Manager */}
+      <Dialog open={showBulkAccessManager} onOpenChange={setShowBulkAccessManager}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" /> Liberar acceso masivo — {bulkAccessTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground mb-2">Seleccione un usuario para liberar acceso a todas las aulas privadas {bulkAccessMode === 'module' ? 'del módulo' : 'del conteúdo completo'}.</p>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder={t('searchUsers')} value={bulkAccessSearch} onChange={e => setBulkAccessSearch(e.target.value)} className="pl-10 bg-secondary border-border" />
+          </div>
+          {loadingBulkAccess ? (
+            <p className="text-sm text-muted-foreground text-center py-6">{t('loading')}...</p>
+          ) : (
+            <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+              {filteredBulkProfiles.map(p => (
+                <div key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:bg-secondary/50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
+                    <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => executeBulkGrant(p.user_id)} className="shrink-0 text-xs h-7">
+                    Liberar
+                  </Button>
+                </div>
+              ))}
+              {filteredBulkProfiles.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t('noUsersFound')}</p>}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
