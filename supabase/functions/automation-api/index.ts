@@ -255,6 +255,361 @@ async function handleListPackages(supabase: ReturnType<typeof createClient>) {
   return json({ packages: data });
 }
 
+// ─── Product CRUD ────────────────────────────────────────────────
+
+async function handleCreateProduct(
+  supabase: ReturnType<typeof createClient>,
+  params: { name: string; type: string; description?: string; active?: boolean; has_content?: boolean; payment_type?: string; saas_url?: string; thumbnail_url?: string; thumbnail_vertical_url?: string }
+) {
+  if (!params.name) return json({ error: "name is required" }, 400);
+  if (!params.type) return json({ error: "type is required" }, 400);
+
+  const insertData: any = {
+    name: params.name,
+    type: params.type,
+    description: params.description || null,
+    active: params.active ?? true,
+    has_content: params.has_content ?? false,
+    payment_type: params.payment_type || "one_time",
+    saas_url: params.saas_url || null,
+    thumbnail_url: params.thumbnail_url || null,
+    thumbnail_vertical_url: params.thumbnail_vertical_url || null,
+  };
+
+  // If has_content, create a course automatically
+  if (insertData.has_content) {
+    const { data: course, error: courseErr } = await supabase
+      .from("courses")
+      .insert({ title: params.name, status: "draft" })
+      .select()
+      .single();
+    if (courseErr) return json({ error: courseErr.message }, 500);
+    insertData.course_id = course.id;
+  }
+
+  const { data, error } = await supabase.from("products").insert(insertData).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, product: data });
+}
+
+async function handleUpdateProduct(
+  supabase: ReturnType<typeof createClient>,
+  params: { product_id: string; [key: string]: any }
+) {
+  const { product_id, ...updates } = params;
+  if (!product_id) return json({ error: "product_id is required" }, 400);
+
+  const allowed = ["name", "description", "type", "active", "has_content", "payment_type", "saas_url", "thumbnail_url", "thumbnail_vertical_url", "sort_order", "show_on_home"];
+  const updateData: any = {};
+  for (const key of allowed) {
+    if (updates[key] !== undefined) updateData[key] = updates[key];
+  }
+
+  const { data, error } = await supabase.from("products").update(updateData).eq("id", product_id).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, product: data });
+}
+
+async function handleDeleteProduct(
+  supabase: ReturnType<typeof createClient>,
+  params: { product_id: string }
+) {
+  if (!params.product_id) return json({ error: "product_id is required" }, 400);
+
+  // Get product to check for course_id
+  const { data: product } = await supabase.from("products").select("id, course_id").eq("id", params.product_id).maybeSingle();
+  if (!product) return json({ error: "Product not found" }, 404);
+
+  // Clean up related data
+  await supabase.from("offers").delete().eq("product_id", params.product_id);
+  await supabase.from("user_products").delete().eq("product_id", params.product_id);
+  await supabase.from("product_categories").delete().eq("product_id", params.product_id);
+  await supabase.from("package_products").delete().eq("product_id", params.product_id);
+
+  if (product.course_id) {
+    // Delete lessons, modules, progress, enrollments
+    const { data: modules } = await supabase.from("course_modules").select("id").eq("course_id", product.course_id);
+    if (modules && modules.length > 0) {
+      const moduleIds = modules.map(m => m.id);
+      const { data: lessons } = await supabase.from("course_lessons").select("id").in("module_id", moduleIds);
+      if (lessons && lessons.length > 0) {
+        const lessonIds = lessons.map(l => l.id);
+        await supabase.from("lesson_contents").delete().in("lesson_id", lessonIds);
+        await supabase.from("lesson_comments").delete().in("lesson_id", lessonIds);
+        await supabase.from("lesson_progress").delete().in("lesson_id", lessonIds);
+        await supabase.from("lesson_ratings").delete().in("lesson_id", lessonIds);
+        await supabase.from("user_lesson_access").delete().in("lesson_id", lessonIds);
+      }
+      await supabase.from("course_lessons").delete().in("module_id", moduleIds);
+    }
+    await supabase.from("course_modules").delete().eq("course_id", product.course_id);
+    await supabase.from("course_enrollments").delete().eq("course_id", product.course_id);
+    await supabase.from("lesson_progress").delete().eq("course_id", product.course_id);
+    await supabase.from("courses").delete().eq("id", product.course_id);
+  }
+
+  const { error } = await supabase.from("products").delete().eq("id", params.product_id);
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true });
+}
+
+// ─── Package CRUD ────────────────────────────────────────────────
+
+async function handleCreatePackage(
+  supabase: ReturnType<typeof createClient>,
+  params: { name: string; description?: string; active?: boolean; payment_type?: string; features?: string[]; product_ids?: string[] }
+) {
+  if (!params.name) return json({ error: "name is required" }, 400);
+
+  const { data, error } = await supabase.from("packages").insert({
+    name: params.name,
+    description: params.description || null,
+    active: params.active ?? true,
+    payment_type: params.payment_type || "one_time",
+    features: params.features || [],
+  }).select().single();
+  if (error) return json({ error: error.message }, 500);
+
+  // Link products if provided
+  if (params.product_ids && params.product_ids.length > 0) {
+    const links = params.product_ids.map((pid, i) => ({ package_id: data.id, product_id: pid, sort_order: i }));
+    await supabase.from("package_products").insert(links);
+  }
+
+  return json({ success: true, package: data });
+}
+
+async function handleUpdatePackage(
+  supabase: ReturnType<typeof createClient>,
+  params: { package_id: string; [key: string]: any }
+) {
+  const { package_id, ...updates } = params;
+  if (!package_id) return json({ error: "package_id is required" }, 400);
+
+  const allowed = ["name", "description", "active", "payment_type", "features", "thumbnail_url", "thumbnail_vertical_url", "show_in_showcase", "is_trail"];
+  const updateData: any = {};
+  for (const key of allowed) {
+    if (updates[key] !== undefined) updateData[key] = updates[key];
+  }
+
+  const { data, error } = await supabase.from("packages").update(updateData).eq("id", package_id).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, package: data });
+}
+
+async function handleDeletePackage(
+  supabase: ReturnType<typeof createClient>,
+  params: { package_id: string }
+) {
+  if (!params.package_id) return json({ error: "package_id is required" }, 400);
+
+  await supabase.from("package_products").delete().eq("package_id", params.package_id);
+  await supabase.from("package_product_groups").delete().eq("package_id", params.package_id);
+  await supabase.from("offers").delete().eq("package_id", params.package_id);
+  await supabase.from("user_plans").delete().eq("package_id", params.package_id);
+  await supabase.from("plan_meetings").delete().eq("package_id", params.package_id);
+  await supabase.from("menu_link_packages").delete().eq("package_id", params.package_id);
+
+  const { error } = await supabase.from("packages").delete().eq("id", params.package_id);
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true });
+}
+
+// ─── Module CRUD ─────────────────────────────────────────────────
+
+async function handleCreateModule(
+  supabase: ReturnType<typeof createClient>,
+  params: { course_id: string; title: string; description?: string; sort_order?: number }
+) {
+  if (!params.course_id) return json({ error: "course_id is required" }, 400);
+  if (!params.title) return json({ error: "title is required" }, 400);
+
+  const { data, error } = await supabase.from("course_modules").insert({
+    course_id: params.course_id,
+    title: params.title,
+    description: params.description || null,
+    sort_order: params.sort_order ?? 0,
+  }).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, module: data });
+}
+
+async function handleUpdateModule(
+  supabase: ReturnType<typeof createClient>,
+  params: { module_id: string; title?: string; description?: string; sort_order?: number }
+) {
+  if (!params.module_id) return json({ error: "module_id is required" }, 400);
+
+  const updateData: any = {};
+  if (params.title !== undefined) updateData.title = params.title;
+  if (params.description !== undefined) updateData.description = params.description;
+  if (params.sort_order !== undefined) updateData.sort_order = params.sort_order;
+
+  const { data, error } = await supabase.from("course_modules").update(updateData).eq("id", params.module_id).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, module: data });
+}
+
+async function handleDeleteModule(
+  supabase: ReturnType<typeof createClient>,
+  params: { module_id: string }
+) {
+  if (!params.module_id) return json({ error: "module_id is required" }, 400);
+
+  // Delete lessons and their contents
+  const { data: lessons } = await supabase.from("course_lessons").select("id").eq("module_id", params.module_id);
+  if (lessons && lessons.length > 0) {
+    const lessonIds = lessons.map(l => l.id);
+    await supabase.from("lesson_contents").delete().in("lesson_id", lessonIds);
+    await supabase.from("lesson_comments").delete().in("lesson_id", lessonIds);
+    await supabase.from("lesson_progress").delete().in("lesson_id", lessonIds);
+    await supabase.from("lesson_ratings").delete().in("lesson_id", lessonIds);
+    await supabase.from("user_lesson_access").delete().in("lesson_id", lessonIds);
+    await supabase.from("course_lessons").delete().in("id", lessonIds);
+  }
+
+  const { error } = await supabase.from("course_modules").delete().eq("id", params.module_id);
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true });
+}
+
+// ─── Lesson CRUD ─────────────────────────────────────────────────
+
+async function handleCreateLesson(
+  supabase: ReturnType<typeof createClient>,
+  params: { module_id: string; title: string; description?: string; video_url?: string; duration_minutes?: number; is_free?: boolean; sort_order?: number }
+) {
+  if (!params.module_id) return json({ error: "module_id is required" }, 400);
+  if (!params.title) return json({ error: "title is required" }, 400);
+
+  const { data, error } = await supabase.from("course_lessons").insert({
+    module_id: params.module_id,
+    title: params.title,
+    description: params.description || null,
+    video_url: params.video_url || null,
+    duration_minutes: params.duration_minutes ?? 0,
+    is_free: params.is_free ?? false,
+    sort_order: params.sort_order ?? 0,
+  }).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, lesson: data });
+}
+
+async function handleUpdateLesson(
+  supabase: ReturnType<typeof createClient>,
+  params: { lesson_id: string; title?: string; description?: string; video_url?: string; duration_minutes?: number; is_free?: boolean; sort_order?: number }
+) {
+  if (!params.lesson_id) return json({ error: "lesson_id is required" }, 400);
+
+  const allowed = ["title", "description", "video_url", "duration_minutes", "is_free", "sort_order"];
+  const updateData: any = {};
+  for (const key of allowed) {
+    if ((params as any)[key] !== undefined) updateData[key] = (params as any)[key];
+  }
+
+  const { data, error } = await supabase.from("course_lessons").update(updateData).eq("id", params.lesson_id).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, lesson: data });
+}
+
+async function handleDeleteLesson(
+  supabase: ReturnType<typeof createClient>,
+  params: { lesson_id: string }
+) {
+  if (!params.lesson_id) return json({ error: "lesson_id is required" }, 400);
+
+  await supabase.from("lesson_contents").delete().eq("lesson_id", params.lesson_id);
+  await supabase.from("lesson_comments").delete().eq("lesson_id", params.lesson_id);
+  await supabase.from("lesson_progress").delete().eq("lesson_id", params.lesson_id);
+  await supabase.from("lesson_ratings").delete().eq("lesson_id", params.lesson_id);
+  await supabase.from("user_lesson_access").delete().eq("lesson_id", params.lesson_id);
+
+  const { error } = await supabase.from("course_lessons").delete().eq("id", params.lesson_id);
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true });
+}
+
+// ─── Lesson Content CRUD ─────────────────────────────────────────
+
+async function handleCreateLessonContent(
+  supabase: ReturnType<typeof createClient>,
+  params: { lesson_id: string; title: string; type: string; content?: string; sort_order?: number }
+) {
+  if (!params.lesson_id) return json({ error: "lesson_id is required" }, 400);
+  if (!params.title) return json({ error: "title is required" }, 400);
+  if (!params.type) return json({ error: "type is required (video, text, image, audio, link, pdf)" }, 400);
+
+  const { data, error } = await supabase.from("lesson_contents").insert({
+    lesson_id: params.lesson_id,
+    title: params.title,
+    type: params.type,
+    content: params.content || null,
+    sort_order: params.sort_order ?? 0,
+  }).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, lesson_content: data });
+}
+
+async function handleUpdateLessonContent(
+  supabase: ReturnType<typeof createClient>,
+  params: { content_id: string; title?: string; type?: string; content?: string; sort_order?: number }
+) {
+  if (!params.content_id) return json({ error: "content_id is required" }, 400);
+
+  const allowed = ["title", "type", "content", "sort_order"];
+  const updateData: any = {};
+  for (const key of allowed) {
+    if ((params as any)[key] !== undefined) updateData[key] = (params as any)[key];
+  }
+
+  const { data, error } = await supabase.from("lesson_contents").update(updateData).eq("id", params.content_id).select().single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, lesson_content: data });
+}
+
+async function handleDeleteLessonContent(
+  supabase: ReturnType<typeof createClient>,
+  params: { content_id: string }
+) {
+  if (!params.content_id) return json({ error: "content_id is required" }, 400);
+
+  const { error } = await supabase.from("lesson_contents").delete().eq("id", params.content_id);
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true });
+}
+
+// ─── List Modules/Lessons ────────────────────────────────────────
+
+async function handleListModules(
+  supabase: ReturnType<typeof createClient>,
+  params: { course_id: string }
+) {
+  if (!params.course_id) return json({ error: "course_id is required" }, 400);
+  const { data, error } = await supabase.from("course_modules").select("id, title, description, sort_order").eq("course_id", params.course_id).order("sort_order");
+  if (error) return json({ error: error.message }, 500);
+  return json({ modules: data });
+}
+
+async function handleListLessons(
+  supabase: ReturnType<typeof createClient>,
+  params: { module_id: string }
+) {
+  if (!params.module_id) return json({ error: "module_id is required" }, 400);
+  const { data, error } = await supabase.from("course_lessons").select("id, title, description, video_url, duration_minutes, is_free, sort_order").eq("module_id", params.module_id).order("sort_order");
+  if (error) return json({ error: error.message }, 500);
+  return json({ lessons: data });
+}
+
+async function handleListLessonContents(
+  supabase: ReturnType<typeof createClient>,
+  params: { lesson_id: string }
+) {
+  if (!params.lesson_id) return json({ error: "lesson_id is required" }, 400);
+  const { data, error } = await supabase.from("lesson_contents").select("id, title, type, content, sort_order").eq("lesson_id", params.lesson_id).order("sort_order");
+  if (error) return json({ error: error.message }, 500);
+  return json({ lesson_contents: data });
+}
+
 // ─── Router ──────────────────────────────────────────────────────
 
 type ActionHandler = (supabase: ReturnType<typeof createClient>, params: any) => Promise<Response>;
@@ -267,6 +622,29 @@ const ACTIONS: Record<string, ActionHandler> = {
   list_courses: handleListCourses,
   list_products: handleListProducts,
   list_packages: handleListPackages,
+  // Product CRUD
+  create_product: handleCreateProduct,
+  update_product: handleUpdateProduct,
+  delete_product: handleDeleteProduct,
+  // Package CRUD
+  create_package: handleCreatePackage,
+  update_package: handleUpdatePackage,
+  delete_package: handleDeletePackage,
+  // Module CRUD
+  create_module: handleCreateModule,
+  update_module: handleUpdateModule,
+  delete_module: handleDeleteModule,
+  list_modules: handleListModules,
+  // Lesson CRUD
+  create_lesson: handleCreateLesson,
+  update_lesson: handleUpdateLesson,
+  delete_lesson: handleDeleteLesson,
+  list_lessons: handleListLessons,
+  // Lesson Content CRUD
+  create_lesson_content: handleCreateLessonContent,
+  update_lesson_content: handleUpdateLessonContent,
+  delete_lesson_content: handleDeleteLessonContent,
+  list_lesson_contents: handleListLessonContents,
 };
 
 Deno.serve(async (req) => {
