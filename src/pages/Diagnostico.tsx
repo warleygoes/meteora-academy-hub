@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, User, Mail, Phone, Globe, Building2, Users, Wifi, DollarSign, MessageSquare, Target, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, Mail, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, ShieldAlert, BarChart3, Briefcase, Zap, MessageSquare } from 'lucide-react';
 import PhoneInput from '@/components/PhoneInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import meteoraLogo from '@/assets/logo-white-pink.png';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 const LATAM_COUNTRIES = [
   'Argentina', 'Bolivia', 'Brasil', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
@@ -24,298 +25,389 @@ const fadeUp = {
   transition: { duration: 0.4 },
 };
 
+type Question = {
+  id: string;
+  section: string;
+  type: 'scale' | 'likert' | 'single_choice' | 'multiple_choice';
+  question_text: string;
+  description?: string;
+  options: any[];
+  weight: number;
+};
+
 const Diagnostico: React.FC = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const [step, setStep] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  // Step 1
+  const [step, setStep] = useState<'lead' | 'questions' | 'processing' | 'results'>('lead');
+  const [loading, setLoading] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  
+  // Lead Data
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('');
-  const [phoneError, setPhoneError] = useState('');
-  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [password, setPassword] = useState('');
+  
+  // Results
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [generalLevel, setGeneralLevel] = useState('');
+  const [advisorUrl, setAdvisorUrl] = useState('');
 
-  // Step 2
-  const [companyName, setCompanyName] = useState('');
-  const [roleType, setRoleType] = useState('');
-  const [clientCount, setClientCount] = useState('');
-  const [networkType, setNetworkType] = useState('');
-  const [cheapestPlan, setCheapestPlan] = useState('');
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      const { data, error } = await supabase
+        .from('diagnostic_questions')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      
+      if (!error && data) {
+        setQuestions(data as Question[]);
+      }
+    };
 
-  // Step 3
-  const [mainProblems, setMainProblems] = useState('');
-  const [techKnowledge, setTechKnowledge] = useState('');
-  const [mainGoals, setMainGoals] = useState('');
+    const fetchAdvisorUrl = async () => {
+      const { data } = await supabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'whatsapp_advisor_url')
+        .maybeSingle();
+      if (data) setAdvisorUrl(data.value);
+    };
 
-  const totalSteps = 3;
+    fetchQuestions();
+    fetchAdvisorUrl();
+  }, []);
 
   const validatePhone = (value: string): boolean => {
     const cleaned = value.replace(/[\s\-\(\)]/g, '');
     return /^\+\d{10,15}$/.test(cleaned);
   };
 
-  const handlePhoneBlur = () => {
-    setPhoneTouched(true);
-    if (!phone) {
-      setPhoneError(t('phoneRequired'));
-    } else if (!validatePhone(phone)) {
-      setPhoneError(t('phoneInvalid'));
+  const handleStartQuestions = () => {
+    if (!name || !email || !validatePhone(phone) || !country) {
+      toast({ title: t('fillRequiredFields'), variant: 'destructive' });
+      return;
+    }
+    setStep('questions');
+  };
+
+  const handleAnswer = (questionId: string, value: any) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
     } else {
-      setPhoneError('');
+      calculateAndSaveResults();
     }
   };
 
-  const isPhoneValid = phone && validatePhone(phone);
-  const canProceedStep1 = name && email && isPhoneValid && country;
-  const canProceedStep2 = companyName && roleType && clientCount && networkType;
+  const calculateAndSaveResults = async () => {
+    setStep('processing');
+    setLoading(true);
 
-  const handleSubmit = async () => {
-    setSubmitting(true);
     try {
-      const { error } = await supabase.from('diagnostics' as any).insert({
-        name,
-        email,
-        phone,
-        country,
-        company_name: companyName,
-        role_type: roleType,
-        client_count: clientCount,
-        network_type: networkType,
-        cheapest_plan: cheapestPlan ? parseFloat(cheapestPlan) : null,
-        main_problems: mainProblems,
-        tech_knowledge: techKnowledge,
-        main_goals: mainGoals,
-      } as any);
+      // 1. Calculate Scores per Section
+      const sectionScores: Record<string, number[]> = {
+        technical: [], financial: [], scale: [], expansion: [], commitment: []
+      };
 
-      if (error) throw error;
+      questions.forEach(q => {
+        const answer = answers[q.id];
+        if (answer !== undefined) {
+          // Logic for scoring based on type
+          let scoreValue = 0;
+          if (q.type === 'scale' || q.type === 'likert') {
+            scoreValue = Number(answer);
+          } else if (q.type === 'single_choice') {
+            const option = q.options.find(o => o.value === answer || o.label === answer);
+            scoreValue = option?.score || 0;
+          }
+          sectionScores[q.section]?.push(scoreValue);
+        }
+      });
 
-      // Dispatch webhook for diagnostic submission
-      try {
-        await supabase.functions.invoke('dispatch-webhook', {
-          body: { event: 'diagnostic.submitted', data: { name, email, company_name: companyName, country, role_type: roleType } },
+      const finalScores: Record<string, number> = {};
+      Object.keys(sectionScores).forEach(section => {
+        const vals = sectionScores[section];
+        finalScores[section] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 5;
+      });
+
+      // 2. Weighted Index
+      const weightedIndex = (
+        (finalScores.technical * 0.25) +
+        (finalScores.financial * 0.20) +
+        (finalScores.scale * 0.25) +
+        (finalScores.expansion * 0.15) +
+        (finalScores.commitment * 0.15)
+      );
+
+      // 3. Level
+      let level = 'diagReactive';
+      if (weightedIndex >= 9) level = 'diagStructured';
+      else if (weightedIndex >= 7) level = 'diagTransition';
+      else if (weightedIndex >= 5) level = 'diagInstable';
+
+      setScores(finalScores);
+      setGeneralLevel(level);
+
+      // 4. Save to Database
+      const { data: diagData, error: diagError } = await supabase.from('diagnostics').insert({
+        name, email, phone, country,
+        scores: finalScores,
+        results: { weightedIndex, level },
+        status: 'completed'
+      }).select().single();
+
+      if (diagError) throw diagError;
+
+      // 5. Atomic answers
+      const answerInserts = Object.entries(answers).map(([qId, val]) => ({
+        diagnostic_id: diagData.id,
+        question_id: qId,
+        answer_value: val
+      }));
+      await supabase.from('diagnostic_answers').insert(answerInserts);
+
+      // 6. Account Creation (if new)
+      const { data: existingUser } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+      if (!existingUser && password) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { display_name: name, phone, country }
+          }
         });
-      } catch (e) { console.error('Webhook dispatch failed:', e); }
-
-      // Try to notify via edge function
-      try {
-        await supabase.functions.invoke('notify-new-registration', {
-          body: { email, displayName: name, companyName, country, roleType, phone, clientCount, networkType, cheapestPlan, mainProblems, mainGoals, type: 'diagnostic' },
-        });
-      } catch (e) {
-        console.error('Failed to notify:', e);
+        if (signUpError) console.error('Sign up error:', signUpError);
       }
 
-      setSuccess(true);
+      setStep('results');
     } catch (err) {
       console.error(err);
       toast({ title: t('errorOccurred'), variant: 'destructive' });
+      setStep('lead');
     }
-    setSubmitting(false);
+    setLoading(false);
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-6">
-        <motion.div {...fadeUp} className="text-center max-w-md">
-          <img src={meteoraLogo} alt="Meteora Academy" className="h-10 mx-auto mb-8" />
-          <div className="bg-card rounded-2xl p-8 border border-border">
-            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
-            </div>
-            <h2 className="text-2xl font-display font-bold text-foreground mb-2">{t('diagSuccessTitle')}</h2>
-            <p className="text-muted-foreground text-sm mb-6">{t('diagSuccessMsg')}</p>
-            <Button asChild variant="secondary" className="gap-2">
-              <Link to="/"><ArrowLeft className="w-4 h-4" /> {t('diagSuccessBack')}</Link>
-            </Button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
+  const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Left decorative panel */}
-      <div className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full bg-primary/5 blur-2xl" />
-        <div className="relative z-10 text-center px-16">
-          <img src={meteoraLogo} alt="Meteora Academy" className="h-14 mx-auto mb-8" />
-          <p className="text-xl text-muted-foreground font-display">{t('diagPageTitle')}</p>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-2xl">
+        <div className="text-center mb-8">
+          <img src={meteoraLogo} alt="Meteora Academy" className="h-12 mx-auto mb-4" />
         </div>
-      </div>
 
-      {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center px-6 py-8">
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md">
-          {/* Mobile header */}
-          <div className="lg:hidden mb-6">
-            <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm mb-4">
-              <ArrowLeft className="w-4 h-4" /> {t('diagSuccessBack')}
-            </Link>
-            <img src={meteoraLogo} alt="Meteora Academy" className="h-10 mb-4" />
-          </div>
-
-          {/* Desktop back link */}
-          <div className="hidden lg:block mb-4">
-            <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm">
-              <ArrowLeft className="w-4 h-4" /> {t('diagSuccessBack')}
-            </Link>
-          </div>
-
-          <h1 className="text-3xl font-display font-bold text-foreground mb-1">{t('diagPageTitle')}</h1>
-          <p className="text-muted-foreground mb-6">{t('diagPageSubtitle')}</p>
-
-          {/* Progress bar */}
-          <div className="flex items-center gap-2 mb-6">
-            {[1, 2, 3].map((s) => (
-              <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${s <= step ? 'bg-primary' : 'bg-border'}`} />
-            ))}
-            <span className="text-xs text-muted-foreground ml-2">
-              {t('step')} {step} {t('of')} {totalSteps} — {step === 1 ? t('diagStep1Title') : step === 2 ? t('diagStep2Title') : t('diagStep3Title')}
-            </span>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {/* STEP 1 */}
-            {step === 1 && (
-              <motion.div key="step1" {...fadeUp} className="space-y-4">
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder={t('diagName')} value={name} onChange={(e) => setName(e.target.value)} className="pl-10 bg-secondary border-border" />
-                </div>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="email" placeholder={t('diagEmail')} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-secondary border-border" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagPhone')}</label>
-                  <PhoneInput
-                    value={phone}
-                    onChange={(val) => {
-                      setPhone(val);
-                      if (phoneTouched) {
-                        if (!val) setPhoneError(t('phoneRequired'));
-                        else if (!validatePhone(val)) setPhoneError(t('phoneInvalid'));
-                        else setPhoneError('');
-                      }
-                    }}
-                    onBlur={handlePhoneBlur}
-                    error={phoneTouched && !!phoneError}
-                    success={phoneTouched && !phoneError && !!phone}
-                    defaultCountry={country}
+        <AnimatePresence mode="wait">
+          {step === 'lead' && (
+            <motion.div key="lead" {...fadeUp} className="space-y-6">
+              <Card className="p-8 border-primary/20 bg-secondary/30 backdrop-blur-sm">
+                <h2 className="text-2xl font-display font-bold text-center mb-2">{t('diagPersonalTitle')}</h2>
+                <div className="space-y-4 mt-6">
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input placeholder={t('displayName')} value={name} onChange={(e) => setName(e.target.value)} className="pl-10 h-12" />
+                  </div>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input type="email" placeholder={t('email')} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 h-12" />
+                  </div>
+                  <PhoneInput value={phone} onChange={setPhone} className="h-12" />
+                  <select 
+                    value={country} 
+                    onChange={(e) => setCountry(e.target.value)} 
+                    className="w-full h-12 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">{t('selectCountry')}</option>
+                    {LATAM_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <Input 
+                    type="password" 
+                    placeholder={t('diagCreatePassword')} 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className="h-12"
                   />
-                  {phoneTouched && phoneError && (
-                    <p className="text-xs text-destructive mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {phoneError}</p>
+                  <Button onClick={handleStartQuestions} className="w-full h-12 glow-primary text-lg font-bold" disabled={!name || !email || !phone || !country}>
+                    {t('next')} <ArrowRight className="ml-2 w-5 h-5" />
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {step === 'questions' && currentQuestion && (
+            <motion.div key="questions" {...fadeUp} className="space-y-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-primary uppercase tracking-wider">{t(`diag${currentQuestion.section.charAt(0).toUpperCase() + currentQuestion.section.slice(1)}`)}</span>
+                <span className="text-xs text-muted-foreground">{currentQuestionIndex + 1} / {questions.length}</span>
+              </div>
+              <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} className="h-1.5" />
+              
+              <Card className="p-8 border-primary/20 bg-secondary/30">
+                <h3 className="text-2xl font-bold mb-4">{currentQuestion.question_text}</h3>
+                {currentQuestion.description && <p className="text-muted-foreground mb-6">{currentQuestion.description}</p>}
+
+                <div className="space-y-3">
+                  {currentQuestion.type === 'likert' && (
+                    <div className="grid grid-cols-1 gap-2">
+                      {[2, 4, 6, 8, 10].map((val) => (
+                        <Button 
+                          key={val} 
+                          variant={answers[currentQuestion.id] === val ? 'default' : 'outline'}
+                          className="justify-start h-12 px-6"
+                          onClick={() => handleAnswer(currentQuestion.id, val)}
+                        >
+                          {val === 2 && "Totalmente en desacuerdo"}
+                          {val === 4 && "En desacuerdo"}
+                          {val === 6 && "Neutral"}
+                          {val === 8 && "De acuerdo"}
+                          {val === 10 && "Totalmente de acuerdo"}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  {currentQuestion.type === 'scale' && (
+                    <div className="flex justify-between items-center gap-2">
+                      {[1,2,3,4,5,6,7,8,9,10].map(val => (
+                        <button
+                          key={val}
+                          onClick={() => handleAnswer(currentQuestion.id, val)}
+                          className={`w-10 h-10 rounded-full border transition-all ${answers[currentQuestion.id] === val ? 'bg-primary border-primary text-white scale-110' : 'border-border hover:border-primary/50'}`}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {(currentQuestion.type === 'single_choice' || currentQuestion.type === 'multiple_choice') && (
+                    <div className="grid gap-3">
+                      {currentQuestion.options.map((opt: any) => (
+                        <Button
+                          key={opt.value}
+                          variant={answers[currentQuestion.id] === opt.value ? 'default' : 'outline'}
+                          className="justify-start h-auto py-4 px-6 text-left whitespace-normal"
+                          onClick={() => handleAnswer(currentQuestion.id, opt.value)}
+                        >
+                          {opt.label}
+                        </Button>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagCountry')}</label>
-                  <select value={country} onChange={(e) => setCountry(e.target.value)} className="w-full bg-secondary text-foreground border border-border rounded-md px-3 py-2.5 text-sm">
-                    <option value="">{t('selectCountry')}</option>
-                    {LATAM_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <Button type="button" onClick={() => setStep(2)} className="w-full glow-primary font-semibold gap-2" size="lg" disabled={!canProceedStep1}>
-                  {t('diagNext')} <ArrowRight className="w-4 h-4" />
-                </Button>
-              </motion.div>
-            )}
 
-            {/* STEP 2 */}
-            {step === 2 && (
-              <motion.div key="step2" {...fadeUp} className="space-y-4">
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder={t('diagCompany')} value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="pl-10 bg-secondary border-border" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagRole')}</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['owner', 'employee'].map((r) => (
-                      <button key={r} type="button" onClick={() => setRoleType(r)}
-                        className={`p-3 rounded-xl border text-sm font-medium transition-all ${roleType === r ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground hover:border-primary/30'}`}>
-                        {r === 'owner' ? t('diagOwner') : t('diagEmployee')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagClients')}</label>
-                  <div className="relative">
-                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input placeholder={t('diagClientsPlaceholder')} value={clientCount} onChange={(e) => setClientCount(e.target.value)} className="pl-10 bg-secondary border-border" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagNetwork')}</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {['radio', 'fiber', 'hybrid'].map((type) => (
-                      <button key={type} type="button" onClick={() => setNetworkType(type)}
-                        className={`p-3 rounded-xl border text-sm font-medium transition-all ${networkType === type ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground hover:border-primary/30'}`}>
-                        {type === 'radio' ? t('diagRadio') : type === 'fiber' ? t('diagFiber') : t('diagHybrid')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="number" placeholder={t('diagCheapestPlaceholder')} value={cheapestPlan} onChange={(e) => setCheapestPlan(e.target.value)} className="pl-10 bg-secondary border-border" />
-                </div>
-                <div className="flex gap-3">
-                  <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1 gap-2">
-                    <ArrowLeft className="w-4 h-4" /> {t('diagBack')}
-                  </Button>
-                  <Button type="button" onClick={() => setStep(3)} className="flex-1 glow-primary font-semibold gap-2" disabled={!canProceedStep2}>
-                    {t('diagNext')} <ArrowRight className="w-4 h-4" />
+                <div className="flex gap-3 mt-8">
+                  {currentQuestionIndex > 0 && (
+                    <Button variant="outline" onClick={() => setCurrentQuestionIndex(p => p - 1)} className="flex-1">
+                      {t('back')}
+                    </Button>
+                  )}
+                  <Button onClick={nextQuestion} className="flex-1 glow-primary" disabled={!answers[currentQuestion.id]}>
+                    {currentQuestionIndex === questions.length - 1 ? t('diagSubmit') : t('next')}
                   </Button>
                 </div>
-              </motion.div>
-            )}
+              </Card>
+            </motion.div>
+          )}
 
-            {/* STEP 3 */}
-            {step === 3 && (
-              <motion.div key="step3" {...fadeUp} className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagProblems')}</label>
-                  <Textarea placeholder={t('diagProblemsPlaceholder')} value={mainProblems} onChange={(e) => setMainProblems(e.target.value)} className="bg-secondary border-border min-h-[100px]" />
+          {step === 'processing' && (
+            <motion.div key="processing" {...fadeUp} className="text-center py-20">
+              <Loader2 className="w-16 h-16 text-primary animate-spin mx-auto mb-6" />
+              <h2 className="text-2xl font-bold mb-2">{t('diagProcessing')}</h2>
+            </motion.div>
+          )}
+
+          {step === 'results' && (
+            <motion.div key="results" {...fadeUp} className="space-y-8 pb-12">
+              <div className="text-center">
+                <h2 className="text-xl text-muted-foreground mb-2">{t('diagLevelTitle')}</h2>
+                <div className="inline-block px-8 py-4 rounded-2xl bg-primary/10 border-2 border-primary animate-pulse">
+                  <span className="text-4xl font-display font-black text-primary uppercase">{t(generalLevel)}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagTechKnowledge')}</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {['basic', 'intermediate', 'advanced'].map((level) => (
-                      <button key={level} type="button" onClick={() => setTechKnowledge(level)}
-                        className={`p-3 rounded-xl border text-sm font-medium transition-all ${techKnowledge === level ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground hover:border-primary/30'}`}>
-                        {level === 'basic' ? t('diagTechBasic') : level === 'intermediate' ? t('diagTechIntermediate') : t('diagTechAdvanced')}
-                      </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="p-6 bg-secondary/20">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-primary" /> Pillars Analysis
+                  </h3>
+                  <div className="space-y-4">
+                    {Object.entries(scores).map(([key, val]) => (
+                      <div key={key}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-muted-foreground">{t(`diag${key.charAt(0).toUpperCase() + key.slice(1)}`)}</span>
+                          <span className="font-bold">{val.toFixed(1)}</span>
+                        </div>
+                        <div className="h-2 w-full bg-border rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-1000 ${val < 5 ? 'bg-destructive' : val < 7 ? 'bg-amber-500' : 'bg-green-500'}`} 
+                            style={{ width: `${val * 10}%` }} 
+                          />
+                        </div>
+                      </div>
                     ))}
                   </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">{t('diagGoals')}</label>
-                  <Textarea placeholder={t('diagGoalsPlaceholder')} value={mainGoals} onChange={(e) => setMainGoals(e.target.value)} className="bg-secondary border-border min-h-[100px]" />
-                </div>
-                <div className="flex gap-3">
-                  <Button type="button" variant="outline" onClick={() => setStep(2)} className="flex-1 gap-2">
-                    <ArrowLeft className="w-4 h-4" /> {t('diagBack')}
+                </Card>
+
+                <Card className="p-6 bg-secondary/20 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-destructive flex items-center gap-2 mb-1">
+                      <ShieldAlert className="w-4 h-4" /> {t('diagMainCritical')}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">La gestión financiera está limitando tu capacidad de escalar con seguridad.</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-500 flex items-center gap-2 mb-1">
+                      <Zap className="w-4 h-4" /> {t('diagSecondaryArea')}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">Tu proceso comercial necesita estructura para sostener crecimiento acelerado.</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-green-500 flex items-center gap-2 mb-1">
+                      <Target className="w-4 h-4" /> {t('diagMainStrength')}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">Tu mayor ventaja hoy es tu compromiso estratégico. Estás listo para crecer.</p>
+                  </div>
+                </Card>
+              </div>
+
+              <Card className="p-8 border-primary bg-primary/5 text-center">
+                <h3 className="text-xl font-bold mb-2">{t('diagNextStepTitle')}</h3>
+                <h4 className="text-2xl font-display font-black text-primary mb-4 uppercase">Programa de Gestión ISP</h4>
+                <p className="text-muted-foreground mb-8">Este programa está diseñado para resolver exactamente el cuello de botella que hoy limita tu ISP.</p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button size="lg" className="glow-primary h-14 px-10 text-lg font-bold">
+                    {t('diagStartNow')}
                   </Button>
-                  <Button type="button" onClick={handleSubmit} className="flex-1 glow-primary font-semibold" disabled={submitting || !mainProblems || !techKnowledge || !mainGoals}>
-                    {submitting ? t('loading') + '...' : t('diagSubmit')}
-                  </Button>
+                  {advisorUrl && (
+                    <Button size="lg" variant="outline" className="h-14 px-10 text-lg font-bold" onClick={() => window.open(advisorUrl, '_blank')}>
+                      <MessageSquare className="mr-2 w-5 h-5" /> {t('diagAdvisorCta')}
+                    </Button>
+                  )}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              </Card>
+
+              <div className="text-center space-y-4">
+                <p className="text-sm text-muted-foreground">{t('diagRedo90Days')}</p>
+                <Link to="/app" className="text-primary hover:underline font-bold text-lg">
+                  {t('diagSuccessBack')}
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 };
 
 export default Diagnostico;
+
