@@ -625,10 +625,10 @@ async function handleCreateBulkLessons(
 
   const rows = params.lessons.map((lesson, index) => ({
     module_id: params.module_id,
-    title: lesson.title || `Lesson ${index + 1}`,
+    title: lesson.title, // Asegurar que use title
     description: lesson.description || null,
     video_url: lesson.video_url || null,
-    duration_minutes: lesson.duration_minutes ?? 0,
+    duration_minutes: lesson.duration_minutes ?? 0, // Asegurar que use la duración del JSON
     sort_order: index * 10,
     is_free: false,
   }));
