@@ -71,9 +71,10 @@ const EcosystemWheel: React.FC = () => (
 /* ── Main Section ──────────────────────────────────────── */
 const EcosystemSection: React.FC = () => {
   const [productsByType, setProductsByType] = useState<Record<string, HomeProduct[]>>({});
+  const [productSlugs, setProductSlugs] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       const { data } = await supabase
         .from('products')
         .select('id, name, description, type, thumbnail_url, thumbnail_vertical_url')
@@ -87,8 +88,23 @@ const EcosystemSection: React.FC = () => {
         grouped[p.type].push(p);
       });
       setProductsByType(grouped);
+
+      // Fetch sales page slugs
+      const productIds = data.map((p: any) => p.id);
+      if (productIds.length > 0) {
+        const { data: slugs } = await supabase
+          .from('product_sales_pages')
+          .select('product_id, slug')
+          .in('product_id', productIds)
+          .eq('active', true);
+        if (slugs) {
+          const slugMap: Record<string, string> = {};
+          slugs.forEach((s: any) => { slugMap[s.product_id] = s.slug; });
+          setProductSlugs(slugMap);
+        }
+      }
     };
-    fetch();
+    fetchData();
   }, []);
 
   const scrollRef = React.useRef<Record<string, HTMLDivElement | null>>({});
@@ -147,43 +163,47 @@ const EcosystemSection: React.FC = () => {
                 </h3>
                 <div className="relative">
                   <button onClick={() => scroll(type, 'left')}
-                    className="absolute left-0 top-0 bottom-0 z-10 w-10 flex items-center justify-center bg-gradient-to-r from-background to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity">
-                    <ChevronLeft className="w-5 h-5 text-foreground" />
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
+                    <ChevronLeft className="w-4 h-4" />
                   </button>
                   <div
                     ref={el => { scrollRef.current[type] = el; }}
-                    className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 px-1"
+                    className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 px-8"
                   >
-                    {products.map(product => (
-                      <div key={product.id} className="flex-shrink-0 w-[220px]">
-                        <div className="bg-card rounded-xl border border-border overflow-hidden hover:border-primary/30 transition-all group">
-                          <div className="aspect-[16/10] bg-secondary overflow-hidden">
-                            {product.thumbnail_url ? (
-                              <img src={product.thumbnail_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <BookOpen className="w-8 h-8 text-muted-foreground" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="p-4">
-                            <h4 className="font-display font-semibold text-foreground text-sm line-clamp-2 mb-1">{product.name}</h4>
-                            {product.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{product.description}</p>
-                            )}
-                            <Link to="/login">
-                              <Button variant="outline" size="sm" className="w-full text-xs gap-1">
-                                Ver más <ArrowRight className="w-3 h-3" />
-                              </Button>
-                            </Link>
+                    {products.map(product => {
+                      const salesSlug = productSlugs[product.id];
+                      const linkTarget = salesSlug ? `/venta/${salesSlug}` : '/login';
+                      return (
+                        <div key={product.id} className="flex-shrink-0 w-[220px]">
+                          <div className="bg-card rounded-xl border border-border overflow-hidden hover:border-primary/30 transition-all group">
+                            <div className="aspect-[16/10] bg-secondary overflow-hidden">
+                              {product.thumbnail_url ? (
+                                <img src={product.thumbnail_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <BookOpen className="w-8 h-8 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-4">
+                              <h4 className="font-display font-semibold text-foreground text-sm line-clamp-2 mb-1">{product.name}</h4>
+                              {product.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{product.description}</p>
+                              )}
+                              <Link to={linkTarget}>
+                                <Button variant="outline" size="sm" className="w-full text-xs gap-1">
+                                  Ver más <ArrowRight className="w-3 h-3" />
+                                </Button>
+                              </Link>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <button onClick={() => scroll(type, 'right')}
-                    className="absolute right-0 top-0 bottom-0 z-10 w-10 flex items-center justify-center bg-gradient-to-l from-background to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity">
-                    <ChevronRight className="w-5 h-5 text-foreground" />
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
