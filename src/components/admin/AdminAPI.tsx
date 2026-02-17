@@ -19,6 +19,7 @@ interface ActionDoc {
 }
 
 const actions: ActionDoc[] = [
+  // ─── Users & Access ───
   {
     action: 'create_user',
     description: 'Cria um novo usuário com perfil completo.',
@@ -67,9 +68,213 @@ const actions: ActionDoc[] = [
     ],
     response: '{ "success": true, "already_assigned": false, "package_name": "..." }',
   },
+  // ─── Listagens ───
   { action: 'list_courses', description: 'Lista todos os cursos.', method: 'POST', params: [], response: '{ "courses": [...] }' },
   { action: 'list_products', description: 'Lista todos os produtos.', method: 'POST', params: [], response: '{ "products": [...] }' },
   { action: 'list_packages', description: 'Lista todos os pacotes.', method: 'POST', params: [], response: '{ "packages": [...] }' },
+  {
+    action: 'list_modules',
+    description: 'Lista todos os módulos de um curso.',
+    method: 'POST',
+    params: [{ name: 'course_id', type: 'string', required: true, description: 'ID do curso' }],
+    response: '{ "modules": [...] }',
+  },
+  {
+    action: 'list_lessons',
+    description: 'Lista todas as lições de um módulo.',
+    method: 'POST',
+    params: [{ name: 'module_id', type: 'string', required: true, description: 'ID do módulo' }],
+    response: '{ "lessons": [...] }',
+  },
+  {
+    action: 'list_lesson_contents',
+    description: 'Lista todos os conteúdos de uma lição.',
+    method: 'POST',
+    params: [{ name: 'lesson_id', type: 'string', required: true, description: 'ID da lição' }],
+    response: '{ "lesson_contents": [...] }',
+  },
+  // ─── Product CRUD ───
+  {
+    action: 'create_product',
+    description: 'Cria um novo produto. Se has_content=true, cria um curso associado automaticamente.',
+    method: 'POST',
+    params: [
+      { name: 'name', type: 'string', required: true, description: 'Nome do produto' },
+      { name: 'type', type: 'string', required: true, description: 'Tipo: course, service, consultation, implementation, virtual_event, in_person_event, saas' },
+      { name: 'description', type: 'string', required: false, description: 'Descrição' },
+      { name: 'active', type: 'boolean', required: false, description: 'Ativo (padrão: true)' },
+      { name: 'has_content', type: 'boolean', required: false, description: 'Se true, cria curso associado' },
+      { name: 'payment_type', type: 'string', required: false, description: 'Tipo de pagamento (padrão: one_time)' },
+      { name: 'thumbnail_url', type: 'string', required: false, description: 'URL da thumbnail' },
+    ],
+    response: '{ "success": true, "product": {...} }',
+  },
+  {
+    action: 'update_product',
+    description: 'Atualiza um produto existente.',
+    method: 'POST',
+    params: [
+      { name: 'product_id', type: 'string', required: true, description: 'ID do produto' },
+      { name: 'name', type: 'string', required: false, description: 'Novo nome' },
+      { name: 'description', type: 'string', required: false, description: 'Nova descrição' },
+      { name: 'active', type: 'boolean', required: false, description: 'Ativo' },
+      { name: 'type', type: 'string', required: false, description: 'Novo tipo' },
+    ],
+    response: '{ "success": true, "product": {...} }',
+  },
+  {
+    action: 'delete_product',
+    description: 'Exclui um produto e todos os dados associados (curso, módulos, lições, etc.).',
+    method: 'POST',
+    params: [{ name: 'product_id', type: 'string', required: true, description: 'ID do produto' }],
+    response: '{ "success": true }',
+  },
+  // ─── Package CRUD ───
+  {
+    action: 'create_package',
+    description: 'Cria um novo pacote, opcionalmente vinculando produtos.',
+    method: 'POST',
+    params: [
+      { name: 'name', type: 'string', required: true, description: 'Nome do pacote' },
+      { name: 'description', type: 'string', required: false, description: 'Descrição' },
+      { name: 'active', type: 'boolean', required: false, description: 'Ativo (padrão: true)' },
+      { name: 'payment_type', type: 'string', required: false, description: 'Tipo de pagamento' },
+      { name: 'features', type: 'string[]', required: false, description: 'Lista de features' },
+      { name: 'product_ids', type: 'string[]', required: false, description: 'IDs de produtos para vincular' },
+    ],
+    response: '{ "success": true, "package": {...} }',
+  },
+  {
+    action: 'update_package',
+    description: 'Atualiza um pacote existente.',
+    method: 'POST',
+    params: [
+      { name: 'package_id', type: 'string', required: true, description: 'ID do pacote' },
+      { name: 'name', type: 'string', required: false, description: 'Novo nome' },
+      { name: 'description', type: 'string', required: false, description: 'Nova descrição' },
+      { name: 'active', type: 'boolean', required: false, description: 'Ativo' },
+    ],
+    response: '{ "success": true, "package": {...} }',
+  },
+  {
+    action: 'delete_package',
+    description: 'Exclui um pacote e todos os vínculos associados.',
+    method: 'POST',
+    params: [{ name: 'package_id', type: 'string', required: true, description: 'ID do pacote' }],
+    response: '{ "success": true }',
+  },
+  // ─── Module CRUD ───
+  {
+    action: 'create_module',
+    description: 'Cria um novo módulo dentro de um curso.',
+    method: 'POST',
+    params: [
+      { name: 'course_id', type: 'string', required: true, description: 'ID do curso' },
+      { name: 'title', type: 'string', required: true, description: 'Título do módulo' },
+      { name: 'description', type: 'string', required: false, description: 'Descrição' },
+      { name: 'sort_order', type: 'number', required: false, description: 'Ordem (padrão: 0)' },
+    ],
+    response: '{ "success": true, "module": {...} }',
+  },
+  {
+    action: 'update_module',
+    description: 'Atualiza um módulo existente.',
+    method: 'POST',
+    params: [
+      { name: 'module_id', type: 'string', required: true, description: 'ID do módulo' },
+      { name: 'title', type: 'string', required: false, description: 'Novo título' },
+      { name: 'description', type: 'string', required: false, description: 'Nova descrição' },
+      { name: 'sort_order', type: 'number', required: false, description: 'Nova ordem' },
+    ],
+    response: '{ "success": true, "module": {...} }',
+  },
+  {
+    action: 'delete_module',
+    description: 'Exclui um módulo e todas as lições/conteúdos associados.',
+    method: 'POST',
+    params: [{ name: 'module_id', type: 'string', required: true, description: 'ID do módulo' }],
+    response: '{ "success": true }',
+  },
+  // ─── Lesson CRUD ───
+  {
+    action: 'create_lesson',
+    description: 'Cria uma nova lição dentro de um módulo.',
+    method: 'POST',
+    params: [
+      { name: 'module_id', type: 'string', required: true, description: 'ID do módulo' },
+      { name: 'title', type: 'string', required: true, description: 'Título da lição' },
+      { name: 'description', type: 'string', required: false, description: 'Descrição' },
+      { name: 'video_url', type: 'string', required: false, description: 'URL do vídeo' },
+      { name: 'duration_minutes', type: 'number', required: false, description: 'Duração em minutos' },
+      { name: 'is_free', type: 'boolean', required: false, description: 'Gratuita (padrão: false)' },
+      { name: 'sort_order', type: 'number', required: false, description: 'Ordem (padrão: 0)' },
+    ],
+    response: '{ "success": true, "lesson": {...} }',
+  },
+  {
+    action: 'update_lesson',
+    description: 'Atualiza uma lição existente.',
+    method: 'POST',
+    params: [
+      { name: 'lesson_id', type: 'string', required: true, description: 'ID da lição' },
+      { name: 'title', type: 'string', required: false, description: 'Novo título' },
+      { name: 'description', type: 'string', required: false, description: 'Nova descrição' },
+      { name: 'video_url', type: 'string', required: false, description: 'Nova URL do vídeo' },
+      { name: 'is_free', type: 'boolean', required: false, description: 'Gratuita' },
+    ],
+    response: '{ "success": true, "lesson": {...} }',
+  },
+  {
+    action: 'delete_lesson',
+    description: 'Exclui uma lição e todos os conteúdos/comentários/progresso associados.',
+    method: 'POST',
+    params: [{ name: 'lesson_id', type: 'string', required: true, description: 'ID da lição' }],
+    response: '{ "success": true }',
+  },
+  // ─── Lesson Content CRUD ───
+  {
+    action: 'create_lesson_content',
+    description: 'Adiciona conteúdo a uma lição (vídeo, texto, imagem, etc.).',
+    method: 'POST',
+    params: [
+      { name: 'lesson_id', type: 'string', required: true, description: 'ID da lição' },
+      { name: 'title', type: 'string', required: true, description: 'Título do conteúdo' },
+      { name: 'type', type: 'string', required: true, description: 'Tipo: video, text, image, audio, link, pdf' },
+      { name: 'content', type: 'string', required: false, description: 'Conteúdo (URL ou texto)' },
+      { name: 'sort_order', type: 'number', required: false, description: 'Ordem (padrão: 0)' },
+    ],
+    response: '{ "success": true, "lesson_content": {...} }',
+  },
+  {
+    action: 'update_lesson_content',
+    description: 'Atualiza um conteúdo de lição existente.',
+    method: 'POST',
+    params: [
+      { name: 'content_id', type: 'string', required: true, description: 'ID do conteúdo' },
+      { name: 'title', type: 'string', required: false, description: 'Novo título' },
+      { name: 'type', type: 'string', required: false, description: 'Novo tipo' },
+      { name: 'content', type: 'string', required: false, description: 'Novo conteúdo' },
+    ],
+    response: '{ "success": true, "lesson_content": {...} }',
+  },
+  {
+    action: 'delete_lesson_content',
+    description: 'Exclui um conteúdo de lição.',
+    method: 'POST',
+    params: [{ name: 'content_id', type: 'string', required: true, description: 'ID do conteúdo' }],
+    response: '{ "success": true }',
+  },
+  // ─── Bulk Operations ───
+  {
+    action: 'create_bulk_lessons',
+    description: 'Importa lições em massa para um módulo. Ideal para migração de outra plataforma.',
+    method: 'POST',
+    params: [
+      { name: 'module_id', type: 'string', required: true, description: 'ID do módulo destino' },
+      { name: 'lessons', type: 'array', required: true, description: 'Array de objetos { name, video_url?, description? }' },
+    ],
+    response: '{ "success": true, "created_count": 10, "lessons": [...] }',
+  },
 ];
 
 const AdminAPI: React.FC = () => {
