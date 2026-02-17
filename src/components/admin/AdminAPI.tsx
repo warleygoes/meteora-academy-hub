@@ -271,7 +271,7 @@ const actions: ActionDoc[] = [
     method: 'POST',
     params: [
       { name: 'module_id', type: 'string', required: true, description: 'ID do módulo destino' },
-      { name: 'lessons', type: 'array', required: true, description: 'Array de objetos { name, video_url?, description? }' },
+      { name: 'lessons', type: 'array', required: true, description: 'Array de objetos { title, video_url?, description?, duration_minutes? }' },
     ],
     response: '{ "success": true, "created_count": 10, "lessons": [...] }',
   },
