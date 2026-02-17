@@ -610,6 +610,34 @@ async function handleListLessonContents(
   return json({ lesson_contents: data });
 }
 
+// ─── Bulk Lessons ────────────────────────────────────────────────
+
+async function handleCreateBulkLessons(
+  supabase: ReturnType<typeof createClient>,
+  params: { module_id: string; lessons: { name: string; video_url?: string; description?: string }[] }
+) {
+  if (!params.module_id) return json({ error: "module_id is required" }, 400);
+  if (!Array.isArray(params.lessons) || params.lessons.length === 0) return json({ error: "lessons array is required and must not be empty" }, 400);
+
+  // Verify module exists
+  const { data: mod } = await supabase.from("course_modules").select("id").eq("id", params.module_id).maybeSingle();
+  if (!mod) return json({ error: "Module not found" }, 404);
+
+  const rows = params.lessons.map((lesson, index) => ({
+    module_id: params.module_id,
+    title: lesson.name || `Lesson ${index + 1}`,
+    description: lesson.description || null,
+    video_url: lesson.video_url || null,
+    sort_order: index * 10,
+    is_free: false,
+    duration_minutes: 0,
+  }));
+
+  const { data, error } = await supabase.from("course_lessons").insert(rows).select();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, created_count: data.length, lessons: data });
+}
+
 // ─── Router ──────────────────────────────────────────────────────
 
 type ActionHandler = (supabase: ReturnType<typeof createClient>, params: any) => Promise<Response>;
@@ -645,6 +673,8 @@ const ACTIONS: Record<string, ActionHandler> = {
   update_lesson_content: handleUpdateLessonContent,
   delete_lesson_content: handleDeleteLessonContent,
   list_lesson_contents: handleListLessonContents,
+  // Bulk operations
+  create_bulk_lessons: handleCreateBulkLessons,
 };
 
 Deno.serve(async (req) => {
