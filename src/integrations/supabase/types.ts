@@ -415,6 +415,59 @@ export type Database = {
           },
         ]
       }
+      diagnostic_lead_tracking: {
+        Row: {
+          assigned_advisor: string | null
+          assigned_level_auto: string | null
+          commercial_status: string
+          created_at: string
+          diagnostic_id: string
+          id: string
+          last_action: string | null
+          last_action_at: string | null
+          lead_temperature: string
+          notes: string | null
+          recommended_product_auto: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_advisor?: string | null
+          assigned_level_auto?: string | null
+          commercial_status?: string
+          created_at?: string
+          diagnostic_id: string
+          id?: string
+          last_action?: string | null
+          last_action_at?: string | null
+          lead_temperature?: string
+          notes?: string | null
+          recommended_product_auto?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_advisor?: string | null
+          assigned_level_auto?: string | null
+          commercial_status?: string
+          created_at?: string
+          diagnostic_id?: string
+          id?: string
+          last_action?: string | null
+          last_action_at?: string | null
+          lead_temperature?: string
+          notes?: string | null
+          recommended_product_auto?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnostic_lead_tracking_diagnostic_id_fkey"
+            columns: ["diagnostic_id"]
+            isOneToOne: true
+            referencedRelation: "diagnostics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diagnostic_questions: {
         Row: {
           created_at: string | null

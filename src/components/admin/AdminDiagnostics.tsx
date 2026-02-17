@@ -1,23 +1,20 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
 import {
-  Search, Eye, Trash2, Clock, Globe, Building2, Phone, Users, Wifi, DollarSign,
-  MessageSquare, Target, HelpCircle, ArrowUpDown, ArrowUp, ArrowDown, Columns3,
-  Settings, ClipboardList, Plus, Pencil, GripVertical
+  Search, Eye, Trash2, Globe, Plus, Pencil, GripVertical, Target, Settings, ClipboardList,
+  Filter, BarChart3, Thermometer, UserCheck, TrendingUp
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -31,17 +28,7 @@ const FlagImg: React.FC<{ country: string | null; size?: number }> = ({ country,
   if (!country) return null;
   const code = countryCodes[country];
   if (!code) return <Globe className="w-4 h-4 text-muted-foreground" />;
-  return (
-    <img
-      src={`https://flagcdn.com/w40/${code}.png`}
-      srcSet={`https://flagcdn.com/w80/${code}.png 2x`}
-      width={size}
-      height={Math.round(size * 0.75)}
-      alt={country}
-      className="inline-block rounded-sm object-cover"
-      style={{ width: size, height: Math.round(size * 0.75) }}
-    />
-  );
+  return <img src={`https://flagcdn.com/w40/${code}.png`} width={size} height={Math.round(size * 0.75)} alt={country} className="inline-block rounded-sm object-cover" style={{ width: size, height: Math.round(size * 0.75) }} />;
 };
 
 const SECTION_OPTIONS = [
@@ -68,23 +55,38 @@ const OPERATOR_OPTIONS = [
   { value: '=', label: '= (igual a)' },
 ];
 
+const TEMP_COLORS: Record<string, string> = {
+  cold: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
+  warm: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
+  hot: 'bg-destructive/10 text-destructive border-destructive/30',
+};
+
+const TEMP_LABELS: Record<string, string> = { cold: 'Frío', warm: 'Tibio', hot: 'Caliente' };
+const STATUS_LABELS: Record<string, string> = { new: 'Nuevo', contacted: 'Contactado', negotiating: 'Negociando', converted: 'Convertido', lost: 'Perdido' };
+
 const AdminDiagnostics: React.FC = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('submissions');
   
-  // Submissions state
+  // Submissions
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
+  const [leadTracking, setLeadTracking] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [globalSearch, setGlobalSearch] = useState('');
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
   
-  // Questions state
+  // Filters
+  const [filterTemp, setFilterTemp] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterMinClients, setFilterMinClients] = useState('');
+  const [filterMinCommitment, setFilterMinCommitment] = useState('');
+  const [filterOnlyCompleted, setFilterOnlyCompleted] = useState('all');
+
+  // Questions
   const [questions, setQuestions] = useState<any[]>([]);
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<any>(null);
-
-  // Question Form state
   const [section, setSection] = useState('technical');
   const [type, setType] = useState('scale');
   const [text, setText] = useState('');
@@ -92,7 +94,7 @@ const AdminDiagnostics: React.FC = () => {
   const [options, setOptions] = useState<any[]>([]);
   const [weight, setWeight] = useState('1.0');
 
-  // Rules state
+  // Rules
   const [rules, setRules] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
@@ -115,21 +117,26 @@ const AdminDiagnostics: React.FC = () => {
 
   const fetchDiagnostics = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('diagnostics').select('*').order('created_at', { ascending: false });
-    if (!error) setDiagnostics(data || []);
+    const [{ data: diags }, { data: tracks }] = await Promise.all([
+      supabase.from('diagnostics').select('*').order('created_at', { ascending: false }),
+      supabase.from('diagnostic_lead_tracking').select('*'),
+    ]);
+    if (diags) setDiagnostics(diags);
+    if (tracks) {
+      const map: Record<string, any> = {};
+      tracks.forEach((t: any) => { map[t.diagnostic_id] = t; });
+      setLeadTracking(map);
+    }
     setLoading(false);
   };
 
   const fetchQuestions = async () => {
-    const { data, error } = await supabase.from('diagnostic_questions').select('*').order('sort_order', { ascending: true });
-    if (!error) setQuestions(data || []);
+    const { data } = await supabase.from('diagnostic_questions').select('*').order('sort_order', { ascending: true });
+    if (data) setQuestions(data);
   };
 
   const fetchRules = async () => {
-    const { data } = await supabase
-      .from('diagnostic_recommendation_rules')
-      .select('*, products:recommended_product_id(id, name)')
-      .order('priority', { ascending: true });
+    const { data } = await supabase.from('diagnostic_recommendation_rules').select('*, products:recommended_product_id(id, name)').order('priority', { ascending: true });
     if (data) setRules(data);
   };
 
@@ -138,127 +145,101 @@ const AdminDiagnostics: React.FC = () => {
     if (data) setProducts(data);
   };
 
-  // === Question CRUD ===
-  const handleSaveQuestion = async () => {
-    setLoading(true);
-    const payload = {
-      section,
-      type,
-      question_text: text,
-      description,
-      options,
-      weight: parseFloat(weight),
-      sort_order: editingQuestion ? editingQuestion.sort_order : questions.length
-    };
+  // Lead tracking updates
+  const updateLeadField = async (diagnosticId: string, field: string, value: string) => {
+    const existing = leadTracking[diagnosticId];
+    if (existing) {
+      await supabase.from('diagnostic_lead_tracking').update({ [field]: value, last_action: `Admin actualizó ${field}`, last_action_at: new Date().toISOString() }).eq('diagnostic_id', diagnosticId);
+    } else {
+      await supabase.from('diagnostic_lead_tracking').insert({ diagnostic_id: diagnosticId, [field]: value, last_action: `Admin creó tracking`, last_action_at: new Date().toISOString() });
+    }
+    fetchDiagnostics();
+  };
 
+  // Filters
+  const filteredDiagnostics = diagnostics.filter(d => {
+    if (globalSearch && !d.name?.toLowerCase().includes(globalSearch.toLowerCase()) && !d.email?.toLowerCase().includes(globalSearch.toLowerCase())) return false;
+    const track = leadTracking[d.id];
+    if (filterTemp !== 'all' && track?.lead_temperature !== filterTemp) return false;
+    if (filterStatus !== 'all' && (track?.commercial_status || 'new') !== filterStatus) return false;
+    if (filterMinClients && Number(d.client_count || 0) < Number(filterMinClients)) return false;
+    if (filterMinCommitment) {
+      const scores = d.scores as Record<string, number> | null;
+      if (!scores || (scores.commitment || 0) < Number(filterMinCommitment)) return false;
+    }
+    if (filterOnlyCompleted === 'completed' && d.status !== 'completed') return false;
+    if (filterOnlyCompleted === 'incomplete' && d.status === 'completed') return false;
+    return true;
+  });
+
+  // Metrics
+  const completedDiags = diagnostics.filter(d => d.status === 'completed' && d.scores);
+  const avgScores: Record<string, number> = { technical: 0, financial: 0, scale: 0, expansion: 0, commitment: 0 };
+  if (completedDiags.length > 0) {
+    completedDiags.forEach(d => {
+      const s = d.scores as Record<string, number>;
+      Object.keys(avgScores).forEach(k => { avgScores[k] += (s?.[k] || 0); });
+    });
+    Object.keys(avgScores).forEach(k => { avgScores[k] /= completedDiags.length; });
+  }
+
+  // Find most common critical area
+  const criticalCounts: Record<string, number> = {};
+  completedDiags.forEach(d => {
+    const s = d.scores as Record<string, number>;
+    if (!s) return;
+    const worst = Object.entries(s).sort(([,a],[,b]) => a - b)[0];
+    if (worst) criticalCounts[worst[0]] = (criticalCounts[worst[0]] || 0) + 1;
+  });
+  const mostCritical = Object.entries(criticalCounts).sort(([,a],[,b]) => b - a)[0];
+
+  const getScoreColor = (val: number) => val < 5 ? 'text-destructive' : val < 7 ? 'text-amber-500' : 'text-emerald-500';
+
+  // Question CRUD
+  const handleSaveQuestion = async () => {
+    const payload = { section, type, question_text: text, description, options, weight: parseFloat(weight), sort_order: editingQuestion ? editingQuestion.sort_order : questions.length };
     let error;
     if (editingQuestion) {
-      const { error: err } = await supabase.from('diagnostic_questions').update(payload).eq('id', editingQuestion.id);
-      error = err;
+      ({ error } = await supabase.from('diagnostic_questions').update(payload).eq('id', editingQuestion.id));
     } else {
-      const { error: err } = await supabase.from('diagnostic_questions').insert(payload);
-      error = err;
+      ({ error } = await supabase.from('diagnostic_questions').insert(payload));
     }
-
-    if (error) {
-      toast({ title: 'Error al guardar pregunta', variant: 'destructive' });
-    } else {
-      toast({ title: 'Pregunta guardada exitosamente' });
-      setIsQuestionDialogOpen(false);
-      resetQuestionForm();
-      fetchQuestions();
-    }
-    setLoading(false);
+    if (error) { toast({ title: 'Error al guardar', variant: 'destructive' }); }
+    else { toast({ title: 'Pregunta guardada' }); setIsQuestionDialogOpen(false); resetQuestionForm(); fetchQuestions(); }
   };
 
-  const resetQuestionForm = () => {
-    setEditingQuestion(null);
-    setSection('technical');
-    setType('scale');
-    setText('');
-    setDescription('');
-    setOptions([]);
-    setWeight('1.0');
-  };
+  const resetQuestionForm = () => { setEditingQuestion(null); setSection('technical'); setType('scale'); setText(''); setDescription(''); setOptions([]); setWeight('1.0'); };
 
   const editQuestion = (q: any) => {
-    setEditingQuestion(q);
-    setSection(q.section);
-    setType(q.type);
-    setText(q.question_text);
-    setDescription(q.description || '');
-    setOptions(q.options || []);
-    setWeight(q.weight.toString());
-    setIsQuestionDialogOpen(true);
+    setEditingQuestion(q); setSection(q.section); setType(q.type); setText(q.question_text); setDescription(q.description || ''); setOptions(q.options || []); setWeight(q.weight.toString()); setIsQuestionDialogOpen(true);
   };
 
   const deleteQuestion = async (id: string) => {
-    if (!confirm('¿Seguro que deseas eliminar esta pregunta?')) return;
-    const { error } = await supabase.from('diagnostic_questions').delete().eq('id', id);
-    if (!error) fetchQuestions();
+    if (!confirm('¿Eliminar esta pregunta?')) return;
+    await supabase.from('diagnostic_questions').delete().eq('id', id);
+    fetchQuestions();
   };
 
-  // === Rule CRUD ===
-  const resetRuleForm = () => {
-    setEditingRule(null);
-    setRuleField('technical');
-    setRuleOperator('<');
-    setRuleValue('5');
-    setRuleTitle('');
-    setRuleDescription('');
-    setRuleCtaText('');
-    setRuleProductId('');
-    setRulePriority('0');
-  };
+  // Rule CRUD
+  const resetRuleForm = () => { setEditingRule(null); setRuleField('technical'); setRuleOperator('<'); setRuleValue('5'); setRuleTitle(''); setRuleDescription(''); setRuleCtaText(''); setRuleProductId(''); setRulePriority('0'); };
 
   const editRule = (r: any) => {
-    setEditingRule(r);
-    setRuleField(r.condition_field);
-    setRuleOperator(r.condition_operator);
-    setRuleValue(r.condition_value.toString());
-    setRuleTitle(r.title || '');
-    setRuleDescription(r.description || '');
-    setRuleCtaText(r.cta_text || '');
-    setRuleProductId(r.recommended_product_id || '');
-    setRulePriority((r.priority || 0).toString());
-    setIsRuleDialogOpen(true);
+    setEditingRule(r); setRuleField(r.condition_field); setRuleOperator(r.condition_operator); setRuleValue(r.condition_value.toString()); setRuleTitle(r.title || ''); setRuleDescription(r.description || ''); setRuleCtaText(r.cta_text || ''); setRuleProductId(r.recommended_product_id || ''); setRulePriority((r.priority || 0).toString()); setIsRuleDialogOpen(true);
   };
 
   const handleSaveRule = async () => {
-    const payload = {
-      condition_field: ruleField,
-      condition_operator: ruleOperator,
-      condition_value: parseFloat(ruleValue),
-      title: ruleTitle,
-      description: ruleDescription,
-      cta_text: ruleCtaText,
-      recommended_product_id: ruleProductId || null,
-      priority: parseInt(rulePriority),
-    };
-
+    const payload = { condition_field: ruleField, condition_operator: ruleOperator, condition_value: parseFloat(ruleValue), title: ruleTitle, description: ruleDescription, cta_text: ruleCtaText, recommended_product_id: ruleProductId || null, priority: parseInt(rulePriority) };
     let error;
-    if (editingRule) {
-      const { error: err } = await supabase.from('diagnostic_recommendation_rules').update(payload).eq('id', editingRule.id);
-      error = err;
-    } else {
-      const { error: err } = await supabase.from('diagnostic_recommendation_rules').insert(payload);
-      error = err;
-    }
-
-    if (error) {
-      toast({ title: 'Error al guardar regla', variant: 'destructive' });
-    } else {
-      toast({ title: 'Regla guardada exitosamente' });
-      setIsRuleDialogOpen(false);
-      resetRuleForm();
-      fetchRules();
-    }
+    if (editingRule) { ({ error } = await supabase.from('diagnostic_recommendation_rules').update(payload).eq('id', editingRule.id)); }
+    else { ({ error } = await supabase.from('diagnostic_recommendation_rules').insert(payload)); }
+    if (error) { toast({ title: 'Error al guardar regla', variant: 'destructive' }); }
+    else { toast({ title: 'Regla guardada' }); setIsRuleDialogOpen(false); resetRuleForm(); fetchRules(); }
   };
 
   const deleteRule = async (id: string) => {
-    if (!confirm('¿Seguro que deseas eliminar esta regla?')) return;
-    const { error } = await supabase.from('diagnostic_recommendation_rules').delete().eq('id', id);
-    if (!error) fetchRules();
+    if (!confirm('¿Eliminar esta regla?')) return;
+    await supabase.from('diagnostic_recommendation_rules').delete().eq('id', id);
+    fetchRules();
   };
 
   return (
@@ -272,76 +253,189 @@ const AdminDiagnostics: React.FC = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="submissions" className="gap-2">
-            <ClipboardList className="w-4 h-4" /> Envíos
-          </TabsTrigger>
-          <TabsTrigger value="questions" className="gap-2">
-            <Settings className="w-4 h-4" /> Preguntas
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="gap-2">
-            <Target className="w-4 h-4" /> Reglas
-          </TabsTrigger>
+          <TabsTrigger value="submissions" className="gap-2"><ClipboardList className="w-4 h-4" /> Envíos</TabsTrigger>
+          <TabsTrigger value="metrics" className="gap-2"><BarChart3 className="w-4 h-4" /> Métricas</TabsTrigger>
+          <TabsTrigger value="questions" className="gap-2"><Settings className="w-4 h-4" /> Preguntas</TabsTrigger>
+          <TabsTrigger value="rules" className="gap-2"><Target className="w-4 h-4" /> Reglas</TabsTrigger>
         </TabsList>
 
-        {/* === SUBMISSIONS TAB === */}
+        {/* === SUBMISSIONS === */}
         <TabsContent value="submissions" className="space-y-4">
-          <div className="flex gap-2 mb-2">
-            <Input placeholder="Buscar por nombre o email..." value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} className="max-w-sm" />
+          <div className="flex flex-wrap gap-2 mb-2">
+            <Input placeholder="Buscar nombre o email..." value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} className="max-w-xs" />
+            <Select value={filterTemp} onValueChange={setFilterTemp}>
+              <SelectTrigger className="w-[140px]"><Thermometer className="w-3 h-3 mr-1" /><SelectValue placeholder="Temperatura" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="hot">🔴 Caliente</SelectItem>
+                <SelectItem value="warm">🟡 Tibio</SelectItem>
+                <SelectItem value="cold">🔵 Frío</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterOnlyCompleted} onValueChange={setFilterOnlyCompleted}>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Estado diag." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="completed">Completados</SelectItem>
+                <SelectItem value="incomplete">Incompletos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input placeholder="Clientes mín." value={filterMinClients} onChange={e => setFilterMinClients(e.target.value)} className="w-[120px]" type="number" />
+            <Input placeholder="Compromiso mín." value={filterMinCommitment} onChange={e => setFilterMinCommitment(e.target.value)} className="w-[140px]" type="number" />
           </div>
-          <Card className="border-border overflow-hidden">
+
+          <Card className="border-border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>País</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>Clientes</TableHead>
+                  <TableHead>Nivel</TableHead>
+                  <TableHead>Téc.</TableHead>
+                  <TableHead>Fin.</TableHead>
+                  <TableHead>Esc.</TableHead>
+                  <TableHead>Pot.</TableHead>
+                  <TableHead>Comp.</TableHead>
+                  <TableHead>Temp.</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {diagnostics.filter(d => 
-                  d.name.toLowerCase().includes(globalSearch.toLowerCase()) || 
-                  d.email.toLowerCase().includes(globalSearch.toLowerCase())
-                ).map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.name}</TableCell>
-                    <TableCell>{d.email}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FlagImg country={d.country} />
-                        {d.country}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={d.status === 'completed' ? 'default' : 'secondary'}>
-                        {d.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(d.created_at).toLocaleDateString()} {new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => setSelectedSubmission(d)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredDiagnostics.map((d) => {
+                  const s = d.scores as Record<string, number> | null;
+                  const track = leadTracking[d.id];
+                  const level = (d.results as any)?.level || '';
+                  return (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium whitespace-nowrap">{d.name}</TableCell>
+                      <TableCell className="text-xs">{d.email}</TableCell>
+                      <TableCell><div className="flex items-center gap-1"><FlagImg country={d.country} /><span className="text-xs">{d.country}</span></div></TableCell>
+                      <TableCell className="text-center">{d.client_count || '—'}</TableCell>
+                      <TableCell>
+                        {level && <Badge variant="outline" className="text-xs capitalize">{level.replace('diag', '')}</Badge>}
+                      </TableCell>
+                      <TableCell className={`text-center font-mono text-xs ${s ? getScoreColor(s.technical || 0) : ''}`}>{s?.technical?.toFixed(1) || '—'}</TableCell>
+                      <TableCell className={`text-center font-mono text-xs ${s ? getScoreColor(s.financial || 0) : ''}`}>{s?.financial?.toFixed(1) || '—'}</TableCell>
+                      <TableCell className={`text-center font-mono text-xs ${s ? getScoreColor(s.scale || 0) : ''}`}>{s?.scale?.toFixed(1) || '—'}</TableCell>
+                      <TableCell className={`text-center font-mono text-xs ${s ? getScoreColor(s.expansion || 0) : ''}`}>{s?.expansion?.toFixed(1) || '—'}</TableCell>
+                      <TableCell className={`text-center font-mono text-xs ${s ? getScoreColor(s.commitment || 0) : ''}`}>{s?.commitment?.toFixed(1) || '—'}</TableCell>
+                      <TableCell>
+                        <Select value={track?.lead_temperature || 'cold'} onValueChange={v => updateLeadField(d.id, 'lead_temperature', v)}>
+                          <SelectTrigger className={`h-7 text-xs w-[90px] border ${TEMP_COLORS[track?.lead_temperature || 'cold']}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(TEMP_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select value={track?.commercial_status || 'new'} onValueChange={v => updateLeadField(d.id, 'commercial_status', v)}>
+                          <SelectTrigger className="h-7 text-xs w-[110px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(STATUS_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(d.created_at).toLocaleDateString()} {new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => setSelectedSubmission(d)}><Eye className="w-4 h-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredDiagnostics.length === 0 && (
+                  <TableRow><TableCell colSpan={14} className="text-center py-8 text-muted-foreground">Sin resultados</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>
+          <p className="text-xs text-muted-foreground">{filteredDiagnostics.length} de {diagnostics.length} diagnósticos</p>
         </TabsContent>
 
-        {/* === QUESTIONS TAB === */}
-        <TabsContent value="questions" className="space-y-4">
-          <div className="flex justify-end mb-4">
-            <Button onClick={() => setIsQuestionDialogOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" /> Agregar Pregunta
-            </Button>
+        {/* === METRICS === */}
+        <TabsContent value="metrics" className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="p-4 text-center">
+              <p className="text-3xl font-bold text-primary">{diagnostics.length}</p>
+              <p className="text-xs text-muted-foreground">Total Diagnósticos</p>
+            </Card>
+            <Card className="p-4 text-center">
+              <p className="text-3xl font-bold text-emerald-500">{completedDiags.length}</p>
+              <p className="text-xs text-muted-foreground">Completados</p>
+            </Card>
+            <Card className="p-4 text-center">
+              <p className="text-3xl font-bold text-amber-500">{diagnostics.length - completedDiags.length}</p>
+              <p className="text-xs text-muted-foreground">Incompletos</p>
+            </Card>
+            <Card className="p-4 text-center">
+              <p className="text-3xl font-bold text-destructive">{Object.values(leadTracking).filter((t: any) => t.lead_temperature === 'hot').length}</p>
+              <p className="text-xs text-muted-foreground">Leads Calientes</p>
+            </Card>
           </div>
 
+          <Card className="p-6">
+            <h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> Promedio por Criterio</h3>
+            <div className="space-y-3">
+              {SECTION_OPTIONS.map(s => (
+                <div key={s.value}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>{s.label}</span>
+                    <span className={`font-bold ${getScoreColor(avgScores[s.value] || 0)}`}>{(avgScores[s.value] || 0).toFixed(1)}</span>
+                  </div>
+                  <div className="h-2 w-full bg-border rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${avgScores[s.value] < 5 ? 'bg-destructive' : avgScores[s.value] < 7 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${(avgScores[s.value] || 0) * 10}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {mostCritical && (
+            <Card className="p-6 border-destructive/20">
+              <h3 className="font-bold mb-2">Área Crítica Más Común</h3>
+              <p className="text-lg text-destructive font-bold">{SECTION_OPTIONS.find(s => s.value === mostCritical[0])?.label || mostCritical[0]}</p>
+              <p className="text-sm text-muted-foreground">{mostCritical[1]} de {completedDiags.length} diagnósticos tienen esta como su punto más débil</p>
+            </Card>
+          )}
+
+          {/* Top Leads by Commitment */}
+          <Card className="p-6">
+            <h3 className="font-bold mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> Ranking de Leads por Compromiso</h3>
+            <div className="space-y-2">
+              {completedDiags
+                .sort((a, b) => ((b.scores as any)?.commitment || 0) - ((a.scores as any)?.commitment || 0))
+                .slice(0, 10)
+                .map((d, i) => (
+                  <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/30">
+                    <span className="text-xs font-bold text-muted-foreground w-6">#{i + 1}</span>
+                    <span className="font-medium flex-1">{d.name}</span>
+                    <span className="text-xs text-muted-foreground">{d.client_count || '?'} clientes</span>
+                    <span className={`font-bold text-sm ${getScoreColor((d.scores as any)?.commitment || 0)}`}>{((d.scores as any)?.commitment || 0).toFixed(1)}</span>
+                  </div>
+                ))}
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* === QUESTIONS === */}
+        <TabsContent value="questions" className="space-y-4">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => setIsQuestionDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" /> Agregar Pregunta</Button>
+          </div>
           <Card className="border-border overflow-hidden">
             <Table>
               <TableHeader>
@@ -360,7 +454,7 @@ const AdminDiagnostics: React.FC = () => {
                     <TableCell><GripVertical className="w-4 h-4 text-muted-foreground" /></TableCell>
                     <TableCell className="font-medium max-w-xs truncate">{q.question_text}</TableCell>
                     <TableCell className="capitalize">{SECTION_OPTIONS.find(s => s.value === q.section)?.label || q.section}</TableCell>
-                    <TableCell className="capitalize">{TYPE_OPTIONS.find(t => t.value === q.type)?.label || q.type}</TableCell>
+                    <TableCell className="capitalize">{TYPE_OPTIONS.find(tp => tp.value === q.type)?.label || q.type}</TableCell>
                     <TableCell>{q.weight}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -375,14 +469,11 @@ const AdminDiagnostics: React.FC = () => {
           </Card>
         </TabsContent>
 
-        {/* === RULES TAB === */}
+        {/* === RULES === */}
         <TabsContent value="rules" className="space-y-4">
           <div className="flex justify-end mb-4">
-            <Button onClick={() => { resetRuleForm(); setIsRuleDialogOpen(true); }} className="gap-2">
-              <Plus className="w-4 h-4" /> Agregar Regla
-            </Button>
+            <Button onClick={() => { resetRuleForm(); setIsRuleDialogOpen(true); }} className="gap-2"><Plus className="w-4 h-4" /> Agregar Regla</Button>
           </div>
-
           <Card className="border-border overflow-hidden">
             <Table>
               <TableHeader>
@@ -398,11 +489,7 @@ const AdminDiagnostics: React.FC = () => {
                 {rules.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{r.priority}</TableCell>
-                    <TableCell>
-                      <code className="text-xs bg-muted px-2 py-1 rounded">
-                        {SECTION_OPTIONS.find(s => s.value === r.condition_field)?.label || r.condition_field} {r.condition_operator} {r.condition_value}
-                      </code>
-                    </TableCell>
+                    <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{SECTION_OPTIONS.find(s => s.value === r.condition_field)?.label || r.condition_field} {r.condition_operator} {r.condition_value}</code></TableCell>
                     <TableCell className="font-medium">{r.title}</TableCell>
                     <TableCell>{(r as any).products?.name || '—'}</TableCell>
                     <TableCell className="text-right">
@@ -413,89 +500,128 @@ const AdminDiagnostics: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ))}
-                {rules.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No hay reglas configuradas. Agrega reglas para recomendar productos basados en los scores del diagnóstico.
-                    </TableCell>
-                  </TableRow>
-                )}
+                {rules.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay reglas configuradas.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </Card>
         </TabsContent>
       </Tabs>
 
+      {/* Detail Dialog */}
+      <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Detalle del Diagnóstico</DialogTitle></DialogHeader>
+          {selectedSubmission && (() => {
+            const d = selectedSubmission;
+            const s = d.scores as Record<string, number> | null;
+            const track = leadTracking[d.id];
+            return (
+              <div className="space-y-6 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><p className="text-xs text-muted-foreground">Nombre</p><p className="font-bold">{d.name}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Email</p><p className="font-bold">{d.email}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Teléfono</p><p className="font-bold">{d.phone || '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">País</p><p className="font-bold flex items-center gap-2"><FlagImg country={d.country} /> {d.country}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Clientes</p><p className="font-bold">{d.client_count || '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Estado</p><Badge variant={d.status === 'completed' ? 'default' : 'secondary'}>{d.status}</Badge></div>
+                </div>
+
+                {s && (
+                  <div>
+                    <h4 className="font-bold mb-3">Scores</h4>
+                    <div className="space-y-2">
+                      {SECTION_OPTIONS.map(sec => (
+                        <div key={sec.value} className="flex justify-between items-center">
+                          <span className="text-sm">{sec.label}</span>
+                          <span className={`font-bold ${getScoreColor(s[sec.value] || 0)}`}>{(s[sec.value] || 0).toFixed(1)}/10</span>
+                        </div>
+                      ))}
+                      <div className="border-t pt-2 flex justify-between items-center font-bold">
+                        <span>Índice General</span>
+                        <span>{((d.results as any)?.weightedIndex || 0).toFixed(1)}/10</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <h4 className="font-bold mb-3">Lead Management</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Temperatura</label>
+                      <Select value={track?.lead_temperature || 'cold'} onValueChange={v => updateLeadField(d.id, 'lead_temperature', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{Object.entries(TEMP_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Status Comercial</label>
+                      <Select value={track?.commercial_status || 'new'} onValueChange={v => updateLeadField(d.id, 'commercial_status', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{Object.entries(STATUS_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Asesor Asignado</label>
+                      <Input value={track?.assigned_advisor || ''} onChange={e => updateLeadField(d.id, 'assigned_advisor', e.target.value)} placeholder="Nombre del asesor" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Producto Recomendado</label>
+                      <p className="text-sm font-medium">{track?.recommended_product_auto || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <label className="text-xs text-muted-foreground">Notas internas</label>
+                    <Textarea value={track?.notes || ''} onChange={e => updateLeadField(d.id, 'notes', e.target.value)} placeholder="Notas del equipo comercial..." rows={3} />
+                  </div>
+                  {track?.last_action && (
+                    <p className="text-xs text-muted-foreground mt-2">Última acción: {track.last_action} — {track.last_action_at ? new Date(track.last_action_at).toLocaleString() : ''}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Question Dialog */}
       <Dialog open={isQuestionDialogOpen} onOpenChange={(open) => { setIsQuestionDialogOpen(open); if (!open) resetQuestionForm(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingQuestion ? 'Editar Pregunta' : 'Nueva Pregunta'}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editingQuestion ? 'Editar Pregunta' : 'Nueva Pregunta'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Criterio (Sección)</label>
-                <Select value={section} onValueChange={setSection}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {SECTION_OPTIONS.map(s => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Criterio</label>
+                <Select value={section} onValueChange={setSection}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SECTION_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Tipo de Respuesta</label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TYPE_OPTIONS.map(t => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Tipo</label>
+                <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TYPE_OPTIONS.map(tp => <SelectItem key={tp.value} value={tp.value}>{tp.label}</SelectItem>)}</SelectContent></Select>
               </div>
             </div>
-            
             <div className="space-y-2">
-              <label className="text-sm font-medium">Texto de la Pregunta</label>
-              <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ej: ¿Qué tan estable es tu red?" />
+              <label className="text-sm font-medium">Texto</label>
+              <Input value={text} onChange={e => setText(e.target.value)} placeholder="Texto de la pregunta" />
             </div>
-
             <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción / Ayuda (Opcional)</label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Texto explicativo para el usuario" />
+              <label className="text-sm font-medium">Descripción (Opcional)</label>
+              <Input value={description} onChange={e => setDescription(e.target.value)} />
             </div>
-
             <div className="space-y-2">
-              <label className="text-sm font-medium">Peso (0 = dato objetivo, no puntúa)</label>
-              <Input type="number" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-32" />
+              <label className="text-sm font-medium">Peso (0 = dato objetivo)</label>
+              <Input type="number" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-32" />
             </div>
-
             {(type === 'single_choice' || type === 'multiple_choice') && (
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium">Opciones</label>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...options, { label: '', value: options.length + 1, score: 0 }])}>
-                    Agregar Opción
-                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...options, { label: '', value: options.length + 1, score: 0 }])}>Agregar</Button>
                 </div>
                 {options.map((opt, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
-                    <Input placeholder="Etiqueta" value={opt.label} onChange={(e) => {
-                      const newOpts = [...options];
-                      newOpts[idx].label = e.target.value;
-                      setOptions(newOpts);
-                    }} className="flex-1" />
-                    <Input type="number" placeholder="Score" value={opt.score} onChange={(e) => {
-                      const newOpts = [...options];
-                      newOpts[idx].score = parseFloat(e.target.value);
-                      setOptions(newOpts);
-                    }} className="w-20" />
-                    <Button variant="ghost" size="icon" onClick={() => setOptions(options.filter((_, i) => i !== idx))}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    <Input placeholder="Etiqueta" value={opt.label} onChange={e => { const n = [...options]; n[idx].label = e.target.value; setOptions(n); }} className="flex-1" />
+                    <Input type="number" placeholder="Score" value={opt.score} onChange={e => { const n = [...options]; n[idx].score = parseFloat(e.target.value); setOptions(n); }} className="w-20" />
+                    <Button variant="ghost" size="icon" onClick={() => setOptions(options.filter((_,i) => i !== idx))}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                   </div>
                 ))}
               </div>
@@ -503,7 +629,7 @@ const AdminDiagnostics: React.FC = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsQuestionDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveQuestion} disabled={loading}>{loading ? 'Guardando...' : 'Guardar Pregunta'}</Button>
+            <Button onClick={handleSaveQuestion}>Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -511,69 +637,28 @@ const AdminDiagnostics: React.FC = () => {
       {/* Rule Dialog */}
       <Dialog open={isRuleDialogOpen} onOpenChange={(open) => { setIsRuleDialogOpen(open); if (!open) resetRuleForm(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingRule ? 'Editar Regla' : 'Nueva Regla de Recomendación'}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editingRule ? 'Editar Regla' : 'Nueva Regla'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Condición: Si el criterio...</label>
+              <label className="text-sm font-medium">Condición</label>
               <div className="grid grid-cols-3 gap-2">
-                <Select value={ruleField} onValueChange={setRuleField}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {SECTION_OPTIONS.map(s => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={ruleOperator} onValueChange={setRuleOperator}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {OPERATOR_OPTIONS.map(o => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input type="number" step="0.1" value={ruleValue} onChange={e => setRuleValue(e.target.value)} placeholder="Valor" />
+                <Select value={ruleField} onValueChange={setRuleField}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SECTION_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>
+                <Select value={ruleOperator} onValueChange={setRuleOperator}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{OPERATOR_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select>
+                <Input type="number" step="0.1" value={ruleValue} onChange={e => setRuleValue(e.target.value)} />
               </div>
             </div>
-
+            <div className="space-y-2"><label className="text-sm font-medium">Título</label><Input value={ruleTitle} onChange={e => setRuleTitle(e.target.value)} /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">Descripción</label><Input value={ruleDescription} onChange={e => setRuleDescription(e.target.value)} /></div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Título de la Recomendación</label>
-              <Input value={ruleTitle} onChange={e => setRuleTitle(e.target.value)} placeholder="Ej: Programa de Gestión ISP" />
+              <label className="text-sm font-medium">Producto Vinculado</label>
+              <Select value={ruleProductId} onValueChange={setRuleProductId}><SelectTrigger><SelectValue placeholder="Ninguno" /></SelectTrigger><SelectContent><SelectItem value="">Ninguno</SelectItem>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción</label>
-              <Input value={ruleDescription} onChange={e => setRuleDescription(e.target.value)} placeholder="Descripción breve de la recomendación" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Producto Vinculado (Opcional)</label>
-              <Select value={ruleProductId} onValueChange={setRuleProductId}>
-                <SelectTrigger><SelectValue placeholder="Sin producto vinculado" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Ninguno</SelectItem>
-                  {products.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Texto del Botón CTA</label>
-              <Input value={ruleCtaText} onChange={e => setRuleCtaText(e.target.value)} placeholder="Ej: Comenzar Ahora" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Prioridad (menor = más importante)</label>
-              <Input type="number" value={rulePriority} onChange={e => setRulePriority(e.target.value)} className="w-32" />
-            </div>
+            <div className="space-y-2"><label className="text-sm font-medium">CTA</label><Input value={ruleCtaText} onChange={e => setRuleCtaText(e.target.value)} /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">Prioridad</label><Input type="number" value={rulePriority} onChange={e => setRulePriority(e.target.value)} className="w-32" /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRuleDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveRule}>Guardar Regla</Button>
+            <Button onClick={handleSaveRule}>Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
