@@ -6,12 +6,12 @@ import PhoneInput from '@/components/PhoneInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import meteoraLogo from '@/assets/logo-white-pink.png';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-
 const LATAM_COUNTRIES = [
   'Argentina', 'Bolivia', 'Brasil', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
   'Ecuador', 'El Salvador', 'Guatemala', 'Honduras', 'México', 'Nicaragua',
@@ -28,7 +28,7 @@ const fadeUp = {
 type Question = {
   id: string;
   section: string;
-  type: 'scale' | 'likert' | 'single_choice' | 'multiple_choice';
+  type: 'scale' | 'likert' | 'single_choice' | 'multiple_choice' | 'text_open';
   question_text: string;
   description?: string;
   options: any[];
@@ -57,6 +57,7 @@ const Diagnostico: React.FC = () => {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [generalLevel, setGeneralLevel] = useState('');
   const [advisorUrl, setAdvisorUrl] = useState('');
+  const [recommendations, setRecommendations] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -79,8 +80,17 @@ const Diagnostico: React.FC = () => {
       if (data) setAdvisorUrl(data.value);
     };
 
+    const fetchRules = async () => {
+      const { data } = await supabase
+        .from('diagnostic_recommendation_rules')
+        .select('*, products:recommended_product_id(id, name, thumbnail_url)')
+        .order('priority', { ascending: true });
+      if (data) setRecommendations(data);
+    };
+
     fetchQuestions();
     fetchAdvisorUrl();
+    fetchRules();
   }, []);
 
   const validatePhone = (value: string): boolean => {
@@ -283,6 +293,16 @@ const Diagnostico: React.FC = () => {
                 {currentQuestion.description && <p className="text-muted-foreground mb-6">{currentQuestion.description}</p>}
 
                 <div className="space-y-3">
+                  {/* Text Open (campo abierto) */}
+                  {currentQuestion.type === 'text_open' && (
+                    <Textarea
+                      placeholder="Escribe tu respuesta..."
+                      value={answers[currentQuestion.id] || ''}
+                      onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
+                      className="min-h-[120px] text-base"
+                    />
+                  )}
+
                   {/* Objective numeric data (weight=0) */}
                   {currentQuestion.type === 'scale' && isObjectiveQuestion(currentQuestion) && (
                     <Input
@@ -374,9 +394,11 @@ const Diagnostico: React.FC = () => {
                     </Button>
                   )}
                   <Button onClick={nextQuestion} className="flex-1 glow-primary" disabled={
-                    currentQuestion.type === 'multiple_choice' 
-                      ? !answers[currentQuestion.id] || (Array.isArray(answers[currentQuestion.id]) && answers[currentQuestion.id].length === 0)
-                      : !answers[currentQuestion.id] && answers[currentQuestion.id] !== 0
+                    currentQuestion.type === 'text_open'
+                      ? !answers[currentQuestion.id] || (typeof answers[currentQuestion.id] === 'string' && answers[currentQuestion.id].trim() === '')
+                      : currentQuestion.type === 'multiple_choice' 
+                        ? !answers[currentQuestion.id] || (Array.isArray(answers[currentQuestion.id]) && answers[currentQuestion.id].length === 0)
+                        : !answers[currentQuestion.id] && answers[currentQuestion.id] !== 0
                   }>
                     {currentQuestionIndex === questions.length - 1 ? t('diagSubmit') : t('next')}
                   </Button>
@@ -404,7 +426,7 @@ const Diagnostico: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="p-6 bg-secondary/20">
                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-primary" /> Pillars Analysis
+                    <BarChart3 className="w-5 h-5 text-primary" /> {t('diagPillarsAnalysis')}
                   </h3>
                   <div className="space-y-4">
                     {Object.entries(scores).map(([key, val]) => (
@@ -425,42 +447,94 @@ const Diagnostico: React.FC = () => {
                 </Card>
 
                 <Card className="p-6 bg-secondary/20 space-y-4">
-                  <div>
-                    <h4 className="text-sm font-bold text-destructive flex items-center gap-2 mb-1">
-                      <ShieldAlert className="w-4 h-4" /> {t('diagMainCritical')}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">La gestión financiera está limitando tu capacidad de escalar con seguridad.</p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-amber-500 flex items-center gap-2 mb-1">
-                      <Zap className="w-4 h-4" /> {t('diagSecondaryArea')}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Tu proceso comercial necesita estructura para sostener crecimiento acelerado.</p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-green-500 flex items-center gap-2 mb-1">
-                      <Target className="w-4 h-4" /> {t('diagMainStrength')}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Tu mayor ventaja hoy es tu compromiso estratégico. Estás listo para crecer.</p>
-                  </div>
+                  {(() => {
+                    const sorted = Object.entries(scores).sort(([, a], [, b]) => a - b);
+                    const worst = sorted[0];
+                    const second = sorted[1];
+                    const best = sorted[sorted.length - 1];
+                    const sectionLabel = (key: string) => t(`diag${key.charAt(0).toUpperCase() + key.slice(1)}`);
+                    return (
+                      <>
+                        {worst && (
+                          <div>
+                            <h4 className="text-sm font-bold text-destructive flex items-center gap-2 mb-1">
+                              <ShieldAlert className="w-4 h-4" /> {t('diagMainCritical')}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {sectionLabel(worst[0])} ({worst[1].toFixed(1)}/10) — {t('diagCriticalDesc')}
+                            </p>
+                          </div>
+                        )}
+                        {second && (
+                          <div>
+                            <h4 className="text-sm font-bold text-amber-500 flex items-center gap-2 mb-1">
+                              <Zap className="w-4 h-4" /> {t('diagSecondaryArea')}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {sectionLabel(second[0])} ({second[1].toFixed(1)}/10) — {t('diagSecondaryDesc')}
+                            </p>
+                          </div>
+                        )}
+                        {best && (
+                          <div>
+                            <h4 className="text-sm font-bold text-green-500 flex items-center gap-2 mb-1">
+                              <Target className="w-4 h-4" /> {t('diagMainStrength')}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {sectionLabel(best[0])} ({best[1].toFixed(1)}/10) — {t('diagStrengthDesc')}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </Card>
               </div>
 
-              <Card className="p-8 border-primary bg-primary/5 text-center">
-                <h3 className="text-xl font-bold mb-2">{t('diagNextStepTitle')}</h3>
-                <h4 className="text-2xl font-display font-black text-primary mb-4 uppercase">Programa de Gestión ISP</h4>
-                <p className="text-muted-foreground mb-8">Este programa está diseñado para resolver exactamente el cuello de botella que hoy limita tu ISP.</p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button size="lg" className="glow-primary h-14 px-10 text-lg font-bold">
-                    {t('diagStartNow')}
+              {/* Dynamic Recommendations */}
+              {(() => {
+                const matchedRules = recommendations.filter(rule => {
+                  const fieldVal = scores[rule.condition_field] ?? 0;
+                  switch (rule.condition_operator) {
+                    case '<': return fieldVal < rule.condition_value;
+                    case '<=': return fieldVal <= rule.condition_value;
+                    case '>': return fieldVal > rule.condition_value;
+                    case '>=': return fieldVal >= rule.condition_value;
+                    case '=': return fieldVal === rule.condition_value;
+                    default: return false;
+                  }
+                });
+
+                if (matchedRules.length === 0) return null;
+
+                return (
+                  <Card className="p-8 border-primary bg-primary/5">
+                    <h3 className="text-xl font-bold mb-6 text-center">{t('diagNextStepTitle')}</h3>
+                    <div className="space-y-4">
+                      {matchedRules.map((rule) => (
+                        <div key={rule.id} className="flex items-center gap-4 p-4 rounded-xl bg-background/50 border border-border">
+                          <Target className="w-8 h-8 text-primary shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-bold text-lg">{rule.title}</h4>
+                            {rule.description && <p className="text-sm text-muted-foreground">{rule.description}</p>}
+                          </div>
+                          {rule.cta_text && (
+                            <Button size="sm" className="shrink-0">{rule.cta_text}</Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                );
+              })()}
+
+              {advisorUrl && (
+                <div className="text-center">
+                  <Button size="lg" variant="outline" className="h-14 px-10 text-lg font-bold" onClick={() => window.open(advisorUrl, '_blank')}>
+                    <MessageSquare className="mr-2 w-5 h-5" /> {t('diagAdvisorCta')}
                   </Button>
-                  {advisorUrl && (
-                    <Button size="lg" variant="outline" className="h-14 px-10 text-lg font-bold" onClick={() => window.open(advisorUrl, '_blank')}>
-                      <MessageSquare className="mr-2 w-5 h-5" /> {t('diagAdvisorCta')}
-                    </Button>
-                  )}
                 </div>
-              </Card>
+              )}
 
               <div className="text-center space-y-4">
                 <p className="text-sm text-muted-foreground">{t('diagRedo90Days')}</p>

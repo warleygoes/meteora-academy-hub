@@ -225,6 +225,10 @@ export const translations: Record<Language, Record<string, string>> = {
     diagConsecuence: 'Si no actúas:',
     diagPotentialReferent: 'Tu ISP tiene potencial real de convertirse en referente regional.',
     diagRedo90Days: 'En 90 días puedes rehacerlo y medir tu evolución.',
+    diagPillarsAnalysis: 'Análisis por Pilares',
+    diagCriticalDesc: 'Este pilar está limitando tu capacidad de escalar con seguridad.',
+    diagSecondaryDesc: 'Necesita estructura para sostener crecimiento acelerado.',
+    diagStrengthDesc: 'Tu mayor ventaja competitiva hoy. Estás listo para crecer.',
 
     // Approval
     pendingApproval: 'Aprobación Pendiente',
