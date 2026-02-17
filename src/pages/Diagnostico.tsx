@@ -100,6 +100,20 @@ const Diagnostico: React.FC = () => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
   };
 
+  const handleMultipleAnswer = (questionId: string, value: string) => {
+    setAnswers(prev => {
+      const current = prev[questionId] || [];
+      const arr = Array.isArray(current) ? current : [];
+      return { ...prev, [questionId]: arr.includes(value) ? arr.filter((v: string) => v !== value) : [...arr, value] };
+    });
+  };
+
+  const handleNumericAnswer = (questionId: string, value: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const isObjectiveQuestion = (q: Question) => q.weight === 0;
+
   const nextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
@@ -113,24 +127,36 @@ const Diagnostico: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1. Calculate Scores per Section
       const sectionScores: Record<string, number[]> = {
         technical: [], financial: [], scale: [], expansion: [], commitment: []
       };
 
       questions.forEach(q => {
         const answer = answers[q.id];
-        if (answer !== undefined) {
-          // Logic for scoring based on type
-          let scoreValue = 0;
-          if (q.type === 'scale' || q.type === 'likert') {
-            scoreValue = Number(answer);
-          } else if (q.type === 'single_choice') {
-            const option = q.options.find(o => o.value === answer || o.label === answer);
-            scoreValue = option?.score || 0;
-          }
-          sectionScores[q.section]?.push(scoreValue);
+        if (answer === undefined || q.weight === 0) return; // Skip objective data
+
+        let scoreValue = 0;
+        if (q.type === 'scale') {
+          scoreValue = Number(answer);
+        } else if (q.type === 'likert') {
+          scoreValue = Number(answer);
+        } else if (q.type === 'single_choice') {
+          const option = q.options.find((o: any) => o.value === answer);
+          scoreValue = option?.score || 0;
+        } else if (q.type === 'multiple_choice') {
+          const selected = Array.isArray(answer) ? answer : [];
+          let total = 0;
+          selected.forEach((val: string) => {
+            const opt = q.options.find((o: any) => o.value === val);
+            total += opt?.score || 0;
+          });
+          // Normalize to 0-10 range
+          const maxPossible = q.options.reduce((sum: number, o: any) => sum + Math.max(0, o.score || 0), 0);
+          const minPossible = q.options.reduce((sum: number, o: any) => sum + Math.min(0, o.score || 0), 0);
+          const range = maxPossible - minPossible;
+          scoreValue = range > 0 ? ((total - minPossible) / range) * 10 : 5;
         }
+        sectionScores[q.section]?.push(scoreValue);
       });
 
       const finalScores: Record<string, number> = {};
@@ -257,38 +283,56 @@ const Diagnostico: React.FC = () => {
                 {currentQuestion.description && <p className="text-muted-foreground mb-6">{currentQuestion.description}</p>}
 
                 <div className="space-y-3">
+                  {/* Objective numeric data (weight=0) */}
+                  {currentQuestion.type === 'scale' && isObjectiveQuestion(currentQuestion) && (
+                    <Input
+                      type="number"
+                      placeholder="Ingresa el número..."
+                      value={answers[currentQuestion.id] || ''}
+                      onChange={(e) => handleNumericAnswer(currentQuestion.id, e.target.value)}
+                      className="h-14 text-lg"
+                    />
+                  )}
+
+                  {/* Likert */}
                   {currentQuestion.type === 'likert' && (
                     <div className="grid grid-cols-1 gap-2">
-                      {[2, 4, 6, 8, 10].map((val) => (
+                      {[
+                        { val: 2, label: 'Totalmente en desacuerdo' },
+                        { val: 4, label: 'En desacuerdo' },
+                        { val: 6, label: 'Neutral' },
+                        { val: 8, label: 'De acuerdo' },
+                        { val: 10, label: 'Totalmente de acuerdo' },
+                      ].map(({ val, label }) => (
                         <Button 
                           key={val} 
                           variant={answers[currentQuestion.id] === val ? 'default' : 'outline'}
                           className="justify-start h-12 px-6"
                           onClick={() => handleAnswer(currentQuestion.id, val)}
                         >
-                          {val === 2 && "Totalmente en desacuerdo"}
-                          {val === 4 && "En desacuerdo"}
-                          {val === 6 && "Neutral"}
-                          {val === 8 && "De acuerdo"}
-                          {val === 10 && "Totalmente de acuerdo"}
+                          {label}
                         </Button>
                       ))}
                     </div>
                   )}
-                  {currentQuestion.type === 'scale' && (
+
+                  {/* Scale 1-10 (scored questions only) */}
+                  {currentQuestion.type === 'scale' && !isObjectiveQuestion(currentQuestion) && (
                     <div className="flex justify-between items-center gap-2">
                       {[1,2,3,4,5,6,7,8,9,10].map(val => (
                         <button
                           key={val}
                           onClick={() => handleAnswer(currentQuestion.id, val)}
-                          className={`w-10 h-10 rounded-full border transition-all ${answers[currentQuestion.id] === val ? 'bg-primary border-primary text-white scale-110' : 'border-border hover:border-primary/50'}`}
+                          className={`w-10 h-10 rounded-full border transition-all ${answers[currentQuestion.id] === val ? 'bg-primary border-primary text-primary-foreground scale-110' : 'border-border hover:border-primary/50'}`}
                         >
                           {val}
                         </button>
                       ))}
                     </div>
                   )}
-                  {(currentQuestion.type === 'single_choice' || currentQuestion.type === 'multiple_choice') && (
+
+                  {/* Single Choice */}
+                  {currentQuestion.type === 'single_choice' && (
                     <div className="grid gap-3">
                       {currentQuestion.options.map((opt: any) => (
                         <Button
@@ -302,6 +346,25 @@ const Diagnostico: React.FC = () => {
                       ))}
                     </div>
                   )}
+
+                  {/* Multiple Choice */}
+                  {currentQuestion.type === 'multiple_choice' && (
+                    <div className="grid gap-3">
+                      {currentQuestion.options.map((opt: any) => {
+                        const selected = Array.isArray(answers[currentQuestion.id]) && answers[currentQuestion.id].includes(opt.value);
+                        return (
+                          <Button
+                            key={opt.value}
+                            variant={selected ? 'default' : 'outline'}
+                            className="justify-start h-auto py-4 px-6 text-left whitespace-normal"
+                            onClick={() => handleMultipleAnswer(currentQuestion.id, opt.value)}
+                          >
+                            {opt.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 mt-8">
@@ -310,7 +373,11 @@ const Diagnostico: React.FC = () => {
                       {t('back')}
                     </Button>
                   )}
-                  <Button onClick={nextQuestion} className="flex-1 glow-primary" disabled={!answers[currentQuestion.id]}>
+                  <Button onClick={nextQuestion} className="flex-1 glow-primary" disabled={
+                    currentQuestion.type === 'multiple_choice' 
+                      ? !answers[currentQuestion.id] || (Array.isArray(answers[currentQuestion.id]) && answers[currentQuestion.id].length === 0)
+                      : !answers[currentQuestion.id] && answers[currentQuestion.id] !== 0
+                  }>
                     {currentQuestionIndex === questions.length - 1 ? t('diagSubmit') : t('next')}
                   </Button>
                 </div>
