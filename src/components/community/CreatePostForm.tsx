@@ -31,13 +31,13 @@ const CreatePostForm: React.FC<Props> = ({ onSubmit }) => {
     setUploading(true);
     const ext = file.name.split('.').pop();
     const path = `community/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from('product-images').upload(path, file);
+    const { error } = await supabase.storage.from('community-images').upload(path, file);
     if (error) {
       toast({ title: 'Error al subir imagen', variant: 'destructive' });
       setUploading(false);
       return;
     }
-    const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path);
+    const { data: { publicUrl } } = supabase.storage.from('community-images').getPublicUrl(path);
     setImageUrl(publicUrl);
     setUploading(false);
   };
