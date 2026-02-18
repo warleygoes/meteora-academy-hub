@@ -556,6 +556,7 @@ export type Database = {
       }
       diagnostics: {
         Row: {
+          archived: boolean
           cheapest_plan: number | null
           client_count: string | null
           company_name: string | null
@@ -576,6 +577,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          archived?: boolean
           cheapest_plan?: number | null
           client_count?: string | null
           company_name?: string | null
@@ -596,6 +598,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          archived?: boolean
           cheapest_plan?: number | null
           client_count?: string | null
           company_name?: string | null
