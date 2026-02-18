@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search, Eye, Trash2, Globe, Plus, Pencil, GripVertical, Target, Settings, ClipboardList,
-  Filter, BarChart3, Thermometer, UserCheck, TrendingUp, X
+  Filter, BarChart3, Thermometer, UserCheck, TrendingUp, X, Archive, ArchiveRestore
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -156,8 +157,46 @@ const AdminDiagnostics: React.FC = () => {
     fetchDiagnostics();
   };
 
+  // Archive / Delete
+  const archiveDiagnostic = async (id: string) => {
+    await supabase.from('diagnostics').update({ archived: true }).eq('id', id);
+    toast({ title: 'Diagnóstico archivado' });
+    fetchDiagnostics();
+  };
+
+  const unarchiveDiagnostic = async (id: string) => {
+    await supabase.from('diagnostics').update({ archived: false }).eq('id', id);
+    toast({ title: 'Diagnóstico restaurado' });
+    fetchDiagnostics();
+  };
+
+  const permanentlyDelete = async (id: string) => {
+    await Promise.all([
+      supabase.from('diagnostic_lead_tracking').delete().eq('diagnostic_id', id),
+      supabase.from('diagnostic_answers').delete().eq('diagnostic_id', id),
+    ]);
+    await supabase.from('diagnostics').delete().eq('id', id);
+    toast({ title: 'Diagnóstico eliminado permanentemente' });
+    fetchDiagnostics();
+  };
+
+  const deleteAllArchived = async () => {
+    const archivedIds = diagnostics.filter(d => d.archived).map(d => d.id);
+    if (archivedIds.length === 0) return;
+    await Promise.all([
+      supabase.from('diagnostic_lead_tracking').delete().in('diagnostic_id', archivedIds),
+      supabase.from('diagnostic_answers').delete().in('diagnostic_id', archivedIds),
+    ]);
+    await supabase.from('diagnostics').delete().in('id', archivedIds);
+    toast({ title: `${archivedIds.length} diagnósticos eliminados` });
+    fetchDiagnostics();
+  };
+
   // Filters
-  const filteredDiagnostics = diagnostics.filter(d => {
+  const activeDiagnostics = diagnostics.filter(d => !d.archived);
+  const archivedDiagnostics = diagnostics.filter(d => d.archived);
+
+  const filteredDiagnostics = activeDiagnostics.filter(d => {
     if (globalSearch && !d.name?.toLowerCase().includes(globalSearch.toLowerCase()) && !d.email?.toLowerCase().includes(globalSearch.toLowerCase())) return false;
     const track = leadTracking[d.id];
     if (filterTemp !== 'all' && track?.lead_temperature !== filterTemp) return false;
@@ -253,7 +292,8 @@ const AdminDiagnostics: React.FC = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="submissions" className="gap-2"><ClipboardList className="w-4 h-4" /> Envíos</TabsTrigger>
+          <TabsTrigger value="submissions" className="gap-2"><ClipboardList className="w-4 h-4" /> Envíos ({activeDiagnostics.length})</TabsTrigger>
+          <TabsTrigger value="archived" className="gap-2"><Archive className="w-4 h-4" /> Archivados ({archivedDiagnostics.length})</TabsTrigger>
           <TabsTrigger value="metrics" className="gap-2"><BarChart3 className="w-4 h-4" /> Métricas</TabsTrigger>
           <TabsTrigger value="questions" className="gap-2"><Settings className="w-4 h-4" /> Preguntas</TabsTrigger>
           <TabsTrigger value="rules" className="gap-2"><Target className="w-4 h-4" /> Reglas</TabsTrigger>
@@ -355,7 +395,10 @@ const AdminDiagnostics: React.FC = () => {
                         {new Date(d.created_at).toLocaleDateString()} {new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedSubmission(d)}><Eye className="w-4 h-4" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => setSelectedSubmission(d)} title="Ver detalle"><Eye className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => archiveDiagnostic(d.id)} title="Archivar"><Archive className="w-4 h-4 text-muted-foreground" /></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -366,7 +409,81 @@ const AdminDiagnostics: React.FC = () => {
               </TableBody>
             </Table>
           </Card>
-          <p className="text-xs text-muted-foreground">{filteredDiagnostics.length} de {diagnostics.length} diagnósticos</p>
+          <p className="text-xs text-muted-foreground">{filteredDiagnostics.length} de {activeDiagnostics.length} diagnósticos</p>
+        </TabsContent>
+
+        {/* === ARCHIVED === */}
+        <TabsContent value="archived" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">{archivedDiagnostics.length} diagnósticos archivados</p>
+            {archivedDiagnostics.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-2"><Trash2 className="w-4 h-4" /> Eliminar Todos</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Eliminar todos los archivados?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta acción eliminará permanentemente {archivedDiagnostics.length} diagnósticos archivados. No se puede deshacer.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={deleteAllArchived} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar Todos</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+          <Card className="border-border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>País</TableHead>
+                  <TableHead>Clientes</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {archivedDiagnostics.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium">{d.name}</TableCell>
+                    <TableCell className="text-xs">{d.email}</TableCell>
+                    <TableCell><div className="flex items-center gap-1"><FlagImg country={d.country} /><span className="text-xs">{d.country}</span></div></TableCell>
+                    <TableCell className="text-center">{d.client_count || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(d.created_at).toLocaleDateString()} {new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => unarchiveDiagnostic(d.id)} title="Restaurar"><ArchiveRestore className="w-4 h-4 text-primary" /></Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Eliminar permanentemente"><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar permanentemente?</AlertDialogTitle>
+                              <AlertDialogDescription>El diagnóstico de "{d.name}" será eliminado de forma irreversible junto con todas sus respuestas.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => permanentlyDelete(d.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {archivedDiagnostics.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay diagnósticos archivados</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
         </TabsContent>
 
         {/* === METRICS === */}
