@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { DollarSign, Plus, Edit, Trash2, CheckCircle2, Package as PackageIcon, Users, Tag, ChevronDown, ChevronRight, AlertTriangle, Calendar, GripVertical, Upload } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, CheckCircle2, Package as PackageIcon, Users, Tag, ChevronDown, ChevronRight, AlertTriangle, Calendar, GripVertical, Upload, Search, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +72,9 @@ const AdminPackages: React.FC = () => {
   const [showDelete, setShowDelete] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
+  const [searchPkg, setSearchPkg] = useState('');
+  const [filterPkgActive, setFilterPkgActive] = useState('all');
 
   // Product linker with ordering
   const [showProductLinker, setShowProductLinker] = useState(false);
@@ -335,6 +338,24 @@ const AdminPackages: React.FC = () => {
     return map[type] || type;
   };
 
+  const filteredPackages = packages.filter(pkg => {
+    if (searchPkg) {
+      const s = searchPkg.toLowerCase();
+      if (!pkg.name.toLowerCase().includes(s) && !(pkg.description || '').toLowerCase().includes(s)) return false;
+    }
+    if (filterPkgActive === 'active' && !pkg.active) return false;
+    if (filterPkgActive === 'inactive' && pkg.active) return false;
+    return true;
+  });
+
+  const toggleDetails = (id: string) => {
+    setExpandedDetails(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div>
       <input type="file" ref={fileRefH} className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) uploadPackageImage(e.target.files[0], 'horizontal'); }} />
@@ -350,18 +371,36 @@ const AdminPackages: React.FC = () => {
         </Button>
       </div>
 
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Buscar paquetes..." value={searchPkg} onChange={e => setSearchPkg(e.target.value)} className="pl-10 pr-8 bg-secondary border-border" />
+          {searchPkg && <button onClick={() => setSearchPkg('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
+        </div>
+        <Select value={filterPkgActive} onValueChange={setFilterPkgActive}>
+          <SelectTrigger className="w-[130px] bg-secondary border-border"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">{t('active')}</SelectItem>
+            <SelectItem value="inactive">{t('inactive')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {loading ? (
         <p className="text-center py-12 text-muted-foreground">{t('loading')}...</p>
-      ) : packages.length === 0 ? (
+      ) : filteredPackages.length === 0 ? (
         <p className="text-center py-12 text-muted-foreground">{t('noPackagesFound') || 'No se encontraron paquetes.'}</p>
       ) : (
         <div className="space-y-4">
-          {packages.map(pkg => {
+          {filteredPackages.map(pkg => {
             const isExpanded = expandedPkg === pkg.id;
+            const isDetailsExpanded = expandedDetails.has(pkg.id);
             const defaultOffer = pkg.offers.find(o => o.is_default);
             return (
               <div key={pkg.id} className={`bg-card rounded-xl border overflow-hidden ${pkg.active ? 'border-primary/20' : 'border-border opacity-70'}`}>
-                <div className="p-5">
+              <div className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Badge variant={pkg.active ? 'default' : 'secondary'} className={pkg.active ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}>
@@ -385,49 +424,57 @@ const AdminPackages: React.FC = () => {
                     {pkg.thumbnail_url && <img src={pkg.thumbnail_url} alt="" className="w-24 h-16 object-cover rounded shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-display font-bold text-foreground">{pkg.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{pkg.description}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-1">{pkg.description}</p>
                     </div>
+                    {defaultOffer && (
+                      <span className="text-2xl font-display font-bold text-foreground shrink-0">
+                        {defaultOffer.currency === 'USD' ? 'U$' : defaultOffer.currency} {defaultOffer.price}
+                      </span>
+                    )}
                   </div>
 
-                  {defaultOffer && (
-                    <p className="text-3xl font-display font-bold text-foreground mb-1 mt-2">
-                      {defaultOffer.currency === 'USD' ? 'U$' : defaultOffer.currency} {defaultOffer.price}
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
                     <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {pkg.subscriber_count} {t('subscribers')}</span>
                     <span className="flex items-center gap-1"><PackageIcon className="w-3 h-3" /> {pkg.products.length} {t('productsLabel') || 'productos'}</span>
                     <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {pkg.offers.length} {t('offers') || 'ofertas'}</span>
                   </div>
 
-                  {pkg.products.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">{t('includedProducts') || 'Productos incluidos'}:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {pkg.products.map((p, i) => (
-                          <Badge key={p.id} variant="secondary" className="text-xs">
-                            <span className="opacity-50 mr-1">{i + 1}.</span>
-                            {p.name} <span className="opacity-60 ml-1">({getTypeLabel(p.type)})</span>
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Collapsible details */}
+                  {isDetailsExpanded && (
+                    <>
+                      {pkg.products.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">{t('includedProducts') || 'Productos incluidos'}:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {pkg.products.map((p, i) => (
+                              <Badge key={p.id} variant="secondary" className="text-xs">
+                                <span className="opacity-50 mr-1">{i + 1}.</span>
+                                {p.name} <span className="opacity-60 ml-1">({getTypeLabel(p.type)})</span>
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {(pkg.features || []).length > 0 && (
+                        <ul className="space-y-1 mt-3">
+                          {pkg.features.map((f, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                              <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" /> {f}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
                   )}
 
-                  {(pkg.features || []).length > 0 && (
-                    <ul className="space-y-1 mb-3">
-                      {pkg.features.map((f, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                          <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" /> {f}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mt-3">
                     <Button variant="outline" size="sm" onClick={() => toggleActive(pkg)}>
                       {pkg.active ? t('deactivate') : t('activate')}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => toggleDetails(pkg.id)} className="gap-1">
+                      {isDetailsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      {isDetailsExpanded ? 'Ocultar detalles' : 'Ver detalles'}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setExpandedPkg(isExpanded ? null : pkg.id)} className="gap-1">
                       <Tag className="w-3.5 h-3.5" /> {t('offers') || 'Ofertas'}

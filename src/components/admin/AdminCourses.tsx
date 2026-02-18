@@ -58,6 +58,7 @@ interface Course {
   category_id: string | null; status: string; sort_order: number;
   category?: Category | null; enrollment_count?: number;
   product_id?: string;
+  product_categories?: { category_id: string; category_name: string }[];
 }
 
 interface Enrollment {
@@ -281,7 +282,26 @@ const AdminCourses: React.FC = () => {
       const { data: products } = await supabase.from('products').select('id, course_id').not('course_id', 'is', null);
       const productMap: Record<string, string> = {};
       products?.forEach(p => { if (p.course_id) productMap[p.course_id] = p.id; });
-      setCourses(coursesData.map((c: any) => ({ ...c, category: c.course_categories, enrollment_count: countMap[c.id] || 0, product_id: productMap[c.id] })));
+      // Get product_categories for all products
+      const productIds = (products || []).map(p => p.id);
+      const { data: prodCats } = productIds.length > 0 
+        ? await supabase.from('product_categories').select('product_id, category_id, course_categories:category_id(name)').in('product_id', productIds)
+        : { data: [] };
+      const prodCatMap: Record<string, { category_id: string; category_name: string }[]> = {};
+      (prodCats || []).forEach((pc: any) => {
+        const productId = pc.product_id;
+        // Find course_id for this product
+        const courseId = Object.entries(productMap).find(([, pid]) => pid === productId)?.[0];
+        if (courseId) {
+          if (!prodCatMap[courseId]) prodCatMap[courseId] = [];
+          prodCatMap[courseId].push({ category_id: pc.category_id, category_name: (pc.course_categories as any)?.name || '' });
+        }
+      });
+      setCourses(coursesData.map((c: any) => ({
+        ...c, category: c.course_categories, enrollment_count: countMap[c.id] || 0, 
+        product_id: productMap[c.id],
+        product_categories: prodCatMap[c.id] || [],
+      })));
     }
     setLoading(false);
   }, []);
@@ -552,7 +572,12 @@ const AdminCourses: React.FC = () => {
 
   const filtered = courses.filter(c => {
     if (filterStatus !== 'all' && c.status !== filterStatus) return false;
-    if (filterCategory !== 'all' && c.category_id !== filterCategory) return false;
+    if (filterCategory !== 'all') {
+      // Check both the legacy category_id and the product_categories
+      const hasCategory = c.category_id === filterCategory || 
+        (c.product_categories || []).some(pc => pc.category_id === filterCategory);
+      if (!hasCategory) return false;
+    }
     if (search) {
       const s = search.toLowerCase();
       return c.title.toLowerCase().includes(s) || (c.description || '').toLowerCase().includes(s) || (c.category?.name || '').toLowerCase().includes(s);
@@ -578,7 +603,8 @@ const AdminCourses: React.FC = () => {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder={t('searchCourses')} value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-secondary border-border" />
+          <Input placeholder={t('searchCourses')} value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-8 bg-secondary border-border" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
         </div>
         <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
           <SelectTrigger className="w-[140px] bg-secondary border-border"><Filter className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
@@ -632,7 +658,17 @@ const AdminCourses: React.FC = () => {
                   </div>
                   <p className="text-sm text-muted-foreground truncate ml-6">{course.description}</p>
                   <div className="flex gap-4 mt-1 text-xs text-muted-foreground ml-6">
-                    {course.category && <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{course.category.name}</span>}
+                    {(course.product_categories || []).length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {(course.product_categories || []).map(pc => (
+                          <Badge key={pc.category_id} variant="outline" className="text-xs">
+                            <Tag className="w-2.5 h-2.5 mr-1" />{pc.category_name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : course.category ? (
+                      <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{course.category.name}</span>
+                    ) : null}
                     <span>{course.enrollment_count} {t('students')}</span>
                   </div>
                 </div>

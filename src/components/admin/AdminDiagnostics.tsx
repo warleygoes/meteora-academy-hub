@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search, Eye, Trash2, Globe, Plus, Pencil, GripVertical, Target, Settings, ClipboardList,
-  Filter, BarChart3, Thermometer, UserCheck, TrendingUp
+  Filter, BarChart3, Thermometer, UserCheck, TrendingUp, X
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -262,7 +262,10 @@ const AdminDiagnostics: React.FC = () => {
         {/* === SUBMISSIONS === */}
         <TabsContent value="submissions" className="space-y-4">
           <div className="flex flex-wrap gap-2 mb-2">
-            <Input placeholder="Buscar nombre o email..." value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} className="max-w-xs" />
+            <div className="relative max-w-xs">
+              <Input placeholder="Buscar nombre o email..." value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} className="pr-8" />
+              {globalSearch && <button onClick={() => setGlobalSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
+            </div>
             <Select value={filterTemp} onValueChange={setFilterTemp}>
               <SelectTrigger className="w-[140px]"><Thermometer className="w-3 h-3 mr-1" /><SelectValue placeholder="Temperatura" /></SelectTrigger>
               <SelectContent>
@@ -651,7 +654,7 @@ const AdminDiagnostics: React.FC = () => {
             <div className="space-y-2"><label className="text-sm font-medium">Descripción</label><Input value={ruleDescription} onChange={e => setRuleDescription(e.target.value)} /></div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Producto Vinculado</label>
-              <Select value={ruleProductId} onValueChange={setRuleProductId}><SelectTrigger><SelectValue placeholder="Ninguno" /></SelectTrigger><SelectContent><SelectItem value="">Ninguno</SelectItem>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
+              <Select value={ruleProductId || 'none'} onValueChange={v => setRuleProductId(v === 'none' ? '' : v)}><SelectTrigger><SelectValue placeholder="Ninguno" /></SelectTrigger><SelectContent><SelectItem value="none">Ninguno</SelectItem>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
             </div>
             <div className="space-y-2"><label className="text-sm font-medium">CTA</label><Input value={ruleCtaText} onChange={e => setRuleCtaText(e.target.value)} /></div>
             <div className="space-y-2"><label className="text-sm font-medium">Prioridad</label><Input type="number" value={rulePriority} onChange={e => setRulePriority(e.target.value)} className="w-32" /></div>
