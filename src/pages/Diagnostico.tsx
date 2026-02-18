@@ -273,10 +273,16 @@ const Diagnostico: React.FC = () => {
 
       // Check if user already exists
       const { data: profileData } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
-      setExistingUser(!!profileData);
+      const userExists = !!profileData;
+      setExistingUser(userExists);
 
-      // Move to auth step (password creation)
-      setStep('auth');
+      if (userExists) {
+        // Existing user: go to auth step to login
+        setStep('auth');
+      } else {
+        // New user: go to auth step to create password
+        setStep('auth');
+      }
     } catch (err) {
       console.error(err);
       toast({ title: t('errorOccurred'), variant: 'destructive' });
@@ -644,20 +650,20 @@ const Diagnostico: React.FC = () => {
                 <h2 className="text-2xl font-display font-bold mb-2">¡Tu diagnóstico está listo!</h2>
                 {existingUser ? (
                   <>
-                    <p className="text-muted-foreground mb-6">Tu cuenta ya existe. Solo confirma tu acceso para ver los resultados.</p>
+                    <p className="text-muted-foreground mb-6">Ya tienes una cuenta registrada con <strong>{email}</strong>. Ingresa tu contraseña para ver tus resultados.</p>
                     <div className="space-y-4 max-w-sm mx-auto">
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input type="password" placeholder="Tu contraseña" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 h-12" />
                       </div>
                       <Button onClick={handleAuthAndShowResults} disabled={loading || !password} className="w-full h-12 glow-primary text-lg font-bold">
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ver Mi Diagnóstico'}
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Iniciar Sesión y Ver Resultado'}
                       </Button>
                     </div>
                   </>
                 ) : (
                   <>
-                    <p className="text-muted-foreground mb-6">Crea tu contraseña para acceder a tu diagnóstico completo y guardarlo en tu cuenta.</p>
+                    <p className="text-muted-foreground mb-6">Crea tu contraseña para acceder a tu diagnóstico completo y a la comunidad Meteora.</p>
                     <div className="space-y-4 max-w-sm mx-auto">
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
