@@ -346,6 +346,51 @@ const Diagnostico: React.FC = () => {
   const sectionLabel = (key: string) => t(`diag${key.charAt(0).toUpperCase() + key.slice(1)}`);
   const levelCfg = LEVEL_CONFIG[generalLevel] || LEVEL_CONFIG.diagInstable;
 
+  // Section labels & icons for step headers
+  const SECTION_META: Record<string, { icon: string; label: string; step: number }> = {
+    technical: { icon: '🔧', label: 'Arquitectura Técnica', step: 1 },
+    financial: { icon: '💰', label: 'Gestión Financiera', step: 2 },
+    scale: { icon: '📈', label: 'Escala Comercial', step: 3 },
+    expansion: { icon: '🚀', label: 'Potencial de Expansión', step: 4 },
+    commitment: { icon: '🎯', label: 'Compromiso Estratégico', step: 5 },
+  };
+
+  // Calculate accelerated progress (feels faster at start, slower at end)
+  const calcProgress = () => {
+    const raw = (currentQuestionIndex + 1) / questions.length;
+    // Ease-out curve: feels fast initially
+    return Math.round((1 - Math.pow(1 - raw, 0.6)) * 100);
+  };
+
+  // Get current section info
+  const currentSectionMeta = currentQuestion ? SECTION_META[currentQuestion.section] || { icon: '📋', label: currentQuestion.section, step: 0 } : null;
+
+  // Detect section transitions
+  const prevSection = currentQuestionIndex > 0 ? questions[currentQuestionIndex - 1]?.section : null;
+  const isNewSection = currentQuestion && currentQuestion.section !== prevSection;
+
+  // Questions remaining in current section
+  const questionsInSection = currentQuestion ? questions.filter(q => q.section === currentQuestion.section).length : 0;
+  const currentInSection = currentQuestion ? questions.filter(q => q.section === currentQuestion.section).indexOf(currentQuestion) + 1 : 0;
+
+  // Encouragement messages
+  const getEncouragement = () => {
+    const pct = ((currentQuestionIndex + 1) / questions.length) * 100;
+    if (pct >= 90) return '🏁 ¡Ya casi terminas!';
+    if (pct >= 75) return '💪 ¡Falta muy poco!';
+    if (pct >= 50) return '🔥 ¡Vas por la mitad!';
+    if (pct >= 25) return '⚡ ¡Buen ritmo!';
+    return null;
+  };
+
+  const LIKERT_OPTIONS = [
+    { val: 10, label: 'Totalmente de acuerdo', emoji: '💚', color: 'border-emerald-500/40 hover:bg-emerald-500/10' },
+    { val: 8, label: 'De acuerdo', emoji: '👍', color: 'border-emerald-400/30 hover:bg-emerald-400/5' },
+    { val: 6, label: 'Neutral', emoji: '😐', color: 'border-amber-400/30 hover:bg-amber-400/5' },
+    { val: 4, label: 'En desacuerdo', emoji: '👎', color: 'border-orange-400/30 hover:bg-orange-400/5' },
+    { val: 2, label: 'Totalmente en desacuerdo', emoji: '❌', color: 'border-destructive/30 hover:bg-destructive/5' },
+  ];
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-2xl">
@@ -387,15 +432,66 @@ const Diagnostico: React.FC = () => {
 
           {/* === QUESTIONS === */}
           {step === 'questions' && currentQuestion && (
-            <motion.div key={`q-${currentQuestionIndex}`} {...fadeUp} className="space-y-6">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-primary uppercase tracking-wider">{t(`diag${currentQuestion.section.charAt(0).toUpperCase() + currentQuestion.section.slice(1)}`)}</span>
-                <span className="text-xs text-muted-foreground">{currentQuestionIndex + 1} / {questions.length}</span>
+            <motion.div key={`q-${currentQuestionIndex}`} {...fadeUp} className="space-y-5">
+              {/* Section header with steps */}
+              <div className="space-y-3">
+                {/* 5 criteria step indicators */}
+                <div className="flex items-center justify-between gap-1">
+                  {Object.entries(SECTION_META).map(([key, meta]) => {
+                    const isCurrent = currentQuestion.section === key;
+                    const sectionQuestions = questions.filter(q => q.section === key);
+                    const firstIdx = questions.indexOf(sectionQuestions[0]);
+                    const isPast = currentQuestionIndex > firstIdx + sectionQuestions.length - 1;
+                    return (
+                      <div key={key} className={`flex-1 text-center transition-all ${isCurrent ? 'scale-105' : ''}`}>
+                        <div className={`text-lg ${isPast ? 'opacity-60' : isCurrent ? '' : 'opacity-30'}`}>{meta.icon}</div>
+                        <div className={`text-[10px] mt-0.5 leading-tight font-medium ${isCurrent ? 'text-primary' : isPast ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>
+                          {meta.label.split(' ').slice(0, 2).join(' ')}
+                        </div>
+                        <div className={`h-1 rounded-full mt-1 ${isPast ? 'bg-primary/60' : isCurrent ? 'bg-primary' : 'bg-border'}`} />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Progress bar with accelerated feel */}
+                <div className="flex items-center gap-3">
+                  <Progress value={calcProgress()} className="h-2 flex-1" />
+                  <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">{currentQuestionIndex + 1}/{questions.length}</span>
+                </div>
+
+                {/* Encouragement message */}
+                {getEncouragement() && (
+                  <motion.p 
+                    initial={{ opacity: 0, scale: 0.95 }} 
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center text-sm font-medium text-primary"
+                  >
+                    {getEncouragement()}
+                  </motion.p>
+                )}
               </div>
-              <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} className="h-1.5" />
+
+              {/* New section intro card */}
+              {isNewSection && currentSectionMeta && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-center"
+                >
+                  <span className="text-2xl">{currentSectionMeta.icon}</span>
+                  <h3 className="font-bold text-sm mt-1">Criterio {currentSectionMeta.step} de 5: {currentSectionMeta.label}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">{questionsInSection} preguntas en esta sección</p>
+                </motion.div>
+              )}
               
-              <Card className="p-8 border-primary/20 bg-secondary/30">
-                <h3 className="text-2xl font-bold mb-4">{currentQuestion.question_text}</h3>
+              <Card className="p-6 sm:p-8 border-primary/20 bg-secondary/30">
+                <div className="flex items-start gap-2 mb-1">
+                  <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {currentInSection}/{questionsInSection}
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold mb-4">{currentQuestion.question_text}</h3>
                 {currentQuestion.description && <p className="text-muted-foreground mb-6">{currentQuestion.description}</p>}
 
                 <div className="space-y-3">
@@ -405,50 +501,109 @@ const Diagnostico: React.FC = () => {
                   {currentQuestion.type === 'scale' && isObjectiveQuestion(currentQuestion) && (
                     <Input type="number" placeholder="Ingresa el número..." value={answers[currentQuestion.id] || ''} onChange={(e) => handleNumericAnswer(currentQuestion.id, e.target.value)} className="h-14 text-lg" />
                   )}
+
+                  {/* Likert with emojis & reversed order (agree first) */}
                   {currentQuestion.type === 'likert' && (
                     <div className="grid grid-cols-1 gap-2">
-                      {[
-                        { val: 2, label: 'Totalmente en desacuerdo' },
-                        { val: 4, label: 'En desacuerdo' },
-                        { val: 6, label: 'Neutral' },
-                        { val: 8, label: 'De acuerdo' },
-                        { val: 10, label: 'Totalmente de acuerdo' },
-                      ].map(({ val, label }) => (
-                        <Button key={val} variant={answers[currentQuestion.id] === val ? 'default' : 'outline'} className="justify-start h-12 px-6" onClick={() => handleAnswer(currentQuestion.id, val)}>
-                          {label}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                  {currentQuestion.type === 'scale' && !isObjectiveQuestion(currentQuestion) && (
-                    <div className="flex justify-between items-center gap-2">
-                      {[1,2,3,4,5,6,7,8,9,10].map(val => (
-                        <button key={val} onClick={() => handleAnswer(currentQuestion.id, val)}
-                          className={`w-10 h-10 rounded-full border transition-all ${answers[currentQuestion.id] === val ? 'bg-primary border-primary text-primary-foreground scale-110' : 'border-border hover:border-primary/50'}`}>
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {currentQuestion.type === 'single_choice' && (
-                    <div className="grid gap-3">
-                      {currentQuestion.options.map((opt: any) => (
-                        <Button key={opt.value} variant={answers[currentQuestion.id] === opt.value ? 'default' : 'outline'} className="justify-start h-auto py-4 px-6 text-left whitespace-normal" onClick={() => handleAnswer(currentQuestion.id, opt.value)}>
-                          {opt.label}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                  {currentQuestion.type === 'multiple_choice' && (
-                    <div className="grid gap-3">
-                      {currentQuestion.options.map((opt: any) => {
-                        const selected = Array.isArray(answers[currentQuestion.id]) && answers[currentQuestion.id].includes(opt.value);
+                      {LIKERT_OPTIONS.map(({ val, label, emoji, color }) => {
+                        const isSelected = answers[currentQuestion.id] === val;
                         return (
-                          <Button key={opt.value} variant={selected ? 'default' : 'outline'} className="justify-start h-auto py-4 px-6 text-left whitespace-normal" onClick={() => handleMultipleAnswer(currentQuestion.id, opt.value)}>
-                            {opt.label}
-                          </Button>
+                          <button
+                            key={val}
+                            onClick={() => handleAnswer(currentQuestion.id, val)}
+                            className={`flex items-center gap-3 w-full text-left px-5 py-3.5 rounded-xl border-2 transition-all duration-200 ${
+                              isSelected 
+                                ? 'border-primary bg-primary/10 ring-2 ring-primary/20 scale-[1.02]' 
+                                : `border-border ${color}`
+                            }`}
+                          >
+                            <span className="text-xl shrink-0">{emoji}</span>
+                            <span className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>{label}</span>
+                            {isSelected && <CheckCircle2 className="w-5 h-5 text-primary ml-auto shrink-0" />}
+                          </button>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {currentQuestion.type === 'scale' && !isObjectiveQuestion(currentQuestion) && (
+                    <div>
+                      <div className="flex justify-between items-center gap-1.5 sm:gap-2">
+                        {[1,2,3,4,5,6,7,8,9,10].map(val => (
+                          <button key={val} onClick={() => handleAnswer(currentQuestion.id, val)}
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 transition-all text-sm font-bold ${
+                              answers[currentQuestion.id] === val 
+                                ? 'bg-primary border-primary text-primary-foreground scale-110 shadow-lg shadow-primary/30' 
+                                : val <= 4 ? 'border-destructive/30 hover:border-destructive/60 hover:bg-destructive/5'
+                                : val <= 7 ? 'border-amber-400/30 hover:border-amber-400/60 hover:bg-amber-400/5'
+                                : 'border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/5'
+                            }`}>
+                            {val}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground mt-2 px-1">
+                        <span>😟 Muy bajo</span>
+                        <span>🌟 Excelente</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQuestion.type === 'single_choice' && (
+                    <div className="grid gap-2.5">
+                      {currentQuestion.options.map((opt: any, idx: number) => {
+                        const isSelected = answers[currentQuestion.id] === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => handleAnswer(currentQuestion.id, opt.value)}
+                            className={`flex items-center gap-3 w-full text-left px-5 py-4 rounded-xl border-2 transition-all duration-200 ${
+                              isSelected
+                                ? 'border-primary bg-primary/10 ring-2 ring-primary/20 scale-[1.02]'
+                                : 'border-border hover:border-primary/30 hover:bg-primary/5'
+                            }`}
+                          >
+                            <span className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${
+                              isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/30 text-muted-foreground'
+                            }`}>
+                              {String.fromCharCode(65 + idx)}
+                            </span>
+                            <span className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
+                            {isSelected && <CheckCircle2 className="w-5 h-5 text-primary ml-auto shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {currentQuestion.type === 'multiple_choice' && (
+                    <div className="space-y-2.5">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Puedes seleccionar varias opciones
+                      </p>
+                      <div className="grid gap-2.5">
+                        {currentQuestion.options.map((opt: any) => {
+                          const selected = Array.isArray(answers[currentQuestion.id]) && answers[currentQuestion.id].includes(opt.value);
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => handleMultipleAnswer(currentQuestion.id, opt.value)}
+                              className={`flex items-center gap-3 w-full text-left px-5 py-4 rounded-xl border-2 transition-all duration-200 ${
+                                selected
+                                  ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                                  : 'border-border hover:border-primary/30 hover:bg-primary/5'
+                              }`}
+                            >
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                                selected ? 'border-primary bg-primary' : 'border-muted-foreground/30'
+                              }`}>
+                                {selected && <CheckCircle2 className="w-4 h-4 text-primary-foreground" />}
+                              </div>
+                              <span className={`text-sm font-medium ${selected ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -465,6 +620,7 @@ const Diagnostico: React.FC = () => {
                         : !answers[currentQuestion.id] && answers[currentQuestion.id] !== 0
                   }>
                     {currentQuestionIndex === questions.length - 1 ? t('diagSubmit') : t('next')}
+                    <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
               </Card>
