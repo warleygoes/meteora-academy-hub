@@ -219,6 +219,7 @@ export const translations: Record<Language, Record<string, string>> = {
     diagScale: 'Escala Comercial',
     diagExpansion: 'Potencial de Expansión',
     diagStrategic: 'Compromiso Estratégico',
+    diagCommitment: 'Compromiso Estratégico',
     diagMainCritical: 'Área Crítica Principal',
     diagSecondaryArea: 'Área Secundaria',
     diagMainStrength: 'Fortaleza Principal',

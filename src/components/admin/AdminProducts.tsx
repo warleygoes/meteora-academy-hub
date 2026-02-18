@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon, BookOpen, Sparkles, X, Loader2, FileText } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Tag, ChevronDown, ChevronRight, Calendar, DollarSign, Upload, Image as ImageIcon, BookOpen, Sparkles, X, Loader2, FileText, Search } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +54,9 @@ const AdminProducts: React.FC = () => {
   const [uploadingV, setUploadingV] = useState(false);
   const fileRefH = useRef<HTMLInputElement>(null);
   const fileRefV = useRef<HTMLInputElement>(null);
+  const [searchProducts, setSearchProducts] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [filterActive, setFilterActive] = useState('all');
 
   const PRODUCT_TYPES = [
     { value: 'course', label: t('typeCourse') },
@@ -353,6 +356,17 @@ const AdminProducts: React.FC = () => {
     return <SalesPageEditor productId={salesPageProduct.id} productName={salesPageProduct.name} onClose={() => setSalesPageProduct(null)} />;
   }
 
+  const filteredProducts = products.filter(p => {
+    if (searchProducts) {
+      const s = searchProducts.toLowerCase();
+      if (!p.name.toLowerCase().includes(s) && !(p.description || '').toLowerCase().includes(s)) return false;
+    }
+    if (filterType !== 'all' && p.type !== filterType) return false;
+    if (filterActive === 'active' && !p.active) return false;
+    if (filterActive === 'inactive' && p.active) return false;
+    return true;
+  });
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -363,13 +377,37 @@ const AdminProducts: React.FC = () => {
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> {t('addProduct')}</Button>
       </div>
 
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Buscar productos..." value={searchProducts} onChange={e => setSearchProducts(e.target.value)} className="pl-10 pr-8 bg-secondary border-border" />
+          {searchProducts && <button onClick={() => setSearchProducts('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
+        </div>
+        <Select value={filterType} onValueChange={setFilterType}>
+          <SelectTrigger className="w-[160px] bg-secondary border-border"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            {PRODUCT_TYPES.map(pt => <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterActive} onValueChange={setFilterActive}>
+          <SelectTrigger className="w-[130px] bg-secondary border-border"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">{t('active')}</SelectItem>
+            <SelectItem value="inactive">{t('inactive')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {loading ? (
         <p className="text-center py-12 text-muted-foreground">{t('loading')}...</p>
-      ) : products.length === 0 ? (
+      ) : filteredProducts.length === 0 ? (
         <p className="text-center py-12 text-muted-foreground">{t('noProductsFound')}</p>
       ) : (
         <div className="space-y-3">
-          {products.map(p => {
+          {filteredProducts.map(p => {
             const isExpanded = expandedProduct === p.id;
             const defaultOffer = p.offers.find(o => o.is_default);
             return (

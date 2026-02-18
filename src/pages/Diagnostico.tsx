@@ -271,18 +271,22 @@ const Diagnostico: React.FC = () => {
         last_action_at: new Date().toISOString(),
       });
 
+      // Check if user is already logged in
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user?.email === email) {
+        // Already logged in with this email - go straight to results
+        setStep('results');
+        setLoading(false);
+        return;
+      }
+
       // Check if user already exists
       const { data: profileData } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
       const userExists = !!profileData;
       setExistingUser(userExists);
 
-      if (userExists) {
-        // Existing user: go to auth step to login
-        setStep('auth');
-      } else {
-        // New user: go to auth step to create password
-        setStep('auth');
-      }
+      // Go to auth step (login or create password)
+      setStep('auth');
     } catch (err) {
       console.error(err);
       toast({ title: t('errorOccurred'), variant: 'destructive' });
@@ -365,7 +369,8 @@ const Diagnostico: React.FC = () => {
   const calcProgress = () => {
     const raw = (currentQuestionIndex + 1) / questions.length;
     // Ease-out curve: feels fast initially
-    return Math.round((1 - Math.pow(1 - raw, 0.6)) * 100);
+    // Ease-in curve: fast at start, slow at end (encourages completion)
+    return Math.round(Math.pow(raw, 0.55) * 100);
   };
 
   // Get current section info
