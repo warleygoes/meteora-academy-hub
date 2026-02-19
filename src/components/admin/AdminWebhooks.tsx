@@ -98,6 +98,39 @@ const AdminWebhooks: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* Payload Structure Reference */}
+      <div className="bg-card rounded-xl border border-border p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Webhook className="w-5 h-5 text-primary" />
+          <h3 className="font-display font-semibold text-foreground">Estructura del Payload</h3>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Todos los webhooks siguen esta estructura JSON estandarizada. Use estas propiedades para configurar su n8n, Make o Zapier.
+        </p>
+        <pre className="text-xs bg-secondary/50 rounded-lg p-4 border border-border overflow-x-auto font-mono text-foreground whitespace-pre">
+{`{
+  "event": "user.registered | user.approved | user.rejected | user.deleted",
+  "timestamp": "2025-01-01T00:00:00.000Z",
+  "data": {
+    "user_id": "uuid",
+    "email": "string",
+    "name": "string",
+    "company_name": "string",
+    "country": "string",
+    "phone": "string",
+    "role_type": "owner | employee",
+    "client_count": "string",
+    "network_type": "string",
+    "performed_by": "admin@email.com",
+    "timestamp": "2025-01-01T00:00:00.000Z"
+  }
+}`}
+        </pre>
+        <p className="text-xs text-muted-foreground mt-2">
+          <strong>Nota:</strong> El campo <code className="text-primary">name</code> siempre contiene el nombre del usuario (nunca "nome" o "display_name").
+        </p>
+      </div>
+
       {/* Event Types */}
       <div className="bg-card rounded-xl border border-border p-6">
         <div className="flex items-center gap-2 mb-1">
