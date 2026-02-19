@@ -109,14 +109,12 @@ const Login: React.FC = () => {
         return;
       }
 
-      // Check if email already exists
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email.trim().toLowerCase())
-        .maybeSingle();
+      // Check if email already exists using secure DB function (works without auth)
+      const { data: emailExists } = await supabase.rpc('check_email_exists', {
+        check_email: email.trim().toLowerCase(),
+      });
 
-      if (existingProfile) {
+      if (emailExists) {
         toast({ title: t('emailAlreadyRegistered') || 'Este email ya está registrado. Intenta iniciar sesión.', variant: 'destructive' });
         setSubmitting(false);
         return;
@@ -138,8 +136,8 @@ const Login: React.FC = () => {
         setSignupComplete(true);
         // Dispatch webhook for new user registration
         try {
-          await supabase.functions.invoke('dispatch-webhook', {
-            body: { event: 'user.registered', data: { email, name: displayName, company_name: companyName, country, role_type: roleType } },
+           await supabase.functions.invoke('dispatch-webhook', {
+            body: { event: 'user.registered', data: { email, name: displayName, company_name: companyName, country, role_type: roleType, phone, client_count: clientCount, network_type: networkType } },
           });
         } catch (e) { console.error('Webhook dispatch failed:', e); }
         // Trigger n8n workflow notification

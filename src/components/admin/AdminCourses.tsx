@@ -201,6 +201,7 @@ const AdminCourses: React.FC = () => {
   const [bulkAccessTitle, setBulkAccessTitle] = useState('');
   const [bulkAccessSearch, setBulkAccessSearch] = useState('');
   const [bulkAccessProfiles, setBulkAccessProfiles] = useState<UserProfile[]>([]);
+  const [bulkAccessUsersWithAccess, setBulkAccessUsersWithAccess] = useState<Set<string>>(new Set());
   const [loadingBulkAccess, setLoadingBulkAccess] = useState(false);
 
   const openBulkAccessManager = async (mode: 'module' | 'product', courseId: string, moduleId?: string) => {
@@ -211,14 +212,40 @@ const AdminCourses: React.FC = () => {
     setLoadingBulkAccess(true);
     setShowBulkAccessManager(true);
     const course = courses.find(c => c.id === courseId);
+
+    // Get the private lesson IDs for this scope
+    let privateLessonIds: string[] = [];
     if (mode === 'module' && moduleId) {
       const mod = (courseModules[courseId] || []).find(m => m.id === moduleId);
       setBulkAccessTitle(`Módulo: ${mod?.title || ''}`);
+      privateLessonIds = (mod?.lessons || []).filter(l => l.is_private).map(l => l.id);
     } else {
       setBulkAccessTitle(`Conteúdo: ${course?.title || ''}`);
+      privateLessonIds = (courseModules[courseId] || []).flatMap(m => m.lessons.filter(l => l.is_private).map(l => l.id));
     }
-    const { data: profilesData } = await supabase.from('profiles').select('user_id, display_name, email, company_name').eq('approved', true).order('display_name');
+
+    // Fetch profiles and existing access in parallel
+    const [{ data: profilesData }, accessResult] = await Promise.all([
+      supabase.from('profiles').select('user_id, display_name, email, company_name').eq('approved', true).order('display_name'),
+      privateLessonIds.length > 0
+        ? supabase.from('user_lesson_access').select('user_id, lesson_id').in('lesson_id', privateLessonIds)
+        : Promise.resolve({ data: [] as { user_id: string; lesson_id: string }[] }),
+    ]);
     setBulkAccessProfiles(profilesData || []);
+
+    // A user "has access" if they have access to ALL private lessons in the scope
+    const accessData = (accessResult as any).data || [];
+    const userLessonCount: Record<string, number> = {};
+    for (const row of accessData) {
+      userLessonCount[row.user_id] = (userLessonCount[row.user_id] || 0) + 1;
+    }
+    const usersWithFullAccess = new Set<string>();
+    if (privateLessonIds.length > 0) {
+      for (const [uid, count] of Object.entries(userLessonCount)) {
+        if (count >= privateLessonIds.length) usersWithFullAccess.add(uid);
+      }
+    }
+    setBulkAccessUsersWithAccess(usersWithFullAccess);
     setLoadingBulkAccess(false);
   };
 
@@ -228,6 +255,8 @@ const AdminCourses: React.FC = () => {
     } else if (bulkAccessMode === 'product' && bulkAccessCourseId) {
       await grantProductAccessToUser(userId, bulkAccessCourseId);
     }
+    // Update local state to reflect the grant
+    setBulkAccessUsersWithAccess(prev => new Set([...prev, userId]));
   };
 
   const filteredBulkProfiles = bulkAccessProfiles.filter(p => {
@@ -1072,17 +1101,32 @@ const AdminCourses: React.FC = () => {
             <p className="text-sm text-muted-foreground text-center py-6">{t('loading')}...</p>
           ) : (
             <div className="space-y-1 max-h-[50vh] overflow-y-auto">
-              {filteredBulkProfiles.map(p => (
-                <div key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:bg-secondary/50 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
-                    <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+              {/* Users WITH access first */}
+              {filteredBulkProfiles
+                .filter(p => bulkAccessUsersWithAccess.has(p.user_id))
+                .map(p => (
+                  <div key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-primary/30 bg-primary/5 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
+                      <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs border-primary/30 text-primary shrink-0">Con acceso</Badge>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => executeBulkGrant(p.user_id)} className="shrink-0 text-xs h-7">
-                    Liberar
-                  </Button>
-                </div>
-              ))}
+                ))}
+              {/* Users WITHOUT access */}
+              {filteredBulkProfiles
+                .filter(p => !bulkAccessUsersWithAccess.has(p.user_id))
+                .map(p => (
+                  <div key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:bg-secondary/50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
+                      <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => executeBulkGrant(p.user_id)} className="shrink-0 text-xs h-7">
+                      Liberar
+                    </Button>
+                  </div>
+                ))}
               {filteredBulkProfiles.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t('noUsersFound')}</p>}
             </div>
           )}

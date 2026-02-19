@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { buildUserWebhookData } from '@/lib/webhookPayload';
 
 export async function logSystemEvent(params: {
   action: string;
@@ -23,11 +24,16 @@ export async function logSystemEvent(params: {
 
     // Dispatch webhook if event specified
     if (params.webhookEvent) {
+      // Normalize webhook data through standardized builder
+      const normalizedData = params.webhookData
+        ? buildUserWebhookData(params.webhookData as any)
+        : {};
+
       supabase.functions.invoke('dispatch-webhook', {
         body: {
           event: params.webhookEvent,
           data: {
-            ...params.webhookData,
+            ...normalizedData,
             performed_by: user?.email || null,
             timestamp: new Date().toISOString(),
           },
