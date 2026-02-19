@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search, Eye, Trash2, Globe, Plus, Pencil, GripVertical, Target, Settings, ClipboardList,
-  Filter, BarChart3, Thermometer, UserCheck, TrendingUp, X, Archive, ArchiveRestore
+  Filter, BarChart3, Thermometer, UserCheck, TrendingUp, X, Archive, ArchiveRestore, Package
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import DiagnosticRulesManager from './DiagnosticRulesManager';
+import { FIELD_KEY_OPTIONS } from '@/lib/diagnosticComputedFields';
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -236,7 +238,7 @@ const AdminDiagnostics: React.FC = () => {
 
   // Question CRUD
   const handleSaveQuestion = async () => {
-    const payload = { section, type, question_text: text, description, options, weight: parseFloat(weight), sort_order: editingQuestion ? editingQuestion.sort_order : questions.length };
+    const payload: any = { section, type, question_text: text, description, options, weight: parseFloat(weight), sort_order: editingQuestion ? editingQuestion.sort_order : questions.length, field_key: parseFloat(weight) === 0 ? ((editingQuestion as any)?.field_key || null) : null };
     let error;
     if (editingQuestion) {
       ({ error } = await supabase.from('diagnostic_questions').update(payload).eq('id', editingQuestion.id));
@@ -591,39 +593,7 @@ const AdminDiagnostics: React.FC = () => {
 
         {/* === RULES === */}
         <TabsContent value="rules" className="space-y-4">
-          <div className="flex justify-end mb-4">
-            <Button onClick={() => { resetRuleForm(); setIsRuleDialogOpen(true); }} className="gap-2"><Plus className="w-4 h-4" /> Agregar Regla</Button>
-          </div>
-          <Card className="border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Prioridad</TableHead>
-                  <TableHead>Condición</TableHead>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Producto</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rules.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.priority}</TableCell>
-                    <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{SECTION_OPTIONS.find(s => s.value === r.condition_field)?.label || r.condition_field} {r.condition_operator} {r.condition_value}</code></TableCell>
-                    <TableCell className="font-medium">{r.title}</TableCell>
-                    <TableCell>{(r as any).products?.name || '—'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => editRule(r)}><Pencil className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteRule(r.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {rules.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay reglas configuradas.</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </Card>
+          <DiagnosticRulesManager />
         </TabsContent>
       </Tabs>
 
@@ -727,9 +697,23 @@ const AdminDiagnostics: React.FC = () => {
               <label className="text-sm font-medium">Descripción (Opcional)</label>
               <Input value={description} onChange={e => setDescription(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Peso (0 = dato objetivo)</label>
-              <Input type="number" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-32" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Peso (0 = dato objetivo)</label>
+                <Input type="number" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-32" />
+              </div>
+              {parseFloat(weight) === 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Clave de dato (field_key)</label>
+                  <Select value={(editingQuestion as any)?.field_key || ''} onValueChange={v => setEditingQuestion((prev: any) => prev ? { ...prev, field_key: v } : prev)}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Ninguno</SelectItem>
+                      {FIELD_KEY_OPTIONS.map(fk => <SelectItem key={fk.value} value={fk.value}>{fk.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             {(type === 'single_choice' || type === 'multiple_choice') && (
               <div className="space-y-3">
