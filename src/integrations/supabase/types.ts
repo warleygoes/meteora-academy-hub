@@ -472,6 +472,7 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string | null
+          field_key: string | null
           id: string
           options: Json | null
           question_text: string
@@ -484,6 +485,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           description?: string | null
+          field_key?: string | null
           id?: string
           options?: Json | null
           question_text: string
@@ -496,6 +498,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           description?: string | null
+          field_key?: string | null
           id?: string
           options?: Json | null
           question_text?: string
@@ -512,36 +515,48 @@ export type Database = {
           condition_field: string
           condition_operator: string
           condition_value: number
+          conditions: Json | null
+          conditions_logic: string
           created_at: string | null
           cta_text: string | null
           description: string | null
           id: string
           priority: number | null
+          recommended_package_ids: string[] | null
           recommended_product_id: string | null
+          recommended_product_ids: string[] | null
           title: string | null
         }
         Insert: {
           condition_field: string
           condition_operator: string
           condition_value: number
+          conditions?: Json | null
+          conditions_logic?: string
           created_at?: string | null
           cta_text?: string | null
           description?: string | null
           id?: string
           priority?: number | null
+          recommended_package_ids?: string[] | null
           recommended_product_id?: string | null
+          recommended_product_ids?: string[] | null
           title?: string | null
         }
         Update: {
           condition_field?: string
           condition_operator?: string
           condition_value?: number
+          conditions?: Json | null
+          conditions_logic?: string
           created_at?: string | null
           cta_text?: string | null
           description?: string | null
           id?: string
           priority?: number | null
+          recommended_package_ids?: string[] | null
           recommended_product_id?: string | null
+          recommended_product_ids?: string[] | null
           title?: string | null
         }
         Relationships: [

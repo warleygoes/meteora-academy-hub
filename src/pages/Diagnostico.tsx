@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { extractRawData, computeDerivedMetrics, evaluateConditions, type RuleCondition } from '@/lib/diagnosticComputedFields';
 import meteoraLogo from '@/assets/logo-white-pink.png';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -93,6 +94,8 @@ const Diagnostico: React.FC = () => {
   const [advisorUrl, setAdvisorUrl] = useState('');
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [clientCount, setClientCount] = useState(0);
+  const [rawData, setRawData] = useState<Record<string, number>>({});
+  const [computedMetrics, setComputedMetrics] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -220,12 +223,18 @@ const Diagnostico: React.FC = () => {
       setWeightedIndex(wi);
       setClientCount(detectedClientCount);
 
+      // Extract raw data and compute derived metrics
+      const raw = extractRawData(questions as any, answers);
+      const derived = computeDerivedMetrics(raw);
+      setRawData(raw);
+      setComputedMetrics(derived);
+
       // Save to DB
       const { data: diagData, error: diagError } = await supabase.from('diagnostics').insert({
         name, email, phone, country,
         client_count: detectedClientCount.toString(),
         scores: finalScores,
-        results: { weightedIndex: wi, level },
+        results: { weightedIndex: wi, level, rawData: raw, computed: derived },
         status: 'completed'
       }).select().single();
 
@@ -250,15 +259,11 @@ const Diagnostico: React.FC = () => {
 
       // Match recommendations for auto product
       const matchedRules = recommendations.filter(rule => {
-        const fieldVal = finalScores[rule.condition_field] ?? 0;
-        switch (rule.condition_operator) {
-          case '<': return fieldVal < rule.condition_value;
-          case '<=': return fieldVal <= rule.condition_value;
-          case '>': return fieldVal > rule.condition_value;
-          case '>=': return fieldVal >= rule.condition_value;
-          case '=': return fieldVal === rule.condition_value;
-          default: return false;
-        }
+        const conds: RuleCondition[] = (rule as any).conditions?.length > 0
+          ? (rule as any).conditions
+          : [{ field: rule.condition_field, operator: rule.condition_operator, value: rule.condition_value }];
+        const logic = ((rule as any).conditions_logic || 'and') as 'and' | 'or';
+        return evaluateConditions(conds, logic, finalScores, raw, derived);
       });
 
       await supabase.from('diagnostic_lead_tracking').insert({
@@ -338,15 +343,11 @@ const Diagnostico: React.FC = () => {
 
   // Get matched rules for results
   const matchedRules = recommendations.filter(rule => {
-    const fieldVal = scores[rule.condition_field] ?? 0;
-    switch (rule.condition_operator) {
-      case '<': return fieldVal < rule.condition_value;
-      case '<=': return fieldVal <= rule.condition_value;
-      case '>': return fieldVal > rule.condition_value;
-      case '>=': return fieldVal >= rule.condition_value;
-      case '=': return fieldVal === rule.condition_value;
-      default: return false;
-    }
+    const conds: RuleCondition[] = (rule as any).conditions?.length > 0
+      ? (rule as any).conditions
+      : [{ field: rule.condition_field, operator: rule.condition_operator, value: rule.condition_value }];
+    const logic = ((rule as any).conditions_logic || 'and') as 'and' | 'or';
+    return evaluateConditions(conds, logic, scores, rawData, computedMetrics);
   });
 
   const sorted = Object.entries(scores).sort(([, a], [, b]) => a - b);
@@ -468,7 +469,6 @@ const Diagnostico: React.FC = () => {
                 {/* Progress bar with accelerated feel */}
                 <div className="flex items-center gap-3">
                   <Progress value={calcProgress()} className="h-2 flex-1" />
-                  <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">{currentQuestionIndex + 1}/{questions.length}</span>
                 </div>
 
                 {/* Encouragement message */}
