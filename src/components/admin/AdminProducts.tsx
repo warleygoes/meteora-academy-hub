@@ -72,7 +72,7 @@ const AdminProducts: React.FC = () => {
     name: '', description: '', type: 'service' as string, payment_type: 'one_time',
     thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '',
     trial_enabled: false, trial_days: '', recurring_type: '', features_list: [] as string[],
-    show_on_home: false,
+    show_on_home: false, cta_type: 'direct_purchase', cta_url: '',
   });
   const [newFeature, setNewFeature] = useState('');
   const [generatingAI, setGeneratingAI] = useState<Record<string, boolean>>({});
@@ -162,7 +162,7 @@ const AdminProducts: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '', trial_enabled: false, trial_days: '', recurring_type: '', features_list: [], show_on_home: false });
+    setForm({ name: '', description: '', type: 'service', payment_type: 'one_time', thumbnail_url: '', thumbnail_vertical_url: '', has_content: false, saas_url: '', trial_enabled: false, trial_days: '', recurring_type: '', features_list: [], show_on_home: false, cta_type: 'direct_purchase', cta_url: '' });
     setNewFeature('');
     setShowEditor(true);
   };
@@ -179,6 +179,8 @@ const AdminProducts: React.FC = () => {
       recurring_type: p.recurring_type || '',
       features_list: Array.isArray(p.features_list) ? p.features_list : [],
       show_on_home: (p as any).show_on_home || false,
+      cta_type: (p as any).cta_type || 'direct_purchase',
+      cta_url: (p as any).cta_url || '',
     });
     setNewFeature('');
     setShowEditor(true);
@@ -196,6 +198,8 @@ const AdminProducts: React.FC = () => {
       recurring_type: form.recurring_type || null,
       features_list: form.features_list,
       show_on_home: form.show_on_home,
+      cta_type: form.cta_type,
+      cta_url: form.cta_url || null,
     };
 
     if (editing) {
@@ -686,6 +690,32 @@ const AdminProducts: React.FC = () => {
                 <p className="text-sm font-medium text-foreground">Mostrar na Home</p>
                 <p className="text-xs text-muted-foreground">Exibir este produto na landing page pública</p>
               </div>
+            </div>
+
+            {/* CTA Configuration */}
+            <div className="p-4 rounded-xl border border-border bg-secondary/30 space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Tipo de CTA (Acción del Cliente)</h4>
+              <Select value={form.cta_type} onValueChange={v => setForm(f => ({ ...f, cta_type: v }))}>
+                <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="direct_purchase">🛒 Compra Directa</SelectItem>
+                  <SelectItem value="awareness_lessons">📚 Aulas de Concientización</SelectItem>
+                  <SelectItem value="calendar_booking">📅 Agendar en Calendario</SelectItem>
+                  <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
+                  <SelectItem value="custom_url">🔗 URL Personalizada</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.cta_type !== 'direct_purchase' && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">
+                    {form.cta_type === 'whatsapp' ? 'Número WhatsApp (ej: https://wa.me/5511...)' :
+                     form.cta_type === 'calendar_booking' ? 'URL del Calendario (Calendly, Cal.com, etc.)' :
+                     form.cta_type === 'awareness_lessons' ? 'URL de las aulas gratuitas' :
+                     'URL del CTA'}
+                  </label>
+                  <Input value={form.cta_url} onChange={e => setForm(f => ({ ...f, cta_url: e.target.value }))} className="bg-secondary border-border" placeholder="https://..." />
+                </div>
+              )}
             </div>
 
             {/* Image uploads */}

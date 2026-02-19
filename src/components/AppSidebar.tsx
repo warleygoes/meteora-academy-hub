@@ -139,6 +139,7 @@ export const AppSidebar: React.FC = () => {
     { to: '/app/courses', icon: BookOpen, label: t('myLibrary') || 'Minha Biblioteca' },
     { to: '/app/community', icon: Users, label: t('community') },
     { to: '/app/meetings', icon: Video, label: t('liveMeetings') },
+    { to: '/app/diagnostics', icon: Target, label: t('myDiagnostics') || 'Mis Diagnósticos' },
     ...(isAdmin ? [
       { to: '/app/admin', icon: Shield, label: t('admin') },
     ] : []),

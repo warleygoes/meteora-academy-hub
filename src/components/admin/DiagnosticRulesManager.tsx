@@ -122,6 +122,8 @@ const DiagnosticRulesManager: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [ctaText, setCtaText] = useState('');
+  const [ctaType, setCtaType] = useState('custom_url');
+  const [ctaUrl, setCtaUrl] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [itemSearch, setItemSearch] = useState('');
@@ -150,6 +152,8 @@ const DiagnosticRulesManager: React.FC = () => {
     setTitle('');
     setDescription('');
     setCtaText('');
+    setCtaType('custom_url');
+    setCtaUrl('');
     setSelectedProductIds([]);
     setSelectedPackageIds([]);
     setItemSearch('');
@@ -167,6 +171,8 @@ const DiagnosticRulesManager: React.FC = () => {
     setTitle(rule.title || '');
     setDescription(rule.description || '');
     setCtaText(rule.cta_text || '');
+    setCtaType((rule as any).cta_type || 'custom_url');
+    setCtaUrl((rule as any).cta_url || '');
     setSelectedProductIds(rule.recommended_product_ids || (rule.recommended_product_id ? [rule.recommended_product_id] : []));
     setSelectedPackageIds(rule.recommended_package_ids || []);
     setItemSearch('');
@@ -180,6 +186,8 @@ const DiagnosticRulesManager: React.FC = () => {
       title,
       description,
       cta_text: ctaText,
+      cta_type: ctaType,
+      cta_url: ctaUrl || null,
       recommended_product_ids: selectedProductIds,
       recommended_package_ids: selectedPackageIds,
       // Keep legacy fields in sync with first condition
@@ -354,8 +362,26 @@ const DiagnosticRulesManager: React.FC = () => {
                 <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Nombre de la regla" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">CTA</label>
+                <label className="text-sm font-medium">CTA Texto</label>
                 <Input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder="Texto del botón" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tipo de CTA</label>
+                <Select value={ctaType} onValueChange={v => setCtaType(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="sales_page">Página de Venta</SelectItem>
+                    <SelectItem value="calendar">Agendar en Calendario</SelectItem>
+                    <SelectItem value="custom_url">URL Personalizada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">URL / Link del CTA</label>
+                <Input value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} placeholder={ctaType === 'whatsapp' ? 'https://wa.me/5511...' : 'https://...'} />
               </div>
             </div>
             <div className="space-y-2">

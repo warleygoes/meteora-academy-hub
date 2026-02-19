@@ -562,28 +562,38 @@ const Diagnostico: React.FC = () => {
 
                   {currentQuestion.type === 'single_choice' && (
                     <div className="grid gap-2.5">
-                      {currentQuestion.options.map((opt: any, idx: number) => {
-                        const isSelected = answers[currentQuestion.id] === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            onClick={() => handleAnswer(currentQuestion.id, opt.value)}
-                            className={`flex items-center gap-3 w-full text-left px-5 py-4 rounded-xl border-2 transition-all duration-200 ${
-                              isSelected
-                                ? 'border-primary bg-primary/10 ring-2 ring-primary/20 scale-[1.02]'
-                                : 'border-border hover:border-primary/30 hover:bg-primary/5'
-                            }`}
-                          >
-                            <span className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${
-                              isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/30 text-muted-foreground'
-                            }`}>
-                              {String.fromCharCode(65 + idx)}
-                            </span>
-                            <span className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
-                            {isSelected && <CheckCircle2 className="w-5 h-5 text-primary ml-auto shrink-0" />}
-                          </button>
-                        );
-                      })}
+                      {(() => {
+                        const scores = currentQuestion.options.map((o: any) => o.score || 0);
+                        const maxScore = Math.max(...scores);
+                        const minScore = Math.min(...scores);
+                        const range = maxScore - minScore || 1;
+                        return currentQuestion.options.map((opt: any, idx: number) => {
+                          const isSelected = answers[currentQuestion.id] === opt.value;
+                          const score = opt.score || 0;
+                          const pct = (score - minScore) / range;
+                          const qualityEmoji = pct >= 0.7 ? '✅' : pct >= 0.4 ? '⚠️' : '🔴';
+                          const qualityBorder = pct >= 0.7
+                            ? 'border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/5'
+                            : pct >= 0.4
+                              ? 'border-amber-400/30 hover:border-amber-400/50 hover:bg-amber-400/5'
+                              : 'border-destructive/30 hover:border-destructive/50 hover:bg-destructive/5';
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => handleAnswer(currentQuestion.id, opt.value)}
+                              className={`flex items-center gap-3 w-full text-left px-5 py-4 rounded-xl border-2 transition-all duration-200 ${
+                                isSelected
+                                  ? 'border-primary bg-primary/10 ring-2 ring-primary/20 scale-[1.02]'
+                                  : qualityBorder
+                              }`}
+                            >
+                              <span className="text-lg shrink-0">{qualityEmoji}</span>
+                              <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
+                              {isSelected && <CheckCircle2 className="w-5 h-5 text-primary ml-auto shrink-0" />}
+                            </button>
+                          );
+                        });
+                      })()}
                     </div>
                   )}
 
@@ -789,7 +799,12 @@ const Diagnostico: React.FC = () => {
                         <p className="text-sm text-muted-foreground mt-2">Este programa está diseñado para resolver exactamente el cuello de botella que hoy limita tu ISP.</p>
                       </div>
                     </div>
-                    {matchedRules[0].cta_text && (
+                    {matchedRules[0].cta_text && (matchedRules[0] as any).cta_url && (
+                      <Button className="w-full mt-6 h-12 text-lg font-bold glow-primary" onClick={() => window.open((matchedRules[0] as any).cta_url, '_blank')}>
+                        <ArrowUpRight className="w-5 h-5 mr-2" /> {matchedRules[0].cta_text}
+                      </Button>
+                    )}
+                    {matchedRules[0].cta_text && !(matchedRules[0] as any).cta_url && (
                       <Button className="w-full mt-6 h-12 text-lg font-bold glow-primary">
                         <ArrowUpRight className="w-5 h-5 mr-2" /> {matchedRules[0].cta_text}
                       </Button>
@@ -810,7 +825,7 @@ const Diagnostico: React.FC = () => {
                           <span className="font-medium text-sm">{rule.title}</span>
                           {rule.description && <p className="text-xs text-muted-foreground">{rule.description}</p>}
                         </div>
-                        {rule.cta_text && <Button size="sm" variant="outline">{rule.cta_text}</Button>}
+                        {rule.cta_text && <Button size="sm" variant="outline" onClick={() => (rule as any).cta_url && window.open((rule as any).cta_url, '_blank')}>{rule.cta_text}</Button>}
                       </div>
                     ))}
                   </div>
@@ -852,13 +867,13 @@ const Diagnostico: React.FC = () => {
               {/* BLOQUE 8 — Botones Finales */}
               <div className="flex flex-col sm:flex-row gap-3">
                 {matchedRules.length > 0 && matchedRules[0].cta_text && (
-                  <Button className="flex-1 h-14 text-lg font-bold glow-primary">
-                    <ArrowRight className="w-5 h-5 mr-2" /> Comenzar Ahora
+                  <Button className="flex-1 h-14 text-lg font-bold glow-primary" onClick={() => (matchedRules[0] as any).cta_url && window.open((matchedRules[0] as any).cta_url, '_blank')}>
+                    <ArrowRight className="w-5 h-5 mr-2" /> {matchedRules[0].cta_text}
                   </Button>
                 )}
-                {scores.commitment >= 7 && advisorUrl && (
-                  <Button variant="outline" className="flex-1 h-14 text-lg font-bold" onClick={() => window.open(advisorUrl, '_blank')}>
-                    <MessageSquare className="w-5 h-5 mr-2" /> Hablar con un Asesor
+                {matchedRules.length > 1 && matchedRules[1].cta_text && (matchedRules[1] as any).cta_url && (
+                  <Button variant="outline" className="flex-1 h-14 text-lg font-bold" onClick={() => window.open((matchedRules[1] as any).cta_url, '_blank')}>
+                    <MessageSquare className="w-5 h-5 mr-2" /> {matchedRules[1].cta_text}
                   </Button>
                 )}
               </div>

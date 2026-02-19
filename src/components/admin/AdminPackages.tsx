@@ -98,6 +98,7 @@ const AdminPackages: React.FC = () => {
   const [form, setForm] = useState({
     name: '', description: '', payment_type: 'one_time', features: '', duration_days: '',
     show_in_showcase: false, thumbnail_url: '', thumbnail_vertical_url: '',
+    cta_type: 'direct_purchase', cta_url: '',
   });
 
   const [offerForm, setOfferForm] = useState({
@@ -167,7 +168,7 @@ const AdminPackages: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', description: '', payment_type: 'one_time', features: '', duration_days: '', show_in_showcase: false, thumbnail_url: '', thumbnail_vertical_url: '' });
+    setForm({ name: '', description: '', payment_type: 'one_time', features: '', duration_days: '', show_in_showcase: false, thumbnail_url: '', thumbnail_vertical_url: '', cta_type: 'direct_purchase', cta_url: '' });
     setShowEditor(true);
   };
 
@@ -180,6 +181,8 @@ const AdminPackages: React.FC = () => {
       show_in_showcase: pkg.show_in_showcase,
       thumbnail_url: pkg.thumbnail_url || '',
       thumbnail_vertical_url: pkg.thumbnail_vertical_url || '',
+      cta_type: (pkg as any).cta_type || 'direct_purchase',
+      cta_url: (pkg as any).cta_url || '',
     });
     setShowEditor(true);
   };
@@ -194,6 +197,8 @@ const AdminPackages: React.FC = () => {
       show_in_showcase: form.show_in_showcase,
       thumbnail_url: form.thumbnail_url || null,
       thumbnail_vertical_url: form.thumbnail_vertical_url || null,
+      cta_type: form.cta_type,
+      cta_url: form.cta_url || null,
     };
     if (editing) {
       await supabase.from('packages').update(payload).eq('id', editing.id);
@@ -630,6 +635,33 @@ const AdminPackages: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Mostrar como carrossel na vitrine do aluno.</p>
               </div>
             </div>
+
+            {/* CTA Configuration */}
+            <div className="p-4 rounded-xl border border-border bg-secondary/30 space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Tipo de CTA (Acción del Cliente)</h4>
+              <Select value={form.cta_type} onValueChange={v => setForm(f => ({ ...f, cta_type: v }))}>
+                <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="direct_purchase">🛒 Compra Directa</SelectItem>
+                  <SelectItem value="awareness_lessons">📚 Aulas de Concientización</SelectItem>
+                  <SelectItem value="calendar_booking">📅 Agendar en Calendario</SelectItem>
+                  <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
+                  <SelectItem value="custom_url">🔗 URL Personalizada</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.cta_type !== 'direct_purchase' && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">
+                    {form.cta_type === 'whatsapp' ? 'Número WhatsApp (ej: https://wa.me/5511...)' :
+                     form.cta_type === 'calendar_booking' ? 'URL del Calendario (Calendly, Cal.com, etc.)' :
+                     form.cta_type === 'awareness_lessons' ? 'URL de las aulas gratuitas' :
+                     'URL del CTA'}
+                  </label>
+                  <Input value={form.cta_url} onChange={e => setForm(f => ({ ...f, cta_url: e.target.value }))} className="bg-secondary border-border" placeholder="https://..." />
+                </div>
+              )}
+            </div>
+
             <Button onClick={savePackage} className="w-full">{t('save')}</Button>
           </div>
         </DialogContent>
