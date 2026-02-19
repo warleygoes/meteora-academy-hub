@@ -519,6 +519,8 @@ export type Database = {
           conditions_logic: string
           created_at: string | null
           cta_text: string | null
+          cta_type: string | null
+          cta_url: string | null
           description: string | null
           id: string
           priority: number | null
@@ -535,6 +537,8 @@ export type Database = {
           conditions_logic?: string
           created_at?: string | null
           cta_text?: string | null
+          cta_type?: string | null
+          cta_url?: string | null
           description?: string | null
           id?: string
           priority?: number | null
@@ -551,6 +555,8 @@ export type Database = {
           conditions_logic?: string
           created_at?: string | null
           cta_text?: string | null
+          cta_type?: string | null
+          cta_url?: string | null
           description?: string | null
           id?: string
           priority?: number | null
@@ -1134,6 +1140,8 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          cta_type: string | null
+          cta_url: string | null
           description: string | null
           duration_days: number | null
           features: string[] | null
@@ -1149,6 +1157,8 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          cta_type?: string | null
+          cta_url?: string | null
           description?: string | null
           duration_days?: number | null
           features?: string[] | null
@@ -1164,6 +1174,8 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          cta_type?: string | null
+          cta_url?: string | null
           description?: string | null
           duration_days?: number | null
           features?: string[] | null
@@ -1580,6 +1592,8 @@ export type Database = {
           active: boolean
           course_id: string | null
           created_at: string
+          cta_type: string | null
+          cta_url: string | null
           description: string | null
           features_list: Json | null
           has_content: boolean
@@ -1601,6 +1615,8 @@ export type Database = {
           active?: boolean
           course_id?: string | null
           created_at?: string
+          cta_type?: string | null
+          cta_url?: string | null
           description?: string | null
           features_list?: Json | null
           has_content?: boolean
@@ -1622,6 +1638,8 @@ export type Database = {
           active?: boolean
           course_id?: string | null
           created_at?: string
+          cta_type?: string | null
+          cta_url?: string | null
           description?: string | null
           features_list?: Json | null
           has_content?: boolean
