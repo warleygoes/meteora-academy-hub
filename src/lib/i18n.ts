@@ -171,6 +171,7 @@ export const translations: Record<Language, Record<string, string>> = {
     checkEmail: 'Revisa tu email para confirmar el registro.',
     invalidCredentials: 'Email o contraseña inválidos.',
     errorOccurred: 'Ocurrió un error. Intenta de nuevo.',
+    emailAlreadyRegistered: 'Este email ya está registrado. Intenta iniciar sesión.',
     adminAccessDenied: 'Acceso denegado. No eres administrador.',
     // Signup form fields
     roleType: '¿Cuál es tu rol?',
@@ -897,6 +898,7 @@ export const translations: Record<Language, Record<string, string>> = {
     checkEmail: 'Verifique seu email para confirmar o cadastro.',
     invalidCredentials: 'Email ou senha inválidos.',
     errorOccurred: 'Ocorreu um erro. Tente novamente.',
+    emailAlreadyRegistered: 'Este email já está cadastrado. Tente fazer login.',
     adminAccessDenied: 'Acesso negado. Você não é administrador.',
     roleType: 'Qual é seu papel?',
     ispOwner: 'Dono de ISP',
@@ -1577,6 +1579,7 @@ export const translations: Record<Language, Record<string, string>> = {
     checkEmail: 'Check your email to confirm registration.',
     invalidCredentials: 'Invalid email or password.',
     errorOccurred: 'An error occurred. Try again.',
+    emailAlreadyRegistered: 'This email is already registered. Try logging in.',
     adminAccessDenied: 'Access denied. You are not an administrator.',
     roleType: 'What is your role?',
     ispOwner: 'ISP Owner',

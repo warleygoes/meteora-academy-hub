@@ -329,19 +329,12 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     
     // Delete user completely via edge function (profile + auth + related data)
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-users`, {
+      const { data: result, error } = await supabase.functions.invoke('import-users', {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ user_id: actionUserId }),
+        body: { user_id: actionUserId },
       });
-      const result = await res.json();
-      if (!res.ok || result.error) {
-        toast({ title: result.error || 'Error al eliminar usuario', variant: 'destructive' });
+      if (error || result?.error) {
+        toast({ title: result?.error || error?.message || 'Error al eliminar usuario', variant: 'destructive' });
         fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers();
       } else {
         logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning', webhookEvent: 'user.deleted', webhookData: { user_id: actionUserId } });

@@ -109,6 +109,19 @@ const Login: React.FC = () => {
         return;
       }
 
+      // Check if email already exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (existingProfile) {
+        toast({ title: t('emailAlreadyRegistered') || 'Este email ya está registrado. Intenta iniciar sesión.', variant: 'destructive' });
+        setSubmitting(false);
+        return;
+      }
+
       result = await signUp(email, password, {
         display_name: displayName,
         role_type: roleType,
