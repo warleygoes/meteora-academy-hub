@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { logSystemEvent } from '@/lib/systemLog';
 import { supabase } from '@/integrations/supabase/client';
 import AdminWebhooks from './AdminWebhooks';
+import DatabaseExportSection from './DatabaseExportSection';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const SettingsSection: React.FC<{ icon: React.ReactNode; title: string; defaultOpen?: boolean; children: React.ReactNode }> = ({ icon, title, defaultOpen = false, children }) => {
@@ -170,52 +171,7 @@ const AdminSettings: React.FC = () => {
 
         {/* Database Export */}
         <SettingsSection icon={<Database className="w-5 h-5 text-primary" />} title="Exportar Base de Datos">
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Descarga un archivo SQL completo con todos los datos (INSERT INTO) de todas las tablas del sistema.
-            </p>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={async () => {
-                try {
-                  toast({ title: 'Generando dump...', description: 'Esto puede tardar unos segundos.' });
-                  const { data: { session } } = await supabase.auth.getSession();
-                  if (!session) {
-                    toast({ title: 'Error', description: 'Debes estar autenticado.', variant: 'destructive' });
-                    return;
-                  }
-                  const res = await fetch(
-                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pg-dump-export`,
-                    {
-                      headers: {
-                        Authorization: `Bearer ${session.access_token}`,
-                        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-                      },
-                    }
-                  );
-                  if (!res.ok) {
-                    const err = await res.json();
-                    toast({ title: 'Error', description: err.error || 'Error al exportar', variant: 'destructive' });
-                    return;
-                  }
-                  const blob = await res.blob();
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `pg_dump_data_${new Date().toISOString().slice(0, 10)}.sql`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                  toast({ title: 'Éxito', description: 'Archivo SQL descargado correctamente.' });
-                } catch (e: any) {
-                  toast({ title: 'Error', description: e.message, variant: 'destructive' });
-                }
-              }}
-            >
-              <Download className="w-4 h-4" />
-              Descargar pg_dump completo (SQL)
-            </Button>
-          </div>
+          <DatabaseExportSection />
         </SettingsSection>
 
         <Button onClick={saveSettings} className="w-full">{t('saveSettings')}</Button>
