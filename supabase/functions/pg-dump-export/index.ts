@@ -6,7 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-// Tables in dependency order (parents before children)
 const TABLES_ORDER = [
   "course_categories",
   "courses",
@@ -59,7 +58,6 @@ function escapeSQL(val: unknown): string {
   if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
   if (typeof val === "number") return String(val);
   if (Array.isArray(val)) {
-    // PostgreSQL array literal
     const items = val.map((v) => {
       if (v === null) return "NULL";
       const s = String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -68,13 +66,71 @@ function escapeSQL(val: unknown): string {
     return `'{${items.join(",")}}'`;
   }
   if (typeof val === "object") {
-    // JSON
     const json = JSON.stringify(val).replace(/'/g, "''");
     return `'${json}'::jsonb`;
   }
-  // String
   const str = String(val).replace(/'/g, "''");
   return `'${str}'`;
+}
+
+async function verifyAdmin(supabaseAdmin: any, authHeader: string | null) {
+  if (!authHeader) return null;
+  const { data: { user: caller } } = await supabaseAdmin.auth.getUser(
+    authHeader.replace("Bearer ", "")
+  );
+  if (!caller) return null;
+  const { data: roleData } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", caller.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  return roleData ? caller : null;
+}
+
+async function fetchAllRows(supabaseAdmin: any, tableName: string) {
+  let allRows: Record<string, unknown>[] = [];
+  let offset = 0;
+  const PAGE_SIZE = 1000;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from(tableName)
+      .select("*")
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) return { rows: allRows, error: error.message };
+    if (!data || data.length === 0) break;
+    allRows = allRows.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return { rows: allRows, error: null };
+}
+
+function generateTableSQL(tableName: string, rows: Record<string, unknown>[]): string {
+  const lines: string[] = [];
+  lines.push(`-- =====================`);
+  lines.push(`-- TABLE: ${tableName}`);
+  lines.push(`-- =====================`);
+
+  if (rows.length === 0) {
+    lines.push(`-- (empty table)`);
+    lines.push("");
+    return lines.join("\n");
+  }
+
+  const columns = Object.keys(rows[0]);
+  const colList = columns.map((c) => `"${c}"`).join(", ");
+
+  for (const row of rows) {
+    const values = columns.map((col) => escapeSQL(row[col])).join(", ");
+    lines.push(`INSERT INTO public."${tableName}" (${colList}) VALUES (${values});`);
+  }
+
+  lines.push(`-- ${rows.length} rows`);
+  lines.push("");
+  return lines.join("\n");
 }
 
 Deno.serve(async (req) => {
@@ -88,36 +144,80 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify caller is admin
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No authorization" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const { data: { user: caller } } = await supabaseAdmin.auth.getUser(
-      authHeader.replace("Bearer ", "")
-    );
+    const caller = await verifyAdmin(supabaseAdmin, req.headers.get("Authorization"));
     if (!caller) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const { data: roleData } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id)
-      .eq("role", "admin")
-      .maybeSingle();
-    if (!roleData) {
-      return new Response(JSON.stringify({ error: "Not admin" }), {
-        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const url = new URL(req.url);
+    const mode = url.searchParams.get("mode") || "full"; // full | list | table | schema
+    const tableName = url.searchParams.get("table");
+
+    // MODE: list — returns table list with row counts
+    if (mode === "list") {
+      const tableInfo = [];
+      for (const t of TABLES_ORDER) {
+        const { rows } = await fetchAllRows(supabaseAdmin, t);
+        tableInfo.push({ table: t, rows: rows.length });
+      }
+      return new Response(JSON.stringify(tableInfo), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // MODE: table — export single table
+    if (mode === "table" && tableName) {
+      if (!TABLES_ORDER.includes(tableName)) {
+        return new Response(JSON.stringify({ error: "Table not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { rows, error } = await fetchAllRows(supabaseAdmin, tableName);
+      if (error) {
+        return new Response(JSON.stringify({ error }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const sql = `-- Meteora Academy - Table: ${tableName}\n-- Generated: ${new Date().toISOString()}\n\nBEGIN;\n\n${generateTableSQL(tableName, rows)}\nCOMMIT;\n`;
+
+      return new Response(sql, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/sql; charset=utf-8",
+          "Content-Disposition": `attachment; filename=${tableName}_${new Date().toISOString().slice(0, 10)}.sql`,
+        },
+      });
+    }
+
+    // MODE: schema — export DDL only (disable constraints for restore)
+    if (mode === "schema") {
+      const lines: string[] = [];
+      lines.push("-- =============================================================");
+      lines.push("-- Meteora Academy - Disable constraints for data import");
+      lines.push(`-- Generated: ${new Date().toISOString()}`);
+      lines.push("-- =============================================================");
+      lines.push("");
+      lines.push("-- Run this BEFORE importing data:");
+      lines.push("SET session_replication_role = 'replica';");
+      lines.push("");
+      lines.push("-- Run this AFTER importing all data:");
+      lines.push("-- SET session_replication_role = 'origin';");
+      return new Response(lines.join("\n"), {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/sql; charset=utf-8",
+          "Content-Disposition": `attachment; filename=00_disable_constraints.sql`,
+        },
+      });
+    }
+
+    // MODE: full — original behavior (all tables in one file)
     const lines: string[] = [];
     lines.push("-- =============================================================");
     lines.push("-- Meteora Academy - Full Data Dump (INSERT INTO statements)");
@@ -127,58 +227,19 @@ Deno.serve(async (req) => {
     lines.push("BEGIN;");
     lines.push("");
 
-    for (const tableName of TABLES_ORDER) {
-      lines.push(`-- =====================`);
-      lines.push(`-- TABLE: ${tableName}`);
-      lines.push(`-- =====================`);
-
-      // Fetch all rows (paginate to avoid 1000 limit)
-      let allRows: Record<string, unknown>[] = [];
-      let offset = 0;
-      const PAGE_SIZE = 1000;
-
-      while (true) {
-        const { data, error } = await supabaseAdmin
-          .from(tableName)
-          .select("*")
-          .range(offset, offset + PAGE_SIZE - 1);
-
-        if (error) {
-          lines.push(`-- ERROR fetching ${tableName}: ${error.message}`);
-          break;
-        }
-
-        if (!data || data.length === 0) break;
-        allRows = allRows.concat(data);
-        if (data.length < PAGE_SIZE) break;
-        offset += PAGE_SIZE;
-      }
-
-      if (allRows.length === 0) {
-        lines.push(`-- (empty table)`);
-        lines.push("");
+    for (const t of TABLES_ORDER) {
+      const { rows, error } = await fetchAllRows(supabaseAdmin, t);
+      if (error) {
+        lines.push(`-- ERROR fetching ${t}: ${error}`);
         continue;
       }
-
-      // Get column names from first row
-      const columns = Object.keys(allRows[0]);
-      const colList = columns.map((c) => `"${c}"`).join(", ");
-
-      for (const row of allRows) {
-        const values = columns.map((col) => escapeSQL(row[col])).join(", ");
-        lines.push(`INSERT INTO public."${tableName}" (${colList}) VALUES (${values});`);
-      }
-
-      lines.push(`-- ${allRows.length} rows`);
-      lines.push("");
+      lines.push(generateTableSQL(t, rows));
     }
 
     lines.push("COMMIT;");
     lines.push("");
 
-    const sqlContent = lines.join("\n");
-
-    return new Response(sqlContent, {
+    return new Response(lines.join("\n"), {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/sql; charset=utf-8",
