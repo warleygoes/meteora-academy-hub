@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Loader2, FileDown } from 'lucide-react';
+import { Download, Loader2, FileDown, TableProperties } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,6 +70,21 @@ const DatabaseExportSection: React.FC = () => {
     setDownloading(null);
   };
 
+  const downloadSchema = async () => {
+    setDownloading('__schema__');
+    try {
+      toast({ title: 'Gerando schema...', description: 'Extraindo estrutura das tabelas.' });
+      await downloadFile(
+        `${baseUrl}?mode=schema`,
+        `schema_${new Date().toISOString().slice(0, 10)}.sql`
+      );
+      toast({ title: 'Éxito', description: 'Schema descargado.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
   const downloadFull = async () => {
     setDownloading('__full__');
     try {
@@ -122,6 +137,11 @@ const DatabaseExportSection: React.FC = () => {
       </p>
 
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" className="gap-2" onClick={downloadSchema} disabled={!!downloading}>
+          {downloading === '__schema__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <TableProperties className="w-4 h-4" />}
+          Somente Schema (DDL)
+        </Button>
+
         <Button variant="outline" className="gap-2" onClick={downloadFull} disabled={!!downloading}>
           {downloading === '__full__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           Dump completo (1 archivo)

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -195,26 +196,184 @@ Deno.serve(async (req) => {
       });
     }
 
-    // MODE: schema — export DDL only (disable constraints for restore)
+    // MODE: schema — export DDL (CREATE TABLE statements)
     if (mode === "schema") {
-      const lines: string[] = [];
-      lines.push("-- =============================================================");
-      lines.push("-- Meteora Academy - Disable constraints for data import");
-      lines.push(`-- Generated: ${new Date().toISOString()}`);
-      lines.push("-- =============================================================");
-      lines.push("");
-      lines.push("-- Run this BEFORE importing data:");
-      lines.push("SET session_replication_role = 'replica';");
-      lines.push("");
-      lines.push("-- Run this AFTER importing all data:");
-      lines.push("-- SET session_replication_role = 'origin';");
-      return new Response(lines.join("\n"), {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/sql; charset=utf-8",
-          "Content-Disposition": `attachment; filename=00_disable_constraints.sql`,
-        },
-      });
+      const dbUrl = Deno.env.get("SUPABASE_DB_URL")!;
+      const pgClient = new Client(dbUrl);
+      await pgClient.connect();
+
+      try {
+        // Get columns
+        const colResult = await pgClient.queryObject<{
+          table_name: string; column_name: string; udt_name: string;
+          is_nullable: string; column_default: string | null; ordinal_position: number;
+        }>(`
+          SELECT table_name, column_name, udt_name, is_nullable, column_default, ordinal_position
+          FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = ANY($1)
+          ORDER BY table_name, ordinal_position
+        `, [TABLES_ORDER]);
+
+        // Get primary keys
+        const pkResult = await pgClient.queryObject<{ table_name: string; column_name: string }>(`
+          SELECT tc.table_name, kcu.column_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+          WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public' AND tc.table_name = ANY($1)
+        `, [TABLES_ORDER]);
+
+        // Get foreign keys
+        const fkResult = await pgClient.queryObject<{
+          table_name: string; column_name: string; foreign_table: string; foreign_column: string; constraint_name: string;
+        }>(`
+          SELECT tc.table_name, kcu.column_name,
+            ccu.table_name AS foreign_table, ccu.column_name AS foreign_column,
+            tc.constraint_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+          JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
+          WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' AND tc.table_name = ANY($1)
+        `, [TABLES_ORDER]);
+
+        // Get unique constraints
+        const uqResult = await pgClient.queryObject<{ table_name: string; column_name: string; constraint_name: string }>(`
+          SELECT tc.table_name, kcu.column_name, tc.constraint_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+          WHERE tc.constraint_type = 'UNIQUE' AND tc.table_schema = 'public' AND tc.table_name = ANY($1)
+        `, [TABLES_ORDER]);
+
+        // Get enums
+        const enumResult = await pgClient.queryObject<{ typname: string; enumlabel: string }>(`
+          SELECT t.typname, e.enumlabel
+          FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
+          ORDER BY t.typname, e.enumsortorder
+        `);
+
+        // Group data
+        const colsByTable = new Map<string, typeof colResult.rows>();
+        for (const c of colResult.rows) {
+          if (!colsByTable.has(c.table_name)) colsByTable.set(c.table_name, []);
+          colsByTable.get(c.table_name)!.push(c);
+        }
+
+        const pksByTable = new Map<string, Set<string>>();
+        for (const pk of pkResult.rows) {
+          if (!pksByTable.has(pk.table_name)) pksByTable.set(pk.table_name, new Set());
+          pksByTable.get(pk.table_name)!.add(pk.column_name);
+        }
+
+        const fksByTable = new Map<string, typeof fkResult.rows>();
+        for (const fk of fkResult.rows) {
+          if (!fksByTable.has(fk.table_name)) fksByTable.set(fk.table_name, []);
+          fksByTable.get(fk.table_name)!.push(fk);
+        }
+
+        const uqsByTable = new Map<string, Map<string, string[]>>();
+        for (const uq of uqResult.rows) {
+          if (!uqsByTable.has(uq.table_name)) uqsByTable.set(uq.table_name, new Map());
+          const tbl = uqsByTable.get(uq.table_name)!;
+          if (!tbl.has(uq.constraint_name)) tbl.set(uq.constraint_name, []);
+          tbl.get(uq.constraint_name)!.push(uq.column_name);
+        }
+
+        const enumMap = new Map<string, string[]>();
+        for (const e of enumResult.rows) {
+          if (!enumMap.has(e.typname)) enumMap.set(e.typname, []);
+          enumMap.get(e.typname)!.push(e.enumlabel);
+        }
+
+        // Build SQL
+        const lines: string[] = [];
+        lines.push("-- =============================================================");
+        lines.push("-- Meteora Academy - Schema Export (DDL)");
+        lines.push(`-- Generated: ${new Date().toISOString()}`);
+        lines.push("-- =============================================================");
+        lines.push("");
+
+        // Emit enums
+        for (const [name, labels] of enumMap) {
+          lines.push(`CREATE TYPE public.${name} AS ENUM (${labels.map(l => `'${l}'`).join(", ")});`);
+        }
+        if (enumMap.size > 0) lines.push("");
+
+        for (const tName of TABLES_ORDER) {
+          const cols = colsByTable.get(tName);
+          if (!cols) continue;
+          const pks = pksByTable.get(tName) || new Set();
+          const fks = fksByTable.get(tName) || [];
+          const uqs = uqsByTable.get(tName) || new Map();
+
+          lines.push(`-- =====================`);
+          lines.push(`-- TABLE: ${tName}`);
+          lines.push(`-- =====================`);
+          lines.push(`CREATE TABLE IF NOT EXISTS public."${tName}" (`);
+
+          const colDefs: string[] = [];
+          for (const c of cols) {
+            let typeName = c.udt_name;
+            if (typeName === "uuid") typeName = "uuid";
+            else if (typeName === "text") typeName = "text";
+            else if (typeName === "bool") typeName = "boolean";
+            else if (typeName === "int4") typeName = "integer";
+            else if (typeName === "int8") typeName = "bigint";
+            else if (typeName === "float8") typeName = "double precision";
+            else if (typeName === "numeric") typeName = "numeric";
+            else if (typeName === "timestamptz") typeName = "timestamp with time zone";
+            else if (typeName === "timestamp") typeName = "timestamp without time zone";
+            else if (typeName === "date") typeName = "date";
+            else if (typeName === "jsonb") typeName = "jsonb";
+            else if (typeName === "json") typeName = "json";
+            else if (typeName === "_text") typeName = "text[]";
+            else if (typeName === "_uuid") typeName = "uuid[]";
+            else if (typeName === "_int4") typeName = "integer[]";
+            else if (typeName === "_float8") typeName = "double precision[]";
+            else if (enumMap.has(typeName)) typeName = `public.${typeName}`;
+
+            let def = `  "${c.column_name}" ${typeName}`;
+            if (c.is_nullable === "NO") def += " NOT NULL";
+            if (c.column_default !== null) def += ` DEFAULT ${c.column_default}`;
+            colDefs.push(def);
+          }
+
+          // Primary key
+          const pkCols = cols.filter(c => pks.has(c.column_name));
+          if (pkCols.length > 0) {
+            colDefs.push(`  PRIMARY KEY (${pkCols.map(c => `"${c.column_name}"`).join(", ")})`);
+          }
+
+          // Unique constraints
+          for (const [, uqCols] of uqs) {
+            colDefs.push(`  UNIQUE (${uqCols.map(c => `"${c}"`).join(", ")})`);
+          }
+
+          lines.push(colDefs.join(",\n"));
+          lines.push(");");
+          lines.push("");
+
+          // Foreign keys as ALTER TABLE
+          for (const fk of fks) {
+            lines.push(`ALTER TABLE public."${tName}" ADD CONSTRAINT "${fk.constraint_name}" FOREIGN KEY ("${fk.column_name}") REFERENCES public."${fk.foreign_table}" ("${fk.foreign_column}");`);
+          }
+
+          // RLS
+          lines.push(`ALTER TABLE public."${tName}" ENABLE ROW LEVEL SECURITY;`);
+          lines.push("");
+        }
+
+        await pgClient.end();
+
+        return new Response(lines.join("\n"), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/sql; charset=utf-8",
+            "Content-Disposition": `attachment; filename=schema_${new Date().toISOString().slice(0, 10)}.sql`,
+          },
+        });
+      } catch (schemaErr) {
+        await pgClient.end();
+        throw schemaErr;
+      }
     }
 
     // MODE: full — original behavior (all tables in one file)
