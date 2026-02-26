@@ -85,6 +85,21 @@ const DatabaseExportSection: React.FC = () => {
     setDownloading(null);
   };
 
+  const downloadDataOnly = async () => {
+    setDownloading('__data__');
+    try {
+      toast({ title: 'Gerando dump de dados...', description: 'Somente INSERTs, sem DDL.' });
+      await downloadFile(
+        `${baseUrl}?mode=data`,
+        `data_only_${new Date().toISOString().slice(0, 10)}.sql`
+      );
+      toast({ title: 'Sucesso', description: 'Dump de dados baixado.' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
   const downloadFull = async () => {
     setDownloading('__full__');
     try {
@@ -140,6 +155,11 @@ const DatabaseExportSection: React.FC = () => {
         <Button variant="outline" className="gap-2" onClick={downloadSchema} disabled={!!downloading}>
           {downloading === '__schema__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <TableProperties className="w-4 h-4" />}
           Somente Schema (DDL)
+        </Button>
+
+        <Button variant="outline" className="gap-2" onClick={downloadDataOnly} disabled={!!downloading}>
+          {downloading === '__data__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+          Somente Dados (INSERTs)
         </Button>
 
         <Button variant="outline" className="gap-2" onClick={downloadFull} disabled={!!downloading}>
