@@ -376,12 +376,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // MODE: full — original behavior (all tables in one file)
+    // MODE: data — export only INSERT statements (no DDL)
+    // MODE: full — same as data (kept for backward compat)
+    const dataOnly = mode === "data" || mode === "full";
     const lines: string[] = [];
     lines.push("-- =============================================================");
-    lines.push("-- Meteora Academy - Full Data Dump (INSERT INTO statements)");
+    lines.push("-- Meteora Academy - Data Only Dump (INSERT INTO statements)");
     lines.push(`-- Generated: ${new Date().toISOString()}`);
     lines.push("-- =============================================================");
+    lines.push("");
+    lines.push("SET session_replication_role = 'replica';");
     lines.push("");
     lines.push("BEGIN;");
     lines.push("");
@@ -396,6 +400,8 @@ Deno.serve(async (req) => {
     }
 
     lines.push("COMMIT;");
+    lines.push("");
+    lines.push("SET session_replication_role = 'origin';");
     lines.push("");
 
     return new Response(lines.join("\n"), {
