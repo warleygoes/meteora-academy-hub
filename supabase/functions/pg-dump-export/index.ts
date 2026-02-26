@@ -297,11 +297,11 @@ Deno.serve(async (req) => {
         }
         if (enumMap.size > 0) lines.push("");
 
+        // First pass: CREATE TABLE + UNIQUE + PK + RLS (no FKs)
         for (const tName of TABLES_ORDER) {
           const cols = colsByTable.get(tName);
           if (!cols) continue;
           const pks = pksByTable.get(tName) || new Set();
-          const fks = fksByTable.get(tName) || [];
           const uqs = uqsByTable.get(tName) || new Map();
 
           lines.push(`-- =====================`);
@@ -351,15 +351,22 @@ Deno.serve(async (req) => {
           lines.push(");");
           lines.push("");
 
-          // Foreign keys as ALTER TABLE
-          for (const fk of fks) {
-            lines.push(`ALTER TABLE public."${tName}" ADD CONSTRAINT "${fk.constraint_name}" FOREIGN KEY ("${fk.column_name}") REFERENCES public."${fk.foreign_table}" ("${fk.foreign_column}");`);
-          }
-
           // RLS
           lines.push(`ALTER TABLE public."${tName}" ENABLE ROW LEVEL SECURITY;`);
           lines.push("");
         }
+
+        // Second pass: all Foreign Keys (after all tables exist)
+        lines.push(`-- =====================`);
+        lines.push(`-- FOREIGN KEYS`);
+        lines.push(`-- =====================`);
+        for (const tName of TABLES_ORDER) {
+          const fks = fksByTable.get(tName) || [];
+          for (const fk of fks) {
+            lines.push(`ALTER TABLE public."${tName}" ADD CONSTRAINT "${fk.constraint_name}" FOREIGN KEY ("${fk.column_name}") REFERENCES public."${fk.foreign_table}" ("${fk.foreign_column}");`);
+          }
+        }
+        lines.push("");
 
         await pgClient.end();
 
