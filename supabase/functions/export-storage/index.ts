@@ -7,6 +7,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function streamToUint8Array(blob: Blob): Promise<Uint8Array> {
+  const reader = blob.stream().getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    totalLength += value.length;
+  }
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+async function listAllFiles(supabase: any, bucket: string, prefix: string = ""): Promise<string[]> {
+  const paths: string[] = [];
+  const { data: files, error } = await supabase.storage
+    .from(bucket)
+    .list(prefix, { limit: 1000, sortBy: { column: "name", order: "asc" } });
+
+  if (error || !files) return paths;
+
+  for (const file of files) {
+    const fullPath = prefix ? `${prefix}/${file.name}` : file.name;
+    if (file.id === null) {
+      // It's a folder, recurse
+      const subPaths = await listAllFiles(supabase, bucket, fullPath);
+      paths.push(...subPaths);
+    } else {
+      paths.push(fullPath);
+    }
+  }
+  return paths;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -25,7 +65,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify admin
+    // Verify user
     const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
     const { data: { user }, error: userError } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
     if (userError || !user) {
@@ -35,9 +75,8 @@ serve(async (req) => {
       });
     }
 
-    // Check admin role
     const { data: roleData } = await supabase
-      .from("user_roles" as any)
+      .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("role", "admin")
@@ -52,66 +91,37 @@ serve(async (req) => {
 
     const buckets = ["avatars", "product-images", "community-images"];
     const zip = new JSZip();
+    let fileCount = 0;
 
     for (const bucket of buckets) {
-      // List all files in bucket
-      const { data: files, error: listError } = await supabase.storage
-        .from(bucket)
-        .list("", { limit: 1000, sortBy: { column: "name", order: "asc" } });
+      const filePaths = await listAllFiles(supabase, bucket);
+      console.log(`Bucket ${bucket}: ${filePaths.length} files`);
 
-      if (listError) {
-        console.error(`Error listing ${bucket}:`, listError.message);
-        continue;
-      }
-
-      if (!files || files.length === 0) continue;
-
-      // For buckets with folder structure (avatars), we need to recurse
-      for (const file of files) {
-        if (file.id === null) {
-          // It's a folder, list its contents
-          const { data: subFiles } = await supabase.storage
-            .from(bucket)
-            .list(file.name, { limit: 1000 });
-
-          if (subFiles) {
-            for (const subFile of subFiles) {
-              if (subFile.id === null) continue;
-              const path = `${file.name}/${subFile.name}`;
-              const { data: blob, error: dlError } = await supabase.storage
-                .from(bucket)
-                .download(path);
-
-              if (dlError || !blob) {
-                console.error(`Error downloading ${bucket}/${path}:`, dlError?.message);
-                continue;
-              }
-
-              const arrayBuffer = await blob.arrayBuffer();
-              zip.file(`${bucket}/${path}`, arrayBuffer);
-            }
-          }
-        } else {
-          // It's a file
+      for (const path of filePaths) {
+        try {
           const { data: blob, error: dlError } = await supabase.storage
             .from(bucket)
-            .download(file.name);
+            .download(path);
 
           if (dlError || !blob) {
-            console.error(`Error downloading ${bucket}/${file.name}:`, dlError?.message);
+            console.error(`Skip ${bucket}/${path}: ${dlError?.message}`);
             continue;
           }
 
-          const arrayBuffer = await blob.arrayBuffer();
-          zip.file(`${bucket}/${file.name}`, arrayBuffer);
+          // Stream to avoid large single allocation
+          const data = await streamToUint8Array(blob);
+          zip.file(`${bucket}/${path}`, data);
+          fileCount++;
+        } catch (e) {
+          console.error(`Error processing ${bucket}/${path}:`, e.message);
         }
       }
     }
 
-    // Generate ZIP
-    const zipBlob = await zip.generateAsync({ type: "uint8array" });
+    console.log(`Zipping ${fileCount} files...`);
+    const zipData = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 1 } });
 
-    return new Response(zipBlob, {
+    return new Response(zipData, {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/zip",
