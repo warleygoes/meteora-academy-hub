@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import JSZip from "https://esm.sh/jszip@3.10.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,34 +76,34 @@ serve(async (req) => {
       });
     }
 
-    // Export single bucket
+    // Return signed URLs for all files in the bucket
     const filePaths = await listAllFiles(supabase, bucketParam);
     console.log(`Bucket ${bucketParam}: ${filePaths.length} files`);
 
-    const zip = new JSZip();
-    let count = 0;
+    const signedUrls: { path: string; url: string }[] = [];
 
-    for (const path of filePaths) {
-      try {
-        const { data: blob, error: dlError } = await supabase.storage.from(bucketParam).download(path);
-        if (dlError || !blob) { console.error(`Skip ${path}: ${dlError?.message}`); continue; }
-        const buf = new Uint8Array(await blob.arrayBuffer());
-        zip.file(path, buf);
-        count++;
-      } catch (e) {
-        console.error(`Error ${path}:`, e.message);
+    // Create signed URLs in batches of 20
+    for (let i = 0; i < filePaths.length; i += 20) {
+      const batch = filePaths.slice(i, i + 20);
+      const { data, error } = await supabase.storage
+        .from(bucketParam)
+        .createSignedUrls(batch, 3600); // 1 hour expiry
+
+      if (error) {
+        console.error(`Signed URL batch error:`, error.message);
+        continue;
+      }
+      if (data) {
+        for (const item of data) {
+          if (item.signedUrl) {
+            signedUrls.push({ path: item.path!, url: item.signedUrl });
+          }
+        }
       }
     }
 
-    console.log(`Zipping ${count} files from ${bucketParam}...`);
-    const zipData = await zip.generateAsync({ type: "uint8array", compression: "STORE" });
-
-    return new Response(zipData, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${bucketParam}_${new Date().toISOString().slice(0, 10)}.zip"`,
-      },
+    return new Response(JSON.stringify({ bucket: bucketParam, files: signedUrls }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("Export error:", e);
