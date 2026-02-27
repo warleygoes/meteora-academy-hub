@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Loader2, FileDown, TableProperties } from 'lucide-react';
+import { Download, Loader2, FileDown, TableProperties, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -115,6 +115,30 @@ const DatabaseExportSection: React.FC = () => {
     setDownloading(null);
   };
 
+  const downloadStorageZip = async () => {
+    setDownloading('__storage__');
+    try {
+      toast({ title: 'Gerando ZIP do Storage...', description: 'Isso pode levar alguns minutos dependendo do tamanho dos arquivos.' });
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-storage`, { headers });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Erro ao exportar storage' }));
+        throw new Error(err.error || 'Erro ao exportar storage');
+      }
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `storage_export_${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+      toast({ title: 'Sucesso', description: 'ZIP do Storage baixado com sucesso.' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
   const downloadAllSeparate = async () => {
     setDownloading('__all__');
     try {
@@ -174,6 +198,13 @@ const DatabaseExportSection: React.FC = () => {
 
         <Button variant="ghost" size="sm" onClick={loadTables} disabled={loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ver tablas'}
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" className="gap-2" onClick={downloadStorageZip} disabled={!!downloading}>
+          {downloading === '__storage__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+          Exportar Storage (ZIP)
         </Button>
       </div>
 
