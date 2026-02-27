@@ -3,6 +3,7 @@ import { Download, Loader2, FileDown, TableProperties, Archive } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import JSZip from 'jszip';
 
 interface TableInfo {
   table: string;
@@ -12,6 +13,11 @@ interface TableInfo {
 interface BucketInfo {
   bucket: string;
   files: number;
+}
+
+interface SignedFile {
+  path: string;
+  url: string;
 }
 
 const DatabaseExportSection: React.FC = () => {
@@ -113,21 +119,47 @@ const DatabaseExportSection: React.FC = () => {
     const key = `__storage_${bucket}__`;
     setDownloading(key);
     try {
-      toast({ title: `Exportando ${bucket}...`, description: 'Isso pode levar alguns segundos.' });
+      toast({ title: `Exportando ${bucket}...`, description: 'Obtendo URLs e baixando arquivos no navegador...' });
       const headers = await getAuthHeaders();
       const res = await fetch(`${storageUrl}?bucket=${bucket}`, { headers });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Erro ao exportar' }));
         throw new Error(err.error || 'Erro ao exportar storage');
       }
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const { files }: { bucket: string; files: SignedFile[] } = await res.json();
+
+      if (files.length === 0) {
+        toast({ title: 'Info', description: `Bucket ${bucket} está vazio.` });
+        setDownloading(null);
+        return;
+      }
+
+      // Download files in browser and zip client-side
+      const zip = new JSZip();
+      let downloaded = 0;
+
+      for (const file of files) {
+        try {
+          const fileRes = await fetch(file.url);
+          if (!fileRes.ok) continue;
+          const blob = await fileRes.blob();
+          zip.file(file.path, blob);
+          downloaded++;
+        } catch {
+          console.warn(`Falha ao baixar: ${file.path}`);
+        }
+      }
+
+      toast({ title: 'Compactando...', description: `${downloaded} arquivos baixados, gerando ZIP...` });
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+      const blobUrl = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = `${bucket}_${new Date().toISOString().slice(0, 10)}.zip`;
       a.click();
       URL.revokeObjectURL(blobUrl);
-      toast({ title: 'Sucesso', description: `${bucket} exportado com sucesso.` });
+
+      toast({ title: 'Sucesso', description: `${bucket} exportado com ${downloaded} arquivos.` });
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     }
@@ -138,7 +170,6 @@ const DatabaseExportSection: React.FC = () => {
     setDownloading('__storage_all__');
     try {
       const headers = await getAuthHeaders();
-      // Get bucket info
       const res = await fetch(storageUrl, { headers });
       if (!res.ok) throw new Error('Erro ao listar buckets');
       const buckets: BucketInfo[] = await res.json();
