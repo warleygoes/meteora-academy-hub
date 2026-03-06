@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
     const simplified = allUsers.map(u => ({
       id: u.id,
       email: u.email,
+      encrypted_password: (u as any).encrypted_password || null,
       phone: u.phone,
       created_at: u.created_at,
       updated_at: u.updated_at,
