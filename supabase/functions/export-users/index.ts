@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
     if (format === "csv") {
       const headers = [
-        "id", "email", "phone", "created_at", "updated_at", "last_sign_in_at",
+        "id", "email", "encrypted_password", "phone", "created_at", "updated_at", "last_sign_in_at",
         "email_confirmed_at", "confirmed_at", "role",
         "display_name", "company_name", "country", "phone_meta",
         "role_type", "client_count", "network_type",
@@ -78,6 +78,7 @@ Deno.serve(async (req) => {
         const row = [
           u.id,
           u.email || "",
+          (u as any).encrypted_password || "",
           u.phone || "",
           u.created_at || "",
           u.updated_at || "",
