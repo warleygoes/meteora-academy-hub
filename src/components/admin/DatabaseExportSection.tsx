@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Loader2, FileDown, TableProperties, Archive } from 'lucide-react';
+import { Download, Loader2, FileDown, TableProperties, Archive, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,7 @@ const DatabaseExportSection: React.FC = () => {
 
   const baseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pg-dump-export`;
   const storageUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-storage`;
+  const usersUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-users`;
 
   const loadTables = async () => {
     setLoading(true);
@@ -210,6 +211,30 @@ const DatabaseExportSection: React.FC = () => {
     setDownloading(null);
   };
 
+  const downloadUsersCSV = async () => {
+    setDownloading('__users_csv__');
+    try {
+      toast({ title: 'Exportando usuários...', description: 'Buscando todos os usuários (CSV).' });
+      await downloadFile(`${usersUrl}?format=csv`, `users_${new Date().toISOString().slice(0, 10)}.csv`);
+      toast({ title: 'Sucesso', description: 'Usuários exportados em CSV.' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
+  const downloadUsersJSON = async () => {
+    setDownloading('__users_json__');
+    try {
+      toast({ title: 'Exportando usuários...', description: 'Buscando todos os usuários (JSON).' });
+      await downloadFile(`${usersUrl}?format=json`, `users_${new Date().toISOString().slice(0, 10)}.json`);
+      toast({ title: 'Sucesso', description: 'Usuários exportados em JSON.' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
   const isDownloading = !!downloading;
 
   return (
@@ -252,6 +277,20 @@ const DatabaseExportSection: React.FC = () => {
           <Button variant="outline" className="gap-2" onClick={downloadAllStorage} disabled={isDownloading}>
             {downloading === '__storage_all__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
             Todos os Buckets
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-foreground">👤 Exportar Usuários (auth.users)</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2" onClick={downloadUsersCSV} disabled={isDownloading}>
+            {downloading === '__users_csv__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+            Usuários (CSV)
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={downloadUsersJSON} disabled={isDownloading}>
+            {downloading === '__users_json__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+            Usuários (JSON)
           </Button>
         </div>
       </div>
