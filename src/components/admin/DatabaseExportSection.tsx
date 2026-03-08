@@ -235,6 +235,92 @@ const DatabaseExportSection: React.FC = () => {
     setDownloading(null);
   };
 
+  const escapeSQL = (val: any): string => {
+    if (val === null || val === undefined) return 'NULL';
+    if (typeof val === 'boolean') return val ? 'true' : 'false';
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
+    return `'${String(val).replace(/'/g, "''")}'`;
+  };
+
+  const downloadProfilesSQL = async () => {
+    setDownloading('__profiles_sql__');
+    try {
+      toast({ title: 'Exportando profiles...', description: 'Gerando SQL INSERTs.' });
+      let allProfiles: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      while (true) {
+        const { data, error } = await supabase.from('profiles').select('*').range(from, from + batchSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allProfiles = allProfiles.concat(data);
+        if (data.length < batchSize) break;
+        from += batchSize;
+      }
+      if (allProfiles.length === 0) {
+        toast({ title: 'Info', description: 'Nenhum profile encontrado.' });
+        setDownloading(null);
+        return;
+      }
+      const cols = Object.keys(allProfiles[0]);
+      const lines = allProfiles.map(row => {
+        const vals = cols.map(c => escapeSQL(row[c]));
+        return `INSERT INTO public.profiles (${cols.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT (user_id) DO UPDATE SET ${cols.filter(c => c !== 'id' && c !== 'user_id').map(c => `${c} = EXCLUDED.${c}`).join(', ')};`;
+      });
+      const sql = `-- profiles export ${new Date().toISOString()}\n-- ${allProfiles.length} registros\nSET session_replication_role = 'replica';\n\n${lines.join('\n')}\n\nSET session_replication_role = 'origin';\n`;
+      const blob = new Blob([sql], { type: 'text/sql' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `profiles_${new Date().toISOString().slice(0, 10)}.sql`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Sucesso', description: `${allProfiles.length} profiles exportados como SQL.` });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
+  const downloadUserRolesSQL = async () => {
+    setDownloading('__roles_sql__');
+    try {
+      toast({ title: 'Exportando user_roles...', description: 'Gerando SQL INSERTs.' });
+      let allRoles: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      while (true) {
+        const { data, error } = await supabase.from('user_roles').select('*').range(from, from + batchSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allRoles = allRoles.concat(data);
+        if (data.length < batchSize) break;
+        from += batchSize;
+      }
+      if (allRoles.length === 0) {
+        toast({ title: 'Info', description: 'Nenhum role encontrado.' });
+        setDownloading(null);
+        return;
+      }
+      const lines = allRoles.map(row =>
+        `INSERT INTO public.user_roles (id, user_id, role) VALUES (${escapeSQL(row.id)}, ${escapeSQL(row.user_id)}, ${escapeSQL(row.role)}) ON CONFLICT (user_id, role) DO NOTHING;`
+      );
+      const sql = `-- user_roles export ${new Date().toISOString()}\n-- ${allRoles.length} registros\nSET session_replication_role = 'replica';\n\n${lines.join('\n')}\n\nSET session_replication_role = 'origin';\n`;
+      const blob = new Blob([sql], { type: 'text/sql' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `user_roles_${new Date().toISOString().slice(0, 10)}.sql`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Sucesso', description: `${allRoles.length} roles exportados como SQL.` });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
   const isDownloading = !!downloading;
 
   return (
