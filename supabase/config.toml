@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.import-users]
 verify_jwt = false
+
+[functions.migrate-users]
+verify_jwt = false
