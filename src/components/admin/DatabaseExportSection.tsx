@@ -381,6 +381,20 @@ const DatabaseExportSection: React.FC = () => {
         </div>
       </div>
 
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-foreground">📄 Exportar SQL INSERTs (para migração)</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2" onClick={downloadProfilesSQL} disabled={isDownloading}>
+            {downloading === '__profiles_sql__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCode className="w-4 h-4" />}
+            Profiles (SQL)
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={downloadUserRolesSQL} disabled={isDownloading}>
+            {downloading === '__roles_sql__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCode className="w-4 h-4" />}
+            User Roles (SQL)
+          </Button>
+        </div>
+      </div>
+
       {tables.length > 0 && (
         <div className="border border-border rounded-lg overflow-hidden">
           <div className="max-h-64 overflow-y-auto">
