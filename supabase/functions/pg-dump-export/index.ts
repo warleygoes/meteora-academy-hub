@@ -54,11 +54,25 @@ const TABLES_ORDER = [
   "webhook_event_types",
 ];
 
-function escapeSQL(val: unknown): string {
+function escapeSQL(val: unknown, colType?: string): string {
   if (val === null || val === undefined) return "NULL";
   if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
   if (typeof val === "number") return String(val);
+
+  // If we know column type, use it to decide format
+  if (colType === "jsonb" || colType === "json") {
+    const json = JSON.stringify(val).replace(/'/g, "''");
+    return `'${json}'::jsonb`;
+  }
+
   if (Array.isArray(val)) {
+    // If any element is an object (not string/number/null), treat as JSONB
+    const hasObjects = val.some((v) => v !== null && typeof v === "object");
+    if (hasObjects) {
+      const json = JSON.stringify(val).replace(/'/g, "''");
+      return `'${json}'::jsonb`;
+    }
+    // Otherwise treat as PostgreSQL array literal (text[], uuid[], etc.)
     const items = val.map((v) => {
       if (v === null) return "NULL";
       const s = String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
