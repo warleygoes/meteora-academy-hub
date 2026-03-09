@@ -199,11 +199,11 @@ const DatabaseExportSection: React.FC = () => {
         setTables(tableList);
       }
       toast({ title: `Descargando ${tableList.length} tablas...` });
-      for (const t of nonEmpty) {
+      for (const t of tableList) {
         await downloadFile(`${baseUrl}?mode=table&table=${t.table}`, `${t.table}.sql`);
         await new Promise(r => setTimeout(r, 300));
       }
-      toast({ title: 'Éxito', description: `${nonEmpty.length} archivos descargados.` });
+      toast({ title: 'Éxito', description: `${tableList.length} archivos descargados.` });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
