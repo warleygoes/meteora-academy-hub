@@ -131,7 +131,7 @@ const JSONB_COLUMNS: Record<string, Set<string>> = {
   ]),
   diagnostics: new Set(["scores", "results"]),
   diagnostic_questions: new Set(["options"]),
-  diagnostic_answers: new Set(["answer_value"]),
+  diagnostic_answers: new Set(["answer_value", "score_contribution"]),
   diagnostic_recommendation_rules: new Set(["conditions"]),
   network_topologies: new Set(["data"]),
   products: new Set(["features_list"]),
