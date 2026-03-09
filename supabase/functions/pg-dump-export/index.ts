@@ -56,14 +56,15 @@ const TABLES_ORDER = [
 
 function escapeSQL(val: unknown, colType?: string): string {
   if (val === null || val === undefined) return "NULL";
-  if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
-  if (typeof val === "number") return String(val);
 
-  // If we know column type, use it to decide format
+  // JSONB columns: always cast the value, even primitives (number, boolean, string)
   if (colType === "jsonb" || colType === "json") {
     const json = JSON.stringify(val).replace(/'/g, "''");
     return `'${json}'::jsonb`;
   }
+
+  if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
+  if (typeof val === "number") return String(val);
 
   if (Array.isArray(val)) {
     // If any element is an object (not string/number/null), treat as JSONB
