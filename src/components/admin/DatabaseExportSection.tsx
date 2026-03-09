@@ -95,9 +95,35 @@ const DatabaseExportSection: React.FC = () => {
   const downloadDataOnly = async () => {
     setDownloading('__data__');
     try {
-      toast({ title: 'Gerando dump de dados...', description: 'Somente INSERTs, sem DDL.' });
-      await downloadFile(`${baseUrl}?mode=data`, `data_only_${new Date().toISOString().slice(0, 10)}.sql`);
-      toast({ title: 'Sucesso', description: 'Dump de dados baixado.' });
+      const headers = await getAuthHeaders();
+      let tableList = tables;
+      if (tableList.length === 0) {
+        const res = await fetch(`${baseUrl}?mode=list`, { headers });
+        tableList = await res.json();
+        setTables(tableList);
+      }
+      toast({ title: 'Gerando dump de dados...', description: `Baixando ${tableList.length} tabelas e compactando em ZIP.` });
+
+      const zip = new JSZip();
+      let idx = 1;
+      for (const t of tableList) {
+        const res = await fetch(`${baseUrl}?mode=table&table=${t.table}`, { headers });
+        if (!res.ok) continue;
+        const sql = await res.text();
+        const prefix = String(idx).padStart(2, '0');
+        zip.file(`${prefix}_${t.table}.sql`, sql);
+        idx++;
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const blobUrl = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `data_inserts_${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+
+      toast({ title: 'Sucesso', description: `ZIP com ${tableList.length} arquivos SQL baixado. Importe um por um no SQL Editor.` });
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     }
