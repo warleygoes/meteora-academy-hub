@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
   ${esc(meta)},
   FALSE,
   ${esc(u.created_at)}, ${esc(u.updated_at)},
-  ${esc(u.phone)}, NULL,
+  ${esc(u.phone || null)}, NULL,
   '', '', NULL, '', 0, NULL, '', NULL, FALSE, NULL
 ) ON CONFLICT (id) DO NOTHING;`);
       }
