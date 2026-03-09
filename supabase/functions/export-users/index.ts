@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const format = url.searchParams.get("format") || "json"; // json | csv
+    const format = url.searchParams.get("format") || "json"; // json | csv | sql
 
     // Fetch ALL users via admin API with pagination
     const allUsers: any[] = [];
@@ -62,6 +62,88 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Total users fetched: ${allUsers.length}`);
+
+    if (format === "sql") {
+      const esc = (v: any): string => {
+        if (v === null || v === undefined) return "NULL";
+        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+        if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'::jsonb`;
+        return `'${String(v).replace(/'/g, "''")}'`;
+      };
+
+      const lines: string[] = [
+        `-- auth.users + auth.identities export ${new Date().toISOString()}`,
+        `-- Total: ${allUsers.length} users`,
+        `-- Execute as superuser on target Supabase database`,
+        ``,
+        `SET session_replication_role = 'replica';`,
+        ``,
+        `-- ===================== auth.users =====================`,
+      ];
+
+      for (const u of allUsers) {
+        const meta = u.user_metadata || {};
+        const appMeta = u.app_metadata || { provider: "email", providers: ["email"] };
+        lines.push(`INSERT INTO auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at,
+  recovery_token, recovery_sent_at, email_change_token_new, email_change,
+  email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data,
+  is_super_admin, created_at, updated_at, phone, phone_confirmed_at,
+  phone_change, phone_change_token, phone_change_sent_at,
+  email_change_token_current, email_change_confirm_status,
+  banned_until, reauthentication_token, reauthentication_sent_at,
+  is_sso_user, deleted_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000000',
+  ${esc(u.id)}, 'authenticated', 'authenticated',
+  ${esc(u.email)}, ${esc((u as any).encrypted_password || '')},
+  ${u.email_confirmed_at ? esc(u.email_confirmed_at) : "NOW()"},
+  NULL, '', NULL, '', NULL, '', '', NULL,
+  ${esc(u.last_sign_in_at)},
+  ${esc(appMeta)},
+  ${esc(meta)},
+  FALSE,
+  ${esc(u.created_at)}, ${esc(u.updated_at)},
+  ${esc(u.phone)}, NULL,
+  '', '', NULL, '', 0, NULL, '', NULL, FALSE, NULL
+) ON CONFLICT (id) DO NOTHING;`);
+      }
+
+      lines.push(``);
+      lines.push(`-- ===================== auth.identities =====================`);
+
+      for (const u of allUsers) {
+        lines.push(`INSERT INTO auth.identities (
+  id, user_id, identity_data, provider, provider_id,
+  last_sign_in_at, created_at, updated_at
+) VALUES (
+  gen_random_uuid(),
+  ${esc(u.id)},
+  jsonb_build_object('sub', ${esc(u.id)}, 'email', ${esc(u.email)}, 'email_verified', true),
+  'email',
+  ${esc(u.id)},
+  ${u.last_sign_in_at ? esc(u.last_sign_in_at) : "NOW()"},
+  ${esc(u.created_at)}, ${esc(u.updated_at)}
+) ON CONFLICT (provider, provider_id) DO NOTHING;`);
+      }
+
+      lines.push(``);
+      lines.push(`SET session_replication_role = 'origin';`);
+      lines.push(``);
+      lines.push(`-- Verification queries:`);
+      lines.push(`-- SELECT COUNT(*) FROM auth.users;`);
+      lines.push(`-- SELECT COUNT(*) FROM auth.identities;`);
+      lines.push(`-- SELECT u.id, u.email FROM auth.users u LEFT JOIN auth.identities i ON i.user_id = u.id WHERE i.id IS NULL;`);
+
+      return new Response(lines.join("\n"), {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/sql; charset=utf-8",
+          "Content-Disposition": `attachment; filename=auth_users_${new Date().toISOString().slice(0, 10)}.sql`,
+        },
+      });
+    }
 
     if (format === "csv") {
       const headers = [
