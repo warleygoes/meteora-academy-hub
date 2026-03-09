@@ -378,6 +378,10 @@ const DatabaseExportSection: React.FC = () => {
             {downloading === '__users_json__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
             Usuários (JSON)
           </Button>
+          <Button variant="outline" className="gap-2" onClick={downloadUsersSQL} disabled={isDownloading}>
+            {downloading === '__users_sql__' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCode className="w-4 h-4" />}
+            Usuários (SQL)
+          </Button>
         </div>
       </div>
 
