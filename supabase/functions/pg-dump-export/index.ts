@@ -54,11 +54,25 @@ const TABLES_ORDER = [
   "webhook_event_types",
 ];
 
-function escapeSQL(val: unknown): string {
+function escapeSQL(val: unknown, colType?: string): string {
   if (val === null || val === undefined) return "NULL";
   if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
   if (typeof val === "number") return String(val);
+
+  // If we know column type, use it to decide format
+  if (colType === "jsonb" || colType === "json") {
+    const json = JSON.stringify(val).replace(/'/g, "''");
+    return `'${json}'::jsonb`;
+  }
+
   if (Array.isArray(val)) {
+    // If any element is an object (not string/number/null), treat as JSONB
+    const hasObjects = val.some((v) => v !== null && typeof v === "object");
+    if (hasObjects) {
+      const json = JSON.stringify(val).replace(/'/g, "''");
+      return `'${json}'::jsonb`;
+    }
+    // Otherwise treat as PostgreSQL array literal (text[], uuid[], etc.)
     const items = val.map((v) => {
       if (v === null) return "NULL";
       const s = String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -109,6 +123,26 @@ async function fetchAllRows(supabaseAdmin: any, tableName: string) {
   return { rows: allRows, error: null };
 }
 
+// Known JSONB columns per table (to distinguish from text[] arrays)
+const JSONB_COLUMNS: Record<string, Set<string>> = {
+  product_sales_pages: new Set([
+    "before_points", "after_points", "problem_bullet_points", "modules",
+    "core_benefits", "selected_testimonials", "objections", "anchor_items", "bonuses",
+  ]),
+  diagnostics: new Set(["scores", "results"]),
+  diagnostic_questions: new Set(["options"]),
+  diagnostic_answers: new Set(["answer_value"]),
+  diagnostic_recommendation_rules: new Set(["conditions"]),
+  network_topologies: new Set(["data"]),
+  products: new Set(["features_list"]),
+  courses: new Set([]),
+  packages: new Set([]),
+};
+
+function getColType(tableName: string, colName: string): string | undefined {
+  return JSONB_COLUMNS[tableName]?.has(colName) ? "jsonb" : undefined;
+}
+
 function generateTableSQL(tableName: string, rows: Record<string, unknown>[]): string {
   const lines: string[] = [];
   lines.push(`-- =====================`);
@@ -125,7 +159,7 @@ function generateTableSQL(tableName: string, rows: Record<string, unknown>[]): s
   const colList = columns.map((c) => `"${c}"`).join(", ");
 
   for (const row of rows) {
-    const values = columns.map((col) => escapeSQL(row[col])).join(", ");
+    const values = columns.map((col) => escapeSQL(row[col], getColType(tableName, col))).join(", ");
     lines.push(`INSERT INTO public."${tableName}" (${colList}) VALUES (${values});`);
   }
 
