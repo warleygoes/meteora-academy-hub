@@ -198,8 +198,7 @@ const DatabaseExportSection: React.FC = () => {
         tableList = await res.json();
         setTables(tableList);
       }
-      const nonEmpty = tableList.filter(t => t.rows > 0);
-      toast({ title: `Descargando ${nonEmpty.length} tablas...` });
+      toast({ title: `Descargando ${tableList.length} tablas...` });
       for (const t of nonEmpty) {
         await downloadFile(`${baseUrl}?mode=table&table=${t.table}`, `${t.table}.sql`);
         await new Promise(r => setTimeout(r, 300));
