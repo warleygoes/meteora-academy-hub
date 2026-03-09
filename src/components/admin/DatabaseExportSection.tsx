@@ -442,10 +442,27 @@ const DatabaseExportSection: React.FC = () => {
       )}
 
       <div className="bg-secondary/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
-        <p className="font-medium text-foreground">📋 Orden de importación:</p>
-        <p>1. Execute <code className="bg-secondary px-1 rounded">SET session_replication_role = 'replica';</code> para desabilitar constraints</p>
-        <p>2. Importe cada archivo .sql por tabla</p>
-        <p>3. Execute <code className="bg-secondary px-1 rounded">SET session_replication_role = 'origin';</code> para reabilitar constraints</p>
+        <p className="font-medium text-foreground">📋 Ordem de importação (respeitando FKs):</p>
+        <p>0. <code className="bg-secondary px-1 rounded">SET session_replication_role = 'replica';</code></p>
+        <p className="font-medium text-foreground mt-1">1️⃣ Categorias & Cursos</p>
+        <p className="pl-3">course_categories → courses → course_modules → course_lessons → lesson_contents</p>
+        <p className="font-medium text-foreground mt-1">2️⃣ Produtos & Pacotes</p>
+        <p className="pl-3">products → product_categories → product_sales_pages → packages → package_product_groups → package_products → offers</p>
+        <p className="font-medium text-foreground mt-1">3️⃣ Planos & Serviços</p>
+        <p className="pl-3">services → plans → plan_courses → plan_services → plan_meetings</p>
+        <p className="font-medium text-foreground mt-1">4️⃣ Usuários (auth)</p>
+        <p className="pl-3"><strong>auth.users + auth.identities</strong> (usar arquivo Usuários SQL) → profiles → user_roles</p>
+        <p className="font-medium text-foreground mt-1">5️⃣ Assinaturas & Acesso</p>
+        <p className="pl-3">user_plans → user_products → user_lesson_access → course_enrollments</p>
+        <p className="font-medium text-foreground mt-1">6️⃣ Progresso & Avaliações</p>
+        <p className="pl-3">lesson_progress → lesson_ratings → lesson_comments</p>
+        <p className="font-medium text-foreground mt-1">7️⃣ Comunidade</p>
+        <p className="pl-3">community_posts → community_comments → community_likes</p>
+        <p className="font-medium text-foreground mt-1">8️⃣ Diagnósticos</p>
+        <p className="pl-3">diagnostic_questions → diagnostics → diagnostic_answers → diagnostic_lead_tracking → diagnostic_recommendation_rules</p>
+        <p className="font-medium text-foreground mt-1">9️⃣ UI & Sistema</p>
+        <p className="pl-3">banners → menu_links → menu_link_products → menu_link_packages → network_topologies → platform_settings → testimonials → system_logs → webhook_endpoints → webhook_event_types</p>
+        <p className="mt-1">🔚 <code className="bg-secondary px-1 rounded">SET session_replication_role = 'origin';</code></p>
       </div>
     </div>
   );
