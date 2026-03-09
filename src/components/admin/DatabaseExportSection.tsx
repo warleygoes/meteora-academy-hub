@@ -235,6 +235,18 @@ const DatabaseExportSection: React.FC = () => {
     setDownloading(null);
   };
 
+  const downloadUsersSQL = async () => {
+    setDownloading('__users_sql__');
+    try {
+      toast({ title: 'Exportando usuários...', description: 'Gerando SQL com auth.users + auth.identities.' });
+      await downloadFile(`${usersUrl}?format=sql`, `auth_users_${new Date().toISOString().slice(0, 10)}.sql`);
+      toast({ title: 'Sucesso', description: 'Usuários exportados como SQL pronto para importação.' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+    setDownloading(null);
+  };
+
   const escapeSQL = (val: any): string => {
     if (val === null || val === undefined) return 'NULL';
     if (typeof val === 'boolean') return val ? 'true' : 'false';
