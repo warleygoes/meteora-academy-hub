@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import JSZip from 'jszip';
+import EdgeFunctionsExport from './EdgeFunctionsExport';
 
 interface TableInfo {
   table: string;
@@ -435,6 +436,8 @@ const DatabaseExportSection: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <EdgeFunctionsExport />
 
       {tables.length > 0 && (
         <div className="border border-border rounded-lg overflow-hidden">
