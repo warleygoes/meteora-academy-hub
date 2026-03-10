@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import JSZip from 'jszip';
+import EdgeFunctionsExport from './EdgeFunctionsExport';
 
 interface TableInfo {
   table: string;
