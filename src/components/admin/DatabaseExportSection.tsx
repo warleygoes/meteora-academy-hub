@@ -439,7 +439,7 @@ const DatabaseExportSection: React.FC = () => {
 
       <EdgeFunctionsExport />
 
-
+      {tables.length > 0 && (
         <div className="border border-border rounded-lg overflow-hidden">
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-sm">
