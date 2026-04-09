@@ -263,7 +263,7 @@ const Index: React.FC = () => {
             )}
             {packageShowcases.map(pkg => (
               <CourseCarousel key={pkg.id} title={`📦 ${pkg.name}`} products={pkg.products} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
-            )}
+            ))}
             {freeProducts.length > 0 && (
               <CourseCarousel title={`🆓 ${t('freeProducts') || 'Productos Gratuitos'}`} products={freeProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
             )}
