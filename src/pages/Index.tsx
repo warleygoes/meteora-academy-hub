@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { HeroBanner } from '@/components/HeroBanner';
 import { CourseCarousel } from '@/components/CourseCarousel';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -26,6 +27,8 @@ interface PackageShowcase {
 
 const Index: React.FC = () => {
   const { t } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q')?.toLowerCase() || '';
   const { products, loading } = useContentProducts();
   const { user } = useAuth();
   const [packageShowcases, setPackageShowcases] = useState<PackageShowcase[]>([]);
@@ -217,25 +220,59 @@ const Index: React.FC = () => {
     <div>
       <HeroBanner />
       <div className="px-6 md:px-12 -mt-8 relative z-10 pb-12">
-        {continueWatching.length > 0 && (
-          <CourseCarousel title={t('continueWatching')} products={continueWatching} accessibleProductIds={accessibleProductIds} productOffers={productOffers} resumeOnClick />
+        {searchQuery ? (
+          <div className="space-y-8">
+            <div className="flex items-center gap-2 mb-6">
+              <h2 className="text-2xl font-display font-bold">
+                {t('searchResults') || 'Resultados da busca'} para "{searchParams.get('q')}"
+              </h2>
+              <span className="text-muted-foreground">
+                ({allProducts.filter(p => p.name.toLowerCase().includes(searchQuery) || p.description?.toLowerCase().includes(searchQuery)).length})
+              </span>
+            </div>
+            
+            {allProducts.filter(p => 
+              p.name.toLowerCase().includes(searchQuery) || 
+              p.description?.toLowerCase().includes(searchQuery)
+            ).length > 0 ? (
+              <CourseCarousel 
+                title={t('foundContents') || 'Conteúdos encontrados'} 
+                products={allProducts.filter(p => 
+                  p.name.toLowerCase().includes(searchQuery) || 
+                  p.description?.toLowerCase().includes(searchQuery)
+                )} 
+                accessibleProductIds={accessibleProductIds} 
+                productOffers={productOffers} 
+              />
+            ) : (
+              <div className="text-center py-20 bg-card rounded-2xl border border-dashed border-border">
+                <p className="text-muted-foreground">{t('noResults') || 'Nenhum resultado encontrado para sua busca.'}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {continueWatching.length > 0 && (
+              <CourseCarousel title={t('continueWatching')} products={continueWatching} accessibleProductIds={accessibleProductIds} productOffers={productOffers} resumeOnClick />
+            )}
+            {myCourses.length > 0 && (
+              <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+            )}
+            {showcaseProducts.length > 0 && (
+              <CourseCarousel title={`⭐ ${t('featuredProducts') || 'Productos Destacados'}`} products={showcaseProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+            )}
+            {packageShowcases.map(pkg => (
+              <CourseCarousel key={pkg.id} title={`📦 ${pkg.name}`} products={pkg.products} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+            )}
+            {freeProducts.length > 0 && (
+              <CourseCarousel title={`🆓 ${t('freeProducts') || 'Productos Gratuitos'}`} products={freeProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+            )}
+            {allProducts.length > 0 && (
+              <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+            )}
+            <CourseCarousel title={t('allContent')} products={allProducts} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
+          </>
         )}
-        {myCourses.length > 0 && (
-          <CourseCarousel title={t('myCourses') || 'Meus Cursos'} products={myCourses} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
-        )}
-        {showcaseProducts.length > 0 && (
-          <CourseCarousel title={`⭐ ${t('featuredProducts') || 'Productos Destacados'}`} products={showcaseProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
-        )}
-        {packageShowcases.map(pkg => (
-          <CourseCarousel key={pkg.id} title={`📦 ${pkg.name}`} products={pkg.products} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
-        ))}
-        {freeProducts.length > 0 && (
-          <CourseCarousel title={`🆓 ${t('freeProducts') || 'Productos Gratuitos'}`} products={freeProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
-        )}
-        {allProducts.length > 0 && (
-          <CourseCarousel title={t('recommended') || 'Recomendados'} products={allProducts} variant="vertical" accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
-        )}
-        <CourseCarousel title={t('allContent')} products={allProducts} accessibleProductIds={accessibleProductIds} productOffers={productOffers} />
       </div>
     </div>
   );

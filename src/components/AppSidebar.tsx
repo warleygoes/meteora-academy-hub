@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Home, BookOpen, Users, Shield, Search, Globe, User, LogOut, Menu, X, Video, Link2, ExternalLink, Headphones, Calendar, Star, Zap, Rocket, FileText, Settings, MessageSquare, LayoutDashboard, BookOpenCheck, Code, Link, Mail, Phone, Bell, Heart, Image, Map, Music, Play, Target, Award, Coffee, Compass, Database, Download, Eye, Flag, Gift, Hash, Key, Layers, LifeBuoy, Lightbulb, Lock, MapPin, Megaphone, Mic, Monitor, Package, PieChart, Radio, Send, Server, Share2, ShoppingCart, Smartphone, Speaker, Tag, ThumbsUp, Tv, Upload, Wifi, Wrench, Activity, Cpu } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/lib/i18n';
@@ -39,10 +39,29 @@ export const AppSidebar: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
   const { user, isAdmin, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+
+  // Update searchQuery when searchParams change
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q !== null) setSearchQuery(q);
+  }, [searchParams]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (query) {
+      navigate(`/app?q=${encodeURIComponent(query)}`);
+    } else {
+      navigate('/app');
+    }
+  };
 
   // Fetch user profile avatar
   useEffect(() => {
@@ -163,13 +182,15 @@ export const AppSidebar: React.FC = () => {
       {/* Search */}
       {!collapsed && (
         <div className="px-4 mb-4">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-sidebar-accent text-muted-foreground text-sm">
+          <form onSubmit={handleSearch} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-sidebar-accent text-muted-foreground text-sm focus-within:ring-1 focus-within:ring-primary/30 transition-all">
             <Search className="w-4 h-4 flex-shrink-0" />
             <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('search')}
               className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground text-sm"
             />
-          </div>
+          </form>
         </div>
       )}
 
