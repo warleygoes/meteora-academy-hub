@@ -1,0 +1,1139 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { BookOpen, Edit, Trash2, Users, ChevronDown, ChevronRight, Video, FolderPlus, FilePlus, Tag, Filter, X, Image, FileText, Music, Link as LinkIcon, FileDown, Plus, Upload, GripVertical, Lock, Search } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { logSystemEvent } from '@/lib/systemLog';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+interface Category { id: string; name: string; description: string | null; }
+
+interface LessonContent {
+  id: string; lesson_id: string;
+  type: 'video' | 'text' | 'image' | 'audio' | 'link' | 'pdf';
+  title: string; content: string | null; sort_order: number;
+}
+
+interface Lesson {
+  id: string; module_id: string; title: string; description: string | null;
+  video_url: string | null; duration_minutes: number | null; sort_order: number; is_free: boolean;
+  is_private: boolean;
+  contents?: LessonContent[];
+}
+
+interface UserProfile {
+  user_id: string; display_name: string | null; email: string | null; company_name: string | null;
+}
+
+interface Module { id: string; course_id: string; title: string; description: string | null; sort_order: number; lessons: Lesson[]; }
+
+interface Course {
+  id: string; title: string; description: string | null; thumbnail_url: string | null;
+  thumbnail_vertical_url: string | null;
+  category_id: string | null; status: string; sort_order: number;
+  category?: Category | null; enrollment_count?: number;
+  product_id?: string;
+  product_categories?: { category_id: string; category_name: string }[];
+}
+
+interface Enrollment {
+  id: string; user_id: string; enrolled_at: string;
+  profile?: { display_name: string | null; email: string | null; company_name: string | null };
+}
+
+const CONTENT_TYPE_ICONS: Record<string, React.ReactNode> = {
+  video: <Video className="w-3.5 h-3.5" />, text: <FileText className="w-3.5 h-3.5" />,
+  image: <Image className="w-3.5 h-3.5" />, audio: <Music className="w-3.5 h-3.5" />,
+  link: <LinkIcon className="w-3.5 h-3.5" />, pdf: <FileDown className="w-3.5 h-3.5" />,
+};
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  video: 'Video', text: 'Texto', image: 'Imagen', audio: 'Audio', link: 'Link', pdf: 'PDF',
+};
+
+// Sortable module item
+const SortableModuleItem: React.FC<{
+  mod: Module; mi: number; children: React.ReactNode;
+}> = ({ mod, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: mod.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div className="flex items-stretch">
+        <button {...listeners} className="px-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center">
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <div className="flex-1">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// Sortable lesson item
+const SortableLessonItem: React.FC<{
+  lesson: Lesson; children: React.ReactNode;
+}> = ({ lesson, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div className="flex items-stretch">
+        <button {...listeners} className="px-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center">
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+        <div className="flex-1">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+const AdminCourses: React.FC = () => {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'draft'>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+
+  const [showCategoryEditor, setShowCategoryEditor] = useState(false);
+  const [showStudentList, setShowStudentList] = useState(false);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
+  const [showCategoryAssign, setShowCategoryAssign] = useState(false);
+  const [categoryAssignCourseId, setCategoryAssignCourseId] = useState<string | null>(null);
+  const [assignedCategories, setAssignedCategories] = useState<Set<string>>(new Set());
+
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [publishCourseId, setPublishCourseId] = useState<string | null>(null);
+  const [publishAction, setPublishAction] = useState<'published' | 'draft'>('published');
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
+  const [students, setStudents] = useState<Enrollment[]>([]);
+  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
+  const [courseModules, setCourseModules] = useState<Record<string, Module[]>>({});
+  const [loadingModules, setLoadingModules] = useState<Set<string>>(new Set());
+
+  const [inlineEditingModule, setInlineEditingModule] = useState<string | null>(null);
+  const [inlineEditingLesson, setInlineEditingLesson] = useState<string | null>(null);
+  const [inlineModuleForm, setInlineModuleForm] = useState({ title: '', description: '' });
+  const [inlineLessonForm, setInlineLessonForm] = useState({ title: '', description: '', video_url: '', duration_minutes: 0, is_free: false, is_private: false });
+
+  const [editingContent, setEditingContent] = useState<string | null>(null);
+  const [contentForm, setContentForm] = useState({ title: '', type: 'video' as LessonContent['type'], content: '' });
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', auto_translate: true });
+
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageEditorCourseId, setImageEditorCourseId] = useState<string | null>(null);
+  const [imageForm, setImageForm] = useState({ thumbnail_url: '', thumbnail_vertical_url: '' });
+  const [uploadingH, setUploadingH] = useState(false);
+  const [uploadingV, setUploadingV] = useState(false);
+  const fileRefH = useRef<HTMLInputElement>(null);
+  const fileRefV = useRef<HTMLInputElement>(null);
+
+  // Private lesson user access
+  const [showAccessManager, setShowAccessManager] = useState(false);
+  const [accessLessonId, setAccessLessonId] = useState<string | null>(null);
+  const [accessLessonTitle, setAccessLessonTitle] = useState('');
+  const [accessUsers, setAccessUsers] = useState<string[]>([]);
+  const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
+  const [accessSearch, setAccessSearch] = useState('');
+  const [loadingAccess, setLoadingAccess] = useState(false);
+
+  // Bulk access grant
+  const grantBulkAccess = async (userId: string, lessonIds: string[]) => {
+    if (lessonIds.length === 0) return;
+    const existing = await supabase.from('user_lesson_access').select('lesson_id').eq('user_id', userId).in('lesson_id', lessonIds);
+    const existingIds = new Set((existing.data || []).map(e => e.lesson_id));
+    const toInsert = lessonIds.filter(id => !existingIds.has(id)).map(lesson_id => ({ lesson_id, user_id: userId }));
+    if (toInsert.length > 0) {
+      await supabase.from('user_lesson_access').insert(toInsert);
+    }
+    return toInsert.length;
+  };
+
+  const grantModuleAccessToUser = async (userId: string, moduleId: string) => {
+    const mod = Object.values(courseModules).flat().find(m => m.id === moduleId);
+    if (!mod) return;
+    const privateLessonIds = mod.lessons.filter(l => l.is_private).map(l => l.id);
+    const count = await grantBulkAccess(userId, privateLessonIds);
+    toast({ title: `${count || 0} aulas privadas liberadas neste módulo` });
+  };
+
+  const grantProductAccessToUser = async (userId: string, courseId: string) => {
+    const modules = courseModules[courseId] || [];
+    const privateLessonIds = modules.flatMap(m => m.lessons.filter(l => l.is_private).map(l => l.id));
+    const count = await grantBulkAccess(userId, privateLessonIds);
+    toast({ title: `${count || 0} aulas privadas liberadas neste conteúdo` });
+  };
+
+  // Bulk access manager state
+  const [showBulkAccessManager, setShowBulkAccessManager] = useState(false);
+  const [bulkAccessMode, setBulkAccessMode] = useState<'module' | 'product'>('module');
+  const [bulkAccessModuleId, setBulkAccessModuleId] = useState<string | null>(null);
+  const [bulkAccessCourseId, setBulkAccessCourseId] = useState<string | null>(null);
+  const [bulkAccessTitle, setBulkAccessTitle] = useState('');
+  const [bulkAccessSearch, setBulkAccessSearch] = useState('');
+  const [bulkAccessProfiles, setBulkAccessProfiles] = useState<UserProfile[]>([]);
+  const [bulkAccessUsersWithAccess, setBulkAccessUsersWithAccess] = useState<Set<string>>(new Set());
+  const [loadingBulkAccess, setLoadingBulkAccess] = useState(false);
+
+  const openBulkAccessManager = async (mode: 'module' | 'product', courseId: string, moduleId?: string) => {
+    setBulkAccessMode(mode);
+    setBulkAccessCourseId(courseId);
+    setBulkAccessModuleId(moduleId || null);
+    setBulkAccessSearch('');
+    setLoadingBulkAccess(true);
+    setShowBulkAccessManager(true);
+    const course = courses.find(c => c.id === courseId);
+
+    // Get the private lesson IDs for this scope
+    let privateLessonIds: string[] = [];
+    if (mode === 'module' && moduleId) {
+      const mod = (courseModules[courseId] || []).find(m => m.id === moduleId);
+      setBulkAccessTitle(`Módulo: ${mod?.title || ''}`);
+      privateLessonIds = (mod?.lessons || []).filter(l => l.is_private).map(l => l.id);
+    } else {
+      setBulkAccessTitle(`Conteúdo: ${course?.title || ''}`);
+      privateLessonIds = (courseModules[courseId] || []).flatMap(m => m.lessons.filter(l => l.is_private).map(l => l.id));
+    }
+
+    // Fetch profiles and existing access in parallel
+    const [{ data: profilesData }, accessResult] = await Promise.all([
+      supabase.from('profiles').select('user_id, display_name, email, company_name').eq('approved', true).order('display_name'),
+      privateLessonIds.length > 0
+        ? supabase.from('user_lesson_access').select('user_id, lesson_id').in('lesson_id', privateLessonIds)
+        : Promise.resolve({ data: [] as { user_id: string; lesson_id: string }[] }),
+    ]);
+    setBulkAccessProfiles(profilesData || []);
+
+    // A user "has access" if they have access to ALL private lessons in the scope
+    const accessData = (accessResult as any).data || [];
+    const userLessonCount: Record<string, number> = {};
+    for (const row of accessData) {
+      userLessonCount[row.user_id] = (userLessonCount[row.user_id] || 0) + 1;
+    }
+    const usersWithFullAccess = new Set<string>();
+    if (privateLessonIds.length > 0) {
+      for (const [uid, count] of Object.entries(userLessonCount)) {
+        if (count >= privateLessonIds.length) usersWithFullAccess.add(uid);
+      }
+    }
+    setBulkAccessUsersWithAccess(usersWithFullAccess);
+    setLoadingBulkAccess(false);
+  };
+
+  const executeBulkGrant = async (userId: string) => {
+    if (bulkAccessMode === 'module' && bulkAccessModuleId) {
+      await grantModuleAccessToUser(userId, bulkAccessModuleId);
+    } else if (bulkAccessMode === 'product' && bulkAccessCourseId) {
+      await grantProductAccessToUser(userId, bulkAccessCourseId);
+    }
+    // Update local state to reflect the grant
+    setBulkAccessUsersWithAccess(prev => new Set([...prev, userId]));
+  };
+
+  const filteredBulkProfiles = bulkAccessProfiles.filter(p => {
+    if (!bulkAccessSearch) return true;
+    const s = bulkAccessSearch.toLowerCase();
+    return (p.display_name || '').toLowerCase().includes(s) || (p.email || '').toLowerCase().includes(s) || (p.company_name || '').toLowerCase().includes(s);
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // --- Data fetching (same as before) ---
+  const uploadCourseImage = async (file: File, orientation: 'horizontal' | 'vertical') => {
+    const setter = orientation === 'horizontal' ? setUploadingH : setUploadingV;
+    setter(true);
+    const ext = file.name.split('.').pop();
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from('product-images').upload(path, file);
+    if (error) { toast({ title: t('imageUploadError') || 'Error al subir imagen', description: error.message, variant: 'destructive' }); setter(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path);
+    if (orientation === 'horizontal') setImageForm(f => ({ ...f, thumbnail_url: publicUrl }));
+    else setImageForm(f => ({ ...f, thumbnail_vertical_url: publicUrl }));
+    setter(false);
+    toast({ title: t('imageUploaded') || 'Imagen subida' });
+  };
+
+  const openImageEditor = (course: Course) => {
+    setImageEditorCourseId(course.id);
+    setImageForm({ thumbnail_url: course.thumbnail_url || '', thumbnail_vertical_url: course.thumbnail_vertical_url || '' });
+    setShowImageEditor(true);
+  };
+
+  const saveCourseImages = async () => {
+    if (!imageEditorCourseId) return;
+    await supabase.from('courses').update({ thumbnail_url: imageForm.thumbnail_url || null, thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null }).eq('id', imageEditorCourseId);
+    await supabase.from('products').update({ thumbnail_url: imageForm.thumbnail_url || null, thumbnail_vertical_url: imageForm.thumbnail_vertical_url || null }).eq('course_id', imageEditorCourseId);
+    toast({ title: t('courseUpdated') || 'Contenido actualizado' });
+    setShowImageEditor(false);
+    fetchCourses();
+  };
+
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    const { data: coursesData } = await supabase.from('courses').select('*, course_categories(*)').order('sort_order', { ascending: true });
+    if (coursesData) {
+      const { data: enrollments } = await supabase.from('course_enrollments').select('course_id');
+      const countMap: Record<string, number> = {};
+      enrollments?.forEach(e => { countMap[e.course_id] = (countMap[e.course_id] || 0) + 1; });
+      // Get product_ids for each course
+      const { data: products } = await supabase.from('products').select('id, course_id').not('course_id', 'is', null);
+      const productMap: Record<string, string> = {};
+      products?.forEach(p => { if (p.course_id) productMap[p.course_id] = p.id; });
+      // Get product_categories for all products
+      const productIds = (products || []).map(p => p.id);
+      const { data: prodCats } = productIds.length > 0 
+        ? await supabase.from('product_categories').select('product_id, category_id, course_categories:category_id(name)').in('product_id', productIds)
+        : { data: [] };
+      const prodCatMap: Record<string, { category_id: string; category_name: string }[]> = {};
+      (prodCats || []).forEach((pc: any) => {
+        const productId = pc.product_id;
+        // Find course_id for this product
+        const courseId = Object.entries(productMap).find(([, pid]) => pid === productId)?.[0];
+        if (courseId) {
+          if (!prodCatMap[courseId]) prodCatMap[courseId] = [];
+          prodCatMap[courseId].push({ category_id: pc.category_id, category_name: (pc.course_categories as any)?.name || '' });
+        }
+      });
+      setCourses(coursesData.map((c: any) => ({
+        ...c, category: c.course_categories, enrollment_count: countMap[c.id] || 0, 
+        product_id: productMap[c.id],
+        product_categories: prodCatMap[c.id] || [],
+      })));
+    }
+    setLoading(false);
+  }, []);
+
+  const fetchCategories = useCallback(async () => {
+    const { data } = await supabase.from('course_categories').select('*').order('name');
+    if (data) setCategories(data);
+  }, []);
+
+  useEffect(() => { fetchCourses(); fetchCategories(); }, [fetchCourses, fetchCategories]);
+
+  const fetchCourseModules = async (courseId: string) => {
+    setLoadingModules(prev => new Set(prev).add(courseId));
+    const { data: modules } = await supabase.from('course_modules').select('*').eq('course_id', courseId).order('sort_order');
+    const moduleIds = (modules || []).map(m => m.id);
+    const { data: lessons } = moduleIds.length > 0
+      ? await supabase.from('course_lessons').select('*').in('module_id', moduleIds).order('sort_order')
+      : { data: [] };
+    const lessonIds = (lessons || []).map(l => l.id);
+    const { data: contents } = lessonIds.length > 0
+      ? await supabase.from('lesson_contents').select('*').in('lesson_id', lessonIds).order('sort_order')
+      : { data: [] };
+    setCourseModules(prev => ({
+      ...prev,
+      [courseId]: (modules || []).map(m => ({
+        ...m,
+        lessons: (lessons || []).filter(l => l.module_id === m.id).map(l => ({
+          ...l,
+          contents: ((contents || []) as LessonContent[]).filter(c => c.lesson_id === l.id),
+        })),
+      })),
+    }));
+    setLoadingModules(prev => { const next = new Set(prev); next.delete(courseId); return next; });
+  };
+
+  const toggleCourseExpand = (courseId: string) => {
+    setExpandedCourses(prev => {
+      const next = new Set(prev);
+      if (next.has(courseId)) { next.delete(courseId); } else { next.add(courseId); if (!courseModules[courseId]) fetchCourseModules(courseId); }
+      return next;
+    });
+  };
+
+  const toggleLessonExpand = (lessonId: string) => {
+    setExpandedLessons(prev => { const next = new Set(prev); next.has(lessonId) ? next.delete(lessonId) : next.add(lessonId); return next; });
+  };
+
+  const toggleModuleExpand = (id: string) => {
+    setExpandedModules(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  };
+
+  // Status toggle
+  const confirmToggleStatus = (id: string, currentStatus: string) => { setPublishCourseId(id); setPublishAction(currentStatus === 'published' ? 'draft' : 'published'); setShowPublishConfirm(true); };
+  const executeToggleStatus = async () => {
+    if (!publishCourseId) return;
+    await supabase.from('courses').update({ status: publishAction }).eq('id', publishCourseId);
+    logSystemEvent({ action: publishAction === 'published' ? 'Curso publicado' : 'Curso despublicado', entity_type: 'course', entity_id: publishCourseId, level: 'info' });
+    toast({ title: publishAction === 'published' ? (t('coursePublished') || 'Curso publicado') : (t('courseDrafted') || 'Curso movido a borrador') });
+    setShowPublishConfirm(false); setPublishCourseId(null); fetchCourses();
+  };
+
+  // Category CRUD
+  const openNewCategory = () => { setEditingCategory(null); setCategoryForm({ name: '', description: '', auto_translate: true }); setShowCategoryEditor(true); };
+  const openEditCategory = (cat: Category) => { setEditingCategory(cat); setCategoryForm({ name: cat.name, description: cat.description || '', auto_translate: (cat as any).auto_translate ?? true }); setShowCategoryEditor(true); };
+  const saveCategory = async () => {
+    if (!categoryForm.name.trim()) return;
+    if (editingCategory) { await supabase.from('course_categories').update(categoryForm).eq('id', editingCategory.id); }
+    else { await supabase.from('course_categories').insert(categoryForm); }
+    setShowCategoryEditor(false); fetchCategories(); fetchCourses();
+    toast({ title: t('categorySaved') || 'Categoría guardada' });
+  };
+  const confirmDeleteCategory = (id: string) => { setDeleteCategoryId(id); setShowDeleteCategoryConfirm(true); };
+  const executeDeleteCategory = async () => {
+    if (!deleteCategoryId) return;
+    await supabase.from('course_categories').delete().eq('id', deleteCategoryId);
+    fetchCategories(); fetchCourses();
+    toast({ title: t('categoryDeleted') || 'Categoría eliminada' });
+    setShowDeleteCategoryConfirm(false); setDeleteCategoryId(null);
+  };
+
+  // Product-Category assignment
+  const openCategoryAssign = async (course: Course) => {
+    let productId = course.product_id;
+    if (!productId) {
+      // Try to find or create the product for this course
+      const { data: existingProd } = await supabase.from('products').select('id').eq('course_id', course.id).maybeSingle();
+      if (existingProd) {
+        productId = existingProd.id;
+      } else {
+        // Create a product for this course automatically
+        const { data: newProd } = await supabase.from('products').insert({
+          name: course.title, description: course.description, type: 'course' as any,
+          course_id: course.id, has_content: true, active: true,
+          thumbnail_url: course.thumbnail_url, thumbnail_vertical_url: course.thumbnail_vertical_url,
+        }).select('id').single();
+        if (!newProd) { toast({ title: 'Error al crear producto', variant: 'destructive' }); return; }
+        productId = newProd.id;
+        // Update local state
+        setCourses(prev => prev.map(c => c.id === course.id ? { ...c, product_id: productId! } : c));
+      }
+    }
+    setCategoryAssignCourseId(productId);
+    const { data } = await supabase.from('product_categories').select('category_id').eq('product_id', productId);
+    setAssignedCategories(new Set((data || []).map(d => d.category_id)));
+    setShowCategoryAssign(true);
+  };
+
+  const toggleCategoryAssign = async (categoryId: string) => {
+    if (!categoryAssignCourseId) return;
+    const isAssigned = assignedCategories.has(categoryId);
+    if (isAssigned) {
+      await supabase.from('product_categories').delete().eq('product_id', categoryAssignCourseId).eq('category_id', categoryId);
+      setAssignedCategories(prev => { const n = new Set(prev); n.delete(categoryId); return n; });
+    } else {
+      await supabase.from('product_categories').insert({ product_id: categoryAssignCourseId, category_id: categoryId });
+      setAssignedCategories(prev => new Set(prev).add(categoryId));
+    }
+    toast({ title: isAssigned ? 'Categoria removida' : 'Categoria associada' });
+  };
+
+  // Inline Module CRUD
+  const openNewModuleInline = async (courseId: string) => {
+    const modules = courseModules[courseId] || [];
+    await supabase.from('course_modules').insert({ course_id: courseId, title: t('newModule') || 'Nuevo Módulo', sort_order: modules.length });
+    fetchCourseModules(courseId);
+    toast({ title: t('moduleSaved') || 'Módulo creado' });
+  };
+  const startEditModule = (mod: Module) => { setInlineEditingModule(mod.id); setInlineModuleForm({ title: mod.title, description: mod.description || '' }); };
+  const saveInlineModule = async (mod: Module) => {
+    await supabase.from('course_modules').update({ title: inlineModuleForm.title, description: inlineModuleForm.description || null }).eq('id', mod.id);
+    setInlineEditingModule(null); fetchCourseModules(mod.course_id);
+    toast({ title: t('moduleSaved') || 'Módulo guardado' });
+  };
+  const deleteModuleInline = async (mod: Module) => {
+    await supabase.from('course_modules').delete().eq('id', mod.id);
+    fetchCourseModules(mod.course_id);
+    toast({ title: t('moduleDeleted') || 'Módulo eliminado' });
+  };
+
+  // Inline Lesson CRUD
+  const openNewLessonInline = async (moduleId: string, courseId: string) => {
+    const mod = (courseModules[courseId] || []).find(m => m.id === moduleId);
+    await supabase.from('course_lessons').insert({ module_id: moduleId, title: t('newLesson') || 'Nueva Aula', sort_order: (mod?.lessons || []).length });
+    fetchCourseModules(courseId);
+    toast({ title: t('lessonSaved') || 'Aula creada' });
+  };
+  const startEditLesson = (lesson: Lesson) => {
+    setInlineEditingLesson(lesson.id);
+    setInlineLessonForm({ title: lesson.title, description: lesson.description || '', video_url: lesson.video_url || '', duration_minutes: lesson.duration_minutes || 0, is_free: lesson.is_free, is_private: (lesson as any).is_private || false });
+  };
+  const saveInlineLesson = async (lesson: Lesson, courseId: string) => {
+    await supabase.from('course_lessons').update({
+      title: inlineLessonForm.title, description: inlineLessonForm.description || null,
+      video_url: inlineLessonForm.video_url || null, duration_minutes: inlineLessonForm.duration_minutes || 0, is_free: inlineLessonForm.is_free, is_private: inlineLessonForm.is_private,
+    }).eq('id', lesson.id);
+    setInlineEditingLesson(null); fetchCourseModules(courseId);
+    toast({ title: t('lessonSaved') || 'Aula guardada' });
+  };
+  const deleteLessonInline = async (lessonId: string, courseId: string) => {
+    await supabase.from('course_lessons').delete().eq('id', lessonId);
+    fetchCourseModules(courseId);
+    toast({ title: t('lessonDeleted') || 'Aula eliminada' });
+  };
+
+  // Lesson Content CRUD
+  const addContent = async (lessonId: string, courseId: string) => {
+    const { data: existing } = await supabase.from('lesson_contents').select('sort_order').eq('lesson_id', lessonId).order('sort_order', { ascending: false }).limit(1);
+    const nextOrder = (existing && existing.length > 0 ? existing[0].sort_order : -1) + 1;
+    await supabase.from('lesson_contents').insert({ lesson_id: lessonId, type: 'video', title: t('addContent'), sort_order: nextOrder } as any);
+    fetchCourseModules(courseId);
+    toast({ title: t('contentAdded') });
+  };
+  const startEditContent = (c: LessonContent) => { setEditingContent(c.id); setContentForm({ title: c.title, type: c.type, content: c.content || '' }); };
+  const saveContent = async (contentId: string, courseId: string) => {
+    await supabase.from('lesson_contents').update({ title: contentForm.title, type: contentForm.type, content: contentForm.content || null } as any).eq('id', contentId);
+    setEditingContent(null); fetchCourseModules(courseId);
+    toast({ title: t('contentSaved') });
+  };
+  const deleteContent = async (contentId: string, courseId: string) => {
+    await supabase.from('lesson_contents').delete().eq('id', contentId);
+    fetchCourseModules(courseId);
+    toast({ title: t('contentDeleted') });
+  };
+
+  // Drag-and-drop handlers
+  const handleModuleDragEnd = async (event: DragEndEvent, courseId: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const modules = courseModules[courseId] || [];
+    const oldIndex = modules.findIndex(m => m.id === active.id);
+    const newIndex = modules.findIndex(m => m.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(modules, oldIndex, newIndex);
+    setCourseModules(prev => ({ ...prev, [courseId]: reordered }));
+    // Persist new order
+    await Promise.all(reordered.map((m, i) => supabase.from('course_modules').update({ sort_order: i }).eq('id', m.id)));
+    toast({ title: 'Ordem dos módulos atualizada' });
+  };
+
+  const handleLessonDragEnd = async (event: DragEndEvent, moduleId: string, courseId: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const modules = courseModules[courseId] || [];
+    const mod = modules.find(m => m.id === moduleId);
+    if (!mod) return;
+    const oldIndex = mod.lessons.findIndex(l => l.id === active.id);
+    const newIndex = mod.lessons.findIndex(l => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(mod.lessons, oldIndex, newIndex);
+    setCourseModules(prev => ({
+      ...prev,
+      [courseId]: prev[courseId].map(m => m.id === moduleId ? { ...m, lessons: reordered } : m),
+    }));
+    await Promise.all(reordered.map((l, i) => supabase.from('course_lessons').update({ sort_order: i }).eq('id', l.id)));
+    toast({ title: 'Ordem das aulas atualizada' });
+  };
+
+  // Students
+  const openStudentList = async (courseId: string) => {
+    const { data } = await supabase.from('course_enrollments').select('*').eq('course_id', courseId);
+    if (data) {
+      const enriched: Enrollment[] = [];
+      for (const e of data) {
+        const { data: p } = await supabase.from('profiles').select('display_name, email, company_name').eq('user_id', e.user_id).single();
+        enriched.push({ id: e.id, user_id: e.user_id, enrolled_at: e.enrolled_at, profile: p || undefined });
+      }
+    setStudents(enriched);
+    } else { setStudents([]); }
+    setShowStudentList(true);
+  };
+
+  // Private lesson user access management
+  const openAccessManager = async (lesson: Lesson) => {
+    setAccessLessonId(lesson.id);
+    setAccessLessonTitle(lesson.title);
+    setAccessSearch('');
+    setLoadingAccess(true);
+    setShowAccessManager(true);
+    
+    const [{ data: accessData }, { data: profilesData }] = await Promise.all([
+      supabase.from('user_lesson_access').select('user_id').eq('lesson_id', lesson.id),
+      supabase.from('profiles').select('user_id, display_name, email, company_name').eq('approved', true).order('display_name'),
+    ]);
+    setAccessUsers((accessData || []).map(a => a.user_id));
+    setAllProfiles(profilesData || []);
+    setLoadingAccess(false);
+  };
+
+  const toggleUserAccess = async (userId: string) => {
+    if (!accessLessonId) return;
+    const hasAccess = accessUsers.includes(userId);
+    if (hasAccess) {
+      await supabase.from('user_lesson_access').delete().eq('lesson_id', accessLessonId).eq('user_id', userId);
+      setAccessUsers(prev => prev.filter(id => id !== userId));
+      toast({ title: t('accessRemoved') || 'Acceso removido' });
+    } else {
+      await supabase.from('user_lesson_access').insert({ lesson_id: accessLessonId, user_id: userId });
+      setAccessUsers(prev => [...prev, userId]);
+      toast({ title: t('accessGranted') || 'Acceso concedido' });
+    }
+  };
+
+  const filteredProfiles = allProfiles.filter(p => {
+    if (!accessSearch) return true;
+    const s = accessSearch.toLowerCase();
+    return (p.display_name || '').toLowerCase().includes(s) || (p.email || '').toLowerCase().includes(s) || (p.company_name || '').toLowerCase().includes(s);
+  });
+
+  const filtered = courses.filter(c => {
+    if (filterStatus !== 'all' && c.status !== filterStatus) return false;
+    if (filterCategory !== 'all') {
+      // Check both the legacy category_id and the product_categories
+      const hasCategory = c.category_id === filterCategory || 
+        (c.product_categories || []).some(pc => pc.category_id === filterCategory);
+      if (!hasCategory) return false;
+    }
+    if (search) {
+      const s = search.toLowerCase();
+      return c.title.toLowerCase().includes(s) || (c.description || '').toLowerCase().includes(s) || (c.category?.name || '').toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-xl font-display font-bold text-foreground">{t('myLibrary') || 'Minha Biblioteca'}</h2>
+          <p className="text-sm text-muted-foreground">{t('adminCoursesDesc')}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('contentCreatedViaProducts')}</p>
+        </div>
+        <Button variant="outline" onClick={openNewCategory} className="gap-2">
+          <Tag className="w-4 h-4" /> {t('manageCategories') || 'Categorías'}
+        </Button>
+      </div>
+
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder={t('searchCourses')} value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-8 bg-secondary border-border" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
+        </div>
+        <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
+          <SelectTrigger className="w-[140px] bg-secondary border-border"><Filter className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('allFilter') || 'Todos'}</SelectItem>
+            <SelectItem value="published">{t('published')}</SelectItem>
+            <SelectItem value="draft">{t('draft')}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterCategory} onValueChange={setFilterCategory}>
+          <SelectTrigger className="w-[180px] bg-secondary border-border"><Tag className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('allCategories')}</SelectItem>
+            {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Categories */}
+      {categories.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {categories.map(cat => (
+            <div key={cat.id} className="inline-flex items-center gap-1 bg-secondary rounded-lg px-3 py-1.5 text-sm border border-border">
+              <Tag className="w-3 h-3 text-primary" />
+              <span className="text-foreground">{cat.name}</span>
+              <button onClick={() => openEditCategory(cat)} className="ml-1 text-muted-foreground hover:text-foreground"><Edit className="w-3 h-3" /></button>
+              <button onClick={() => confirmDeleteCategory(cat.id)} className="text-muted-foreground hover:text-destructive"><X className="w-3 h-3" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Course list */}
+      {loading ? (
+        <p className="text-center py-12 text-muted-foreground">{t('loading')}...</p>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(course => (
+            <div key={course.id} className="bg-card rounded-xl border border-border overflow-hidden">
+              <div className="p-5 flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <button onClick={() => toggleCourseExpand(course.id)} className="text-muted-foreground hover:text-foreground shrink-0">
+                      {expandedCourses.has(course.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+                    <p className="font-display font-semibold text-foreground truncate">{course.title}</p>
+                    <Badge variant={course.status === 'published' ? 'default' : 'secondary'}
+                      className={course.status === 'published' ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}>
+                      {course.status === 'published' ? t('published') : t('draft')}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate ml-6">{course.description}</p>
+                  <div className="flex gap-4 mt-1 text-xs text-muted-foreground ml-6">
+                    {(course.product_categories || []).length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {(course.product_categories || []).map(pc => (
+                          <Badge key={pc.category_id} variant="outline" className="text-xs">
+                            <Tag className="w-2.5 h-2.5 mr-1" />{pc.category_name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : course.category ? (
+                      <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{course.category.name}</span>
+                    ) : null}
+                    <span>{course.enrollment_count} {t('students')}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{t('draft')}</span>
+                    <Switch checked={course.status === 'published'} onCheckedChange={() => confirmToggleStatus(course.id, course.status)} />
+                    <span className="text-xs text-muted-foreground">{t('published')}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => openCategoryAssign(course)} title="Categorias">
+                    <Tag className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => openImageEditor(course)} title={t('horizontalImage')}>
+                    <Image className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => openStudentList(course.id)} title={t('students')}>
+                    <Users className="w-4 h-4" /><span className="ml-1 text-xs">{course.enrollment_count}</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Expandable modules/lessons with drag-and-drop */}
+              {expandedCourses.has(course.id) && (
+                <div className="border-t border-border bg-secondary/30 p-4 space-y-2">
+                  {loadingModules.has(course.id) ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">{t('loading')}...</p>
+                  ) : (
+                    <>
+                      {/* Bulk access for entire product */}
+                      {(courseModules[course.id] || []).some(m => m.lessons.some(l => l.is_private)) && (
+                        <Button variant="outline" size="sm" onClick={() => openBulkAccessManager('product', course.id)} className="gap-1 mb-2 text-xs">
+                          <Lock className="w-3 h-3" /> Liberar acceso a todo el conteúdo privado
+                        </Button>
+                      )}
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleModuleDragEnd(e, course.id)}>
+                        <SortableContext items={(courseModules[course.id] || []).map(m => m.id)} strategy={verticalListSortingStrategy}>
+                          {(courseModules[course.id] || []).map((mod, mi) => (
+                            <SortableModuleItem key={mod.id} mod={mod} mi={mi}>
+                              <div className="border border-border rounded-lg overflow-hidden bg-card">
+                                <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/50">
+                                  <button onClick={() => toggleModuleExpand(mod.id)} className="flex items-center gap-2 flex-1 text-left">
+                                    {expandedModules.has(mod.id) ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                                    {inlineEditingModule === mod.id ? (
+                                      <Input value={inlineModuleForm.title} onChange={e => setInlineModuleForm(f => ({ ...f, title: e.target.value }))}
+                                        className="bg-background border-border h-7 text-sm w-64" onClick={e => e.stopPropagation()}
+                                        onKeyDown={e => { if (e.key === 'Enter') saveInlineModule(mod); if (e.key === 'Escape') setInlineEditingModule(null); }} />
+                                    ) : (
+                                      <span className="font-medium text-foreground text-sm">{mi + 1}. {mod.title}</span>
+                                    )}
+                                    <Badge variant="secondary" className="text-xs">{mod.lessons.length} {t('lessons')}</Badge>
+                                    {mod.lessons.some(l => l.is_private) && <Badge variant="outline" className="text-xs border-yellow-500/30 text-yellow-500">🔒 {mod.lessons.filter(l => l.is_private).length} privadas</Badge>}
+                                  </button>
+                                  <div className="flex gap-1">
+                                    {inlineEditingModule === mod.id ? (
+                                      <>
+                                        <Button variant="ghost" size="sm" onClick={() => saveInlineModule(mod)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                        <Button variant="ghost" size="sm" onClick={() => setInlineEditingModule(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button variant="ghost" size="sm" onClick={() => startEditModule(mod)} className="h-7"><Edit className="w-3 h-3" /></Button>
+                                        <Button variant="ghost" size="sm" onClick={() => deleteModuleInline(mod)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
+                                        {mod.lessons.some(l => l.is_private) && (
+                                          <Button variant="ghost" size="sm" onClick={() => openBulkAccessManager('module', course.id, mod.id)} className="h-7 text-yellow-500" title="Liberar acceso a todas las aulas privadas del módulo">
+                                            <Lock className="w-3 h-3" />
+                                          </Button>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {expandedModules.has(mod.id) && (
+                                  <div className="p-3 space-y-2">
+                                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleLessonDragEnd(e, mod.id, course.id)}>
+                                      <SortableContext items={mod.lessons.map(l => l.id)} strategy={verticalListSortingStrategy}>
+                                        {mod.lessons.map((lesson, li) => (
+                                          <SortableLessonItem key={lesson.id} lesson={lesson}>
+                                            <div className="rounded-lg bg-background border border-border/50">
+                                              <div className="px-3 py-2">
+                                                {inlineEditingLesson === lesson.id ? (
+                                                  <div className="space-y-2">
+                                                    <Input value={inlineLessonForm.title} onChange={e => setInlineLessonForm(f => ({ ...f, title: e.target.value }))}
+                                                      className="bg-secondary border-border h-8 text-sm" placeholder={t('lessonTitle') || 'Título'} />
+                                                    <Input value={inlineLessonForm.video_url} onChange={e => setInlineLessonForm(f => ({ ...f, video_url: e.target.value }))}
+                                                      className="bg-secondary border-border h-8 text-sm" placeholder={t('videoUrl') || 'URL del video'} />
+                                                    <div className="flex gap-2 items-center">
+                                                      <label className="text-xs text-muted-foreground block mb-0.5">{t('durationMinutes') || 'Duração (minutos)'}</label>
+                                                      <Input type="number" value={inlineLessonForm.duration_minutes}
+                                                        onChange={e => setInlineLessonForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 0 }))}
+                                                        className="bg-secondary border-border h-8 text-sm w-24" placeholder="min" />
+                                                      <div className="flex items-center gap-1">
+                                                        <Switch checked={inlineLessonForm.is_free} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_free: v }))} />
+                                                        <span className="text-xs text-muted-foreground">{t('free') || 'Gratis'}</span>
+                                                      </div>
+                                                      <div className="flex items-center gap-1">
+                                                        <Switch checked={inlineLessonForm.is_private} onCheckedChange={v => setInlineLessonForm(f => ({ ...f, is_private: v }))} />
+                                                        <span className="text-xs text-muted-foreground">🔒 {t('privateLesson') || 'Privada'}</span>
+                                                      </div>
+                                                      <div className="flex gap-1 ml-auto">
+                                                        <Button size="sm" variant="ghost" onClick={() => saveInlineLesson(lesson, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                                        <Button size="sm" variant="ghost" onClick={() => setInlineEditingLesson(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ) : (
+                                                  <div className="flex items-center gap-3">
+                                                    <button onClick={() => toggleLessonExpand(lesson.id)} className="text-muted-foreground hover:text-foreground shrink-0">
+                                                      {expandedLessons.has(lesson.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                    <Video className="w-4 h-4 text-muted-foreground shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                      <p className="text-sm font-medium text-foreground truncate">{li + 1}. {lesson.title}</p>
+                                                      <div className="flex gap-2 text-xs text-muted-foreground">
+                                                        {lesson.duration_minutes ? <span>{lesson.duration_minutes} min</span> : null}
+                                                        {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
+                                                        {(lesson as any).is_private && <Badge variant="outline" className="text-xs py-0 border-yellow-500/30 text-yellow-500">🔒 {t('privateLesson') || 'Privada'}</Badge>}
+                                                        {lesson.contents && lesson.contents.length > 0 && (
+                                                          <span>{lesson.contents.length} {t('contentsCount') || 'conteúdos'}</span>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    {(lesson as any).is_private && (
+                                                      <Button variant="ghost" size="sm" onClick={() => openAccessManager(lesson)} className="h-7" title={t('manageAccess') || 'Gestionar acceso'}>
+                                                        <Lock className="w-3 h-3" />
+                                                      </Button>
+                                                    )}
+                                                    <Button variant="ghost" size="sm" onClick={() => startEditLesson(lesson)} className="h-7"><Edit className="w-3 h-3" /></Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => deleteLessonInline(lesson.id, course.id)} className="text-destructive h-7"><Trash2 className="w-3 h-3" /></Button>
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {/* Lesson contents */}
+                                              {expandedLessons.has(lesson.id) && (
+                                                <div className="border-t border-border/50 px-3 py-2 space-y-2 bg-secondary/20">
+                                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('lessonContents')}</p>
+                                                  {(lesson.contents || []).map(cont => (
+                                                    <div key={cont.id} className="flex items-start gap-2 p-2 rounded-md bg-background border border-border/30">
+                                                      {editingContent === cont.id ? (
+                                                        <div className="flex-1 space-y-2">
+                                                          <Input value={contentForm.title} onChange={e => setContentForm(f => ({ ...f, title: e.target.value }))}
+                                                            className="bg-secondary border-border h-7 text-sm" placeholder={t('contentTitle')} />
+                                                          <Select value={contentForm.type} onValueChange={(v: any) => setContentForm(f => ({ ...f, type: v }))}>
+                                                            <SelectTrigger className="h-7 text-sm bg-secondary border-border w-32"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                              {Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => (
+                                                                <SelectItem key={k} value={k}>{v}</SelectItem>
+                                                              ))}
+                                                            </SelectContent>
+                                                          </Select>
+                                                          {contentForm.type === 'text' ? (
+                                                            <Textarea value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
+                                                              className="bg-secondary border-border text-sm min-h-[60px]" placeholder="Texto / Markdown" />
+                                                          ) : (
+                                                            <Input value={contentForm.content} onChange={e => setContentForm(f => ({ ...f, content: e.target.value }))}
+                                                              className="bg-secondary border-border h-7 text-sm" placeholder="URL" />
+                                                          )}
+                                                          <div className="flex gap-1">
+                                                            <Button size="sm" variant="ghost" onClick={() => saveContent(cont.id, course.id)} className="text-green-500 h-7"><span className="text-xs">✓</span></Button>
+                                                            <Button size="sm" variant="ghost" onClick={() => setEditingContent(null)} className="h-7"><X className="w-3 h-3" /></Button>
+                                                          </div>
+                                                        </div>
+                                                      ) : (
+                                                        <>
+                                                          <span className="text-muted-foreground mt-0.5">{CONTENT_TYPE_ICONS[cont.type]}</span>
+                                                          <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-foreground truncate">{cont.title}</p>
+                                                            <p className="text-xs text-muted-foreground">{CONTENT_TYPE_LABELS[cont.type]}</p>
+                                                          </div>
+                                                          <Button variant="ghost" size="sm" onClick={() => startEditContent(cont)} className="h-6"><Edit className="w-3 h-3" /></Button>
+                                                          <Button variant="ghost" size="sm" onClick={() => deleteContent(cont.id, course.id)} className="text-destructive h-6"><Trash2 className="w-3 h-3" /></Button>
+                                                        </>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                  <Button size="sm" variant="ghost" onClick={() => addContent(lesson.id, course.id)} className="gap-1 w-full text-primary text-xs">
+                                                    <Plus className="w-3.5 h-3.5" /> {t('addContent')}
+                                                  </Button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </SortableLessonItem>
+                                        ))}
+                                      </SortableContext>
+                                    </DndContext>
+                                    <Button size="sm" variant="ghost" onClick={() => openNewLessonInline(mod.id, course.id)} className="gap-1 w-full text-primary">
+                                      <FilePlus className="w-4 h-4" /> {t('addLesson') || 'Agregar Aula'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </SortableModuleItem>
+                          ))}
+                        </SortableContext>
+                      </DndContext>
+                      <Button size="sm" variant="outline" onClick={() => openNewModuleInline(course.id)} className="gap-1 w-full">
+                        <FolderPlus className="w-4 h-4" /> {t('addModule') || 'Agregar Módulo'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          {filtered.length === 0 && <p className="text-center py-12 text-muted-foreground">{t('noCoursesFound')}</p>}
+        </div>
+      )}
+
+      {/* Category Editor */}
+      <Dialog open={showCategoryEditor} onOpenChange={setShowCategoryEditor}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">{editingCategory ? (t('editCategory') || 'Editar Categoría') : (t('addCategory') || 'Nueva Categoría')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('categoryName') || 'Nombre'}</label>
+              <Input value={categoryForm.name} onChange={e => setCategoryForm(f => ({ ...f, name: e.target.value }))} className="bg-secondary border-border" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('courseDescription')}</label>
+              <Input value={categoryForm.description} onChange={e => setCategoryForm(f => ({ ...f, description: e.target.value }))} className="bg-secondary border-border" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={categoryForm.auto_translate} onCheckedChange={v => setCategoryForm(f => ({ ...f, auto_translate: v }))} />
+              <label className="text-sm">{t('autoTranslateAI') || 'Traducir con IA'}</label>
+            </div>
+            <Button onClick={saveCategory} className="w-full">{t('save')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Category Assignment to Product */}
+      <Dialog open={showCategoryAssign} onOpenChange={setShowCategoryAssign}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Associar Categorias</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {categories.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma categoria criada</p>
+            ) : categories.map(cat => (
+              <label key={cat.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer transition-colors">
+                <Checkbox checked={assignedCategories.has(cat.id)} onCheckedChange={() => toggleCategoryAssign(cat.id)} />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{cat.name}</p>
+                  {cat.description && <p className="text-xs text-muted-foreground">{cat.description}</p>}
+                </div>
+              </label>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Category Confirm */}
+      <AlertDialog open={showDeleteCategoryConfirm} onOpenChange={setShowDeleteCategoryConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteCategoryConfirm') || '¿Eliminar esta categoría?'}</AlertDialogTitle>
+            <AlertDialogDescription>{t('deleteCategoryDesc') || 'Los cursos asociados perderán esta categoría.'}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('back') || 'Cancelar'}</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDeleteCategory} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('deleteUser') || 'Eliminar'}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Publish Confirm */}
+      <AlertDialog open={showPublishConfirm} onOpenChange={setShowPublishConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{publishAction === 'published' ? (t('publishCourseConfirm') || '¿Publicar este curso?') : (t('unpublishCourseConfirm') || '¿Mover a borrador?')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {publishAction === 'published' ? (t('publishCourseDesc') || 'El curso será visible para todos los usuarios.') : (t('unpublishCourseDesc') || 'El curso dejará de ser visible para los usuarios.')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('back') || 'Cancelar'}</AlertDialogCancel>
+            <AlertDialogAction onClick={executeToggleStatus}>
+              {publishAction === 'published' ? (t('publish') || 'Publicar') : (t('unpublishAction') || 'Mover a Borrador')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Student List */}
+      <Dialog open={showStudentList} onOpenChange={setShowStudentList}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" /> {t('enrolledStudents') || 'Alumnos Matriculados'} ({students.length})
+            </DialogTitle>
+          </DialogHeader>
+          {students.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">{t('noStudentsEnrolled') || 'No hay alumnos matriculados.'}</p>
+          ) : (
+            <div className="space-y-2">
+              {students.map(s => (
+                <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 border border-border">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
+                    {(s.profile?.display_name || s.profile?.email || '?')[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{s.profile?.display_name || s.profile?.email || s.user_id}</p>
+                    <p className="text-xs text-muted-foreground truncate">{s.profile?.company_name || s.profile?.email}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{new Date(s.enrolled_at).toLocaleDateString()}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Course Image Editor */}
+      <Dialog open={showImageEditor} onOpenChange={setShowImageEditor}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">{t('horizontalImage')} & {t('verticalImage')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('horizontalImage')}</label>
+              <div className="flex gap-2 items-center">
+                <input ref={fileRefH} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadCourseImage(e.target.files[0], 'horizontal')} />
+                <Button variant="outline" size="sm" onClick={() => fileRefH.current?.click()} disabled={uploadingH} className="gap-1 w-full">
+                  <Upload className="w-4 h-4" /> {uploadingH ? '...' : (t('uploadImage') || 'Subir')}
+                </Button>
+              </div>
+              {imageForm.thumbnail_url && <img src={imageForm.thumbnail_url} alt="" className="mt-2 h-20 rounded object-cover" />}
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">{t('verticalImage')}</label>
+              <div className="flex gap-2 items-center">
+                <input ref={fileRefV} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadCourseImage(e.target.files[0], 'vertical')} />
+                <Button variant="outline" size="sm" onClick={() => fileRefV.current?.click()} disabled={uploadingV} className="gap-1 w-full">
+                  <Upload className="w-4 h-4" /> {uploadingV ? '...' : (t('uploadImage') || 'Subir')}
+                </Button>
+              </div>
+              {imageForm.thumbnail_vertical_url && <img src={imageForm.thumbnail_vertical_url} alt="" className="mt-2 h-28 rounded object-cover" />}
+            </div>
+            <Button onClick={saveCourseImages} className="w-full">{t('save')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Private Lesson Access Manager */}
+      <Dialog open={showAccessManager} onOpenChange={setShowAccessManager}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" /> {t('manageAccess') || 'Gestionar Acceso'} — {accessLessonTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder={t('searchUsers')} value={accessSearch} onChange={e => setAccessSearch(e.target.value)} className="pl-10 bg-secondary border-border" />
+          </div>
+          {loadingAccess ? (
+            <p className="text-sm text-muted-foreground text-center py-6">{t('loading')}...</p>
+          ) : (
+            <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+              {/* Show associated users first, then the rest */}
+              {[...filteredProfiles].sort((a, b) => {
+                const aHas = accessUsers.includes(a.user_id) ? 0 : 1;
+                const bHas = accessUsers.includes(b.user_id) ? 0 : 1;
+                return aHas - bHas;
+              }).map(p => (
+                <label key={p.user_id} className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${accessUsers.includes(p.user_id) ? 'border-primary/30 bg-primary/5' : 'border-border hover:bg-secondary/50'}`}>
+                  <Checkbox checked={accessUsers.includes(p.user_id)} onCheckedChange={() => toggleUserAccess(p.user_id)} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
+                    <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+                  </div>
+                  {accessUsers.includes(p.user_id) && <Badge variant="secondary" className="text-xs shrink-0">✓ Con acceso</Badge>}
+                </label>
+              ))}
+              {filteredProfiles.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t('noUsersFound')}</p>}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-2">{accessUsers.length} {t('usersWithAccess') || 'usuarios con acceso'}</p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Access Manager */}
+      <Dialog open={showBulkAccessManager} onOpenChange={setShowBulkAccessManager}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" /> Liberar acceso masivo — {bulkAccessTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground mb-2">Seleccione un usuario para liberar acceso a todas las aulas privadas {bulkAccessMode === 'module' ? 'del módulo' : 'del conteúdo completo'}.</p>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder={t('searchUsers')} value={bulkAccessSearch} onChange={e => setBulkAccessSearch(e.target.value)} className="pl-10 bg-secondary border-border" />
+          </div>
+          {loadingBulkAccess ? (
+            <p className="text-sm text-muted-foreground text-center py-6">{t('loading')}...</p>
+          ) : (
+            <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+              {/* Users WITH access first */}
+              {filteredBulkProfiles
+                .filter(p => bulkAccessUsersWithAccess.has(p.user_id))
+                .map(p => (
+                  <div key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-primary/30 bg-primary/5 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
+                      <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs border-primary/30 text-primary shrink-0">Con acceso</Badge>
+                  </div>
+                ))}
+              {/* Users WITHOUT access */}
+              {filteredBulkProfiles
+                .filter(p => !bulkAccessUsersWithAccess.has(p.user_id))
+                .map(p => (
+                  <div key={p.user_id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:bg-secondary/50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{p.display_name || p.email || p.user_id}</p>
+                      <p className="text-xs text-muted-foreground truncate">{p.company_name || p.email}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => executeBulkGrant(p.user_id)} className="shrink-0 text-xs h-7">
+                      Liberar
+                    </Button>
+                  </div>
+                ))}
+              {filteredBulkProfiles.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t('noUsersFound')}</p>}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default AdminCourses;

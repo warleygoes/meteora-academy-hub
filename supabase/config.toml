@@ -1,0 +1,28 @@
+project_id = "thyowehliqgrjkeknoza"
+
+[functions.notify-new-registration]
+verify_jwt = false
+
+[functions.reset-user-password]
+verify_jwt = false
+
+[functions.automation-api]
+verify_jwt = false
+
+[functions.translate-category]
+verify_jwt = false
+
+[functions.dispatch-webhook]
+verify_jwt = false
+
+[functions.generate-product-content]
+verify_jwt = false
+
+[functions.generate-sales-page-content]
+verify_jwt = false
+
+[functions.import-users]
+verify_jwt = false
+
+[functions.migrate-users]
+verify_jwt = false
