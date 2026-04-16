@@ -17,11 +17,11 @@ function getEmbedUrl(url: string): { type: 'iframe' | 'video'; src: string } | n
   if (vimeoMatch) return { type: 'iframe', src: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
 
   // Adilo (BigCommand)
-  const adiloMatch = url.match(/adilo\.bigcommand\.com\/watch\/([a-zA-Z0-9]+)/);
+  const adiloMatch = url.match(/adilo\.bigcommand\.com\/watch\/([a-zA-Z0-9_-]+)/);
   if (adiloMatch) return { type: 'iframe', src: `https://adilo.bigcommand.com/watch/${adiloMatch[1]}?embed=true` };
 
   // Panda Video
-  const pandaMatch = url.match(/pandavideo\.com(?:\.br)?\/(?:embed\/\?v=|watch\/)?([a-zA-Z0-9-]+)/);
+  const pandaMatch = url.match(/pandavideo\.com(?:\.br)?\/(?:embed\/\?v=|watch\/)?([a-zA-Z0-9_-]+)/);
   if (pandaMatch) return { type: 'iframe', src: `https://player-vz-7b95cf00-d55.tv.pandavideo.com.br/embed/?v=${pandaMatch[1]}` };
   // Already an embed URL from Panda
   if (url.includes('pandavideo.com') && url.includes('embed')) return { type: 'iframe', src: url };
