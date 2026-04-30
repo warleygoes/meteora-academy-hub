@@ -10,7 +10,7 @@ services:
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
         VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
     ports:
-      - "3001:80"
+      - "80:80"
     restart: unless-stopped
     networks:
       - meteora-network
