@@ -29,31 +29,60 @@ Deno.serve(async (req) => {
   );
 
   // Verify caller is admin
+  // Verify caller is authenticated
   const authHeader = req.headers.get("Authorization");
+
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "No authorization" }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 401,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
     });
   }
-  const { data: { user: caller } } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
-  if (!caller) {
-    return new Response(JSON.stringify({ error: "Invalid token" }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  const { data: roleData } = await supabaseAdmin
-    .from("user_roles").select("role").eq("user_id", caller.id).eq("role", "admin").maybeSingle();
-  if (!roleData) {
-    return new Response(JSON.stringify({ error: "Not admin" }), {
-      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+
+  // Create client using user session
+  const supabaseUser = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user: caller },
+    error: userError,
+  } = await supabaseUser.auth.getUser();
+
+  if (userError || !caller) {
+    console.error("Auth validation error:", userError);
+
+    return new Response(
+      JSON.stringify({
+        error: "Invalid token",
+        details: userError?.message,
+      }),
+      {
+        status: 401,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 
   // Handle DELETE - remove auth user so email can be re-registered
   if (req.method === "DELETE") {
     try {
       let user_id: string | null = null;
-      
+
       // Try reading from body first, then URL params
       try {
         const body = await req.text();
@@ -62,18 +91,18 @@ Deno.serve(async (req) => {
           user_id = parsed.user_id;
         }
       } catch { /* ignore parse errors */ }
-      
+
       if (!user_id) {
         const url = new URL(req.url);
         user_id = url.searchParams.get("user_id");
       }
-      
+
       if (!user_id) {
         return new Response(JSON.stringify({ error: "user_id required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      
+
       // Delete related data first
       await supabaseAdmin.from('user_plans').delete().eq('user_id', user_id);
       await supabaseAdmin.from('user_products').delete().eq('user_id', user_id);
@@ -87,7 +116,7 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from('community_comments').delete().eq('user_id', user_id);
       await supabaseAdmin.from('community_posts').delete().eq('user_id', user_id);
       await supabaseAdmin.from('profiles').delete().eq('user_id', user_id);
-      
+
       // Finally delete the auth user
       const { error } = await supabaseAdmin.auth.admin.deleteUser(user_id);
       if (error) {
