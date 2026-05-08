@@ -28,55 +28,46 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Verify caller is authenticated
-  const authHeader = req.headers.get("Authorization");
-
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: "No authorization" }), {
-      status: 401,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Create client using user session
-  const supabaseUser = createClient(
+  // Create a client with the user's token to verify authenticity
+  const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
     {
       global: {
-        headers: {
-          Authorization: authHeader,
-        },
+        headers: { Authorization: req.headers.get("Authorization")! },
       },
     }
   );
 
   const {
     data: { user: caller },
-    error: userError,
-  } = await supabaseUser.auth.getUser();
+    error: authError,
+  } = await supabaseClient.auth.getUser();
 
-  if (userError || !caller) {
-    console.error("Auth validation error:", userError);
-
-    return new Response(
-      JSON.stringify({
-        error: "Invalid token",
-        details: userError?.message,
-      }),
-      {
-        status: 401,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+  if (authError || !caller) {
+    console.error("Auth error:", authError);
+    return new Response(JSON.stringify({ error: "Invalid token", details: authError?.message }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
+  // Check if user is admin using the security definer function has_role
+  const { data: isAdmin, error: roleError } = await supabaseAdmin.rpc("has_role", {
+    _user_id: caller.id,
+    _role: "admin",
+  });
+
+  if (roleError) {
+    console.error("Role check error:", roleError);
+  }
+
+  if (!isAdmin) {
+    return new Response(JSON.stringify({ error: "Not admin" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   // Handle DELETE - remove auth user so email can be re-registered
   if (req.method === "DELETE") {
