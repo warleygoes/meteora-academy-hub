@@ -60,6 +60,10 @@ Deno.serve(async (req) => {
 
   if (roleError) {
     console.error("Role check error:", roleError);
+    return new Response(JSON.stringify({ error: "Role check failed", details: roleError.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   if (!isAdmin) {
