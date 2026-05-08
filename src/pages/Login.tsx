@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
+import { Mail, Lock, User, Sparkles, Building2, Phone, Globe, Users, Wifi, DollarSign, MessageSquare, Target, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle, Eye, EyeOff } from 'lucide-react';
 import PhoneInput from '@/components/PhoneInput';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -45,6 +45,7 @@ const Login: React.FC = () => {
   const [mainDesires, setMainDesires] = useState('');
 
   const [approvalChecked, setApprovalChecked] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   if (loading) return null;
 
@@ -268,7 +269,10 @@ const Login: React.FC = () => {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required />
+                  <Input type={showPassword ? 'text' : 'password'} placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10 bg-secondary border-border" required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -314,7 +318,10 @@ const Login: React.FC = () => {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="password" placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 bg-secondary border-border" required minLength={8} />
+                  <Input type={showPassword ? 'text' : 'password'} placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10 bg-secondary border-border" required minLength={8} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
                 <p className="text-[11px] text-muted-foreground -mt-2">{t('passwordMinLength')}</p>
 
@@ -464,7 +471,7 @@ const Login: React.FC = () => {
                   <button onClick={() => { setMode('login'); setStep(1); }} className="text-primary hover:underline">{t('login')}</button>
                 </p>
                 <a
-                  href="https://wa.me/5491100000000?text=Hola%2C%20necesito%20ayuda%20para%20registrarme%20en%20Meteora%20Academy"
+                  href="https://wa.me/558396549861?text=Necesito%20ayuda%20para%20crear%20mi%20cuenta%20en%20Meteora"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
