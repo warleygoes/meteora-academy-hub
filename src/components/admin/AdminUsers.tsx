@@ -281,7 +281,20 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: true, status: 'approved' } : prev);
     const { error } = await supabase.from('profiles').update({ approved: true, status: 'approved' }).eq('user_id', userId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers(); }
-    else { logSystemEvent({ action: 'Usuario aprobado', entity_type: 'user', entity_id: userId, level: 'success', webhookEvent: 'user.approved', webhookData: { user_id: userId } }); toast({ title: t('userApproved') }); fetchApprovedUsers(); fetchAllUsers(); }
+    else { 
+      const user = allUsers.find(u => u.user_id === userId) || pendingUsers.find(u => u.user_id === userId) || rejectedUsers.find(u => u.user_id === userId);
+      logSystemEvent({ 
+        action: 'Usuario aprobado', 
+        entity_type: 'user', 
+        entity_id: userId, 
+        level: 'success', 
+        webhookEvent: 'user.approved', 
+        webhookData: user || { user_id: userId } 
+      }); 
+      toast({ title: t('userApproved') }); 
+      fetchApprovedUsers(); 
+      fetchAllUsers(); 
+    }
   };
 
   
@@ -318,7 +331,19 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, approved: false, status: 'rejected' } : prev);
     const { error } = await supabase.from('profiles').update({ approved: false, status: 'rejected' }).eq('user_id', userId);
     if (error) { toast({ title: error.message, variant: 'destructive' }); fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers(); }
-    else { logSystemEvent({ action: 'Usuario rechazado', entity_type: 'user', entity_id: userId, level: 'warning', webhookEvent: 'user.rejected', webhookData: { user_id: userId } }); toast({ title: t('userRejected') }); fetchApprovedUsers(); fetchAllUsers(); }
+    else { 
+      logSystemEvent({ 
+        action: 'Usuario rechazado', 
+        entity_type: 'user', 
+        entity_id: userId, 
+        level: 'warning', 
+        webhookEvent: 'user.rejected', 
+        webhookData: rejectedUser || { user_id: userId } 
+      }); 
+      toast({ title: t('userRejected') }); 
+      fetchApprovedUsers(); 
+      fetchAllUsers(); 
+    }
   };
 
   const confirmSuspend = (userId: string) => { setActionUserId(userId); setShowSuspendConfirm(true); };
@@ -344,6 +369,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     
     // Delete user completely via edge function (profile + auth + related data)
     try {
+      const userToDelete = allUsers.find(u => u.user_id === actionUserId);
       const { data: result, error } = await supabase.functions.invoke('import-users', {
         method: 'DELETE',
         body: { user_id: actionUserId },
@@ -352,7 +378,14 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
         toast({ title: result?.error || error?.message || 'Error al eliminar usuario', variant: 'destructive' });
         fetchPendingUsers(); fetchRejectedUsers(); fetchApprovedUsers(); fetchAllUsers();
       } else {
-        logSystemEvent({ action: 'Usuario eliminado', entity_type: 'user', entity_id: actionUserId, level: 'warning', webhookEvent: 'user.deleted', webhookData: { user_id: actionUserId } });
+        logSystemEvent({ 
+          action: 'Usuario eliminado', 
+          entity_type: 'user', 
+          entity_id: actionUserId, 
+          level: 'warning', 
+          webhookEvent: 'user.deleted', 
+          webhookData: userToDelete || { user_id: actionUserId } 
+        });
         toast({ title: t('userDeleted') || 'Usuario eliminado permanentemente.' });
         fetchAllUsers();
       }
