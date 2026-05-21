@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useContentProducts } from '@/hooks/useContentProducts';
 import { useTranslateCategory } from '@/hooks/useTranslateCategory';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,11 +19,22 @@ const PRODUCT_TYPE_LABELS: Record<string, Record<string, string>> = {
 const CoursesPage: React.FC = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { products, loading } = useContentProducts();
   const { translateText } = useTranslateCategory();
   const { user } = useAuth();
-  const [activeCategory, setActiveCategory] = useState('all');
-  const [activeType, setActiveType] = useState('all');
+  const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'all');
+  const [activeType, setActiveType] = useState(searchParams.get('type') || 'all');
+
+  const handleCategoryChange = (category: string) => {
+    setActiveCategory(category);
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('category', category); return p; }, { replace: true });
+  };
+
+  const handleTypeChange = (type: string) => {
+    setActiveType(type);
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('type', type); return p; }, { replace: true });
+  };
   const [allCategories, setAllCategories] = useState<{ id: string; name: string; translatedName?: string }[]>([]);
   const [accessibleProductIds, setAccessibleProductIds] = useState<Set<string> | null>(null);
 
@@ -94,12 +105,12 @@ const CoursesPage: React.FC = () => {
       {/* Product type filter */}
       {productTypes.length > 1 && (
         <div className="flex gap-2 mb-4 flex-wrap">
-          <button onClick={() => setActiveType('all')}
+          <button onClick={() => handleTypeChange('all')}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeType === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
             {t('allFilter') || 'Todos'}
           </button>
           {productTypes.map(type => (
-            <button key={type} onClick={() => setActiveType(type)}
+            <button key={type} onClick={() => handleTypeChange(type)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeType === type ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
               {typeLabels[type] || type}
             </button>
@@ -109,12 +120,12 @@ const CoursesPage: React.FC = () => {
 
       {/* Category filter */}
       <div className="flex gap-2 mb-8 flex-wrap">
-        <button onClick={() => setActiveCategory('all')}
+        <button onClick={() => handleCategoryChange('all')}
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeCategory === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
           {t('allCategories')}
         </button>
         {allCategories.map(cat => (
-          <button key={cat.id} onClick={() => setActiveCategory(cat.name)}
+          <button key={cat.id} onClick={() => handleCategoryChange(cat.name)}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeCategory === cat.name ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
             {cat.translatedName || cat.name}
           </button>

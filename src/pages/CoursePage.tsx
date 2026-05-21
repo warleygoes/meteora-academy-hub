@@ -192,6 +192,20 @@ const CoursePage: React.FC = () => {
       return accessibleSet.has(lesson.id)
     }
 
+    const urlLessonId = searchParams.get('lesson');
+
+    if (urlLessonId) {
+      // Restore the lesson the user was viewing
+      const savedLesson = allL.find(l => l.id === urlLessonId);
+      if (savedLesson && canAccess(savedLesson)) {
+        setActiveLessonId(savedLesson.id);
+        const parentMod = builtModules.find(m => m.lessons.some(l => l.id === savedLesson.id));
+        if (parentMod) setExpandedModules(new Set([parentMod.id]));
+        setLoading(false);
+        return;
+      }
+    }
+
     if (resumeRef.current) {
       resumeRef.current = false // consume the flag
       // Find the last completed lesson index, then pick the next one
@@ -243,7 +257,7 @@ const CoursePage: React.FC = () => {
     const lesson = allLessons.find((l) => l.id === lessonId)
     if (lesson && !canAccessLesson(lesson)) return
     setActiveLessonId(lessonId)
-    // Only track which lesson the user is viewing, don't touch completed status
+    setSearchParams({ lesson: lessonId }, { replace: true })
   }
 
   const toggleComplete = async (lessonId: string) => {

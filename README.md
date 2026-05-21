@@ -1,73 +1,68 @@
-# Welcome to your Lovable project
+# Meteora Academy Hub
 
-## Project info
+Portal de membros da Meteora Academy — plataforma de cursos, comunidade e conteúdo exclusivo para alunos.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Funcionalidades
 
-## How can I edit this code?
+- **Minha Biblioteca** — catálogo de cursos e produtos com filtros por categoria e tipo
+- **Player de vídeo** — suporte a YouTube, Vimeo, Adilo, Panda Video, Google Drive e arquivos nativos (mp4, webm, etc.)
+- **Progresso de aulas** — rastreamento de lições concluídas por aluno
+- **Comunidade** — fórum de discussão por curso
+- **Live Meetings** — agenda de encontros ao vivo
+- **Diagnósticos** — formulários e resultados de diagnóstico personalizados
+- **Painel Admin** — gestão de usuários, cursos, produtos, pacotes, banners, comentários, links e API
+- **Multiidioma** — interface em Português, Inglês e Espanhol
+- **Autenticação** — login por e-mail/senha e magic link via Supabase Auth
 
-There are several ways of editing your application.
+## Stack
 
-**Use Lovable**
+- [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vitejs.dev/) — build e dev server
+- [React Router v6](https://reactrouter.com/) — roteamento client-side
+- [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) — estilização e componentes
+- [Supabase](https://supabase.com/) — banco de dados (PostgreSQL), autenticação, storage e Edge Functions
+- [React Query](https://tanstack.com/query) — cache e sincronização de dados do servidor
+- [Framer Motion](https://www.framer.com/motion/) — animações
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Instalação e uso local
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requisito: [Node.js](https://nodejs.org/) 18+ e npm.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# 1. Clone o repositório
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# 2. Entre no diretório
+cd meteora-academy-hub
 
-# Step 3: Install the necessary dependencies.
-npm i
+# 3. Instale as dependências
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 4. Configure as variáveis de ambiente
+cp .env.example .env
+# Preencha VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
+
+# 5. Inicie o servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Scripts disponíveis
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+| Comando | Descrição |
+|---|---|
+| `npm run dev` | Inicia o servidor de desenvolvimento |
+| `npm run build` | Gera o build de produção em `dist/` |
+| `npm run preview` | Serve o build de produção localmente |
 
-**Use GitHub Codespaces**
+## Estrutura principal
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```
+src/
+├── components/       # Componentes reutilizáveis (Layout, Sidebar, VideoPlayer, etc.)
+│   └── admin/        # Componentes exclusivos do painel admin
+├── contexts/         # Context API (idioma)
+├── hooks/            # Hooks personalizados (auth, dados, tradução)
+├── pages/            # Páginas da aplicação (roteadas pelo React Router)
+├── integrations/     # Cliente e tipos do Supabase
+└── lib/              # Utilitários e internacionalização
+```

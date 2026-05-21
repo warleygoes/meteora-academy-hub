@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Users, BookOpen, Package, TrendingUp, Settings, ClipboardList, ShoppingBag, ScrollText, Image as ImageIcon, Plug, MessageSquare, Link2, Video } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AdminUsers from '@/components/admin/AdminUsers';
@@ -18,8 +19,14 @@ import { cn } from '@/lib/utils';
 
 const AdminPage: React.FC = () => {
   const { t } = useLanguage();
-  const [activeSection, setActiveSection] = useState('users');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState(searchParams.get('section') || 'users');
   const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
+
+  const handleSectionChange = (section: string) => {
+    setActiveSection(section);
+    setSearchParams({ section }, { replace: true });
+  };
 
   const handleStatsUpdate = useCallback((newStats: { total: number; approved: number; pending: number; rejected: number }) => {
     setStats(newStats);
@@ -50,7 +57,7 @@ const AdminPage: React.FC = () => {
         {sections.map(section => (
           <button
             key={section.id}
-            onClick={() => setActiveSection(section.id)}
+            onClick={() => handleSectionChange(section.id)}
             className={cn(
               "flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all",
               activeSection === section.id

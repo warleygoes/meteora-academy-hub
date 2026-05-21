@@ -343,6 +343,43 @@ export const AppSidebar: React.FC = () => {
 
   const isActive = (path: string) => location.pathname === path
 
+  const isActiveSection = (to: string) => {
+    if (to === '/app') return location.pathname === '/app';
+    return location.pathname.startsWith(to);
+  };
+
+  // Save last URL for each section to sessionStorage
+  useEffect(() => {
+    const url = location.pathname + location.search;
+    if (location.pathname.startsWith('/app/courses')) {
+      sessionStorage.setItem('nav_last_courses', url);
+    } else if (location.pathname.startsWith('/app/admin')) {
+      sessionStorage.setItem('nav_last_admin', url);
+    } else if (location.pathname.startsWith('/app/community')) {
+      sessionStorage.setItem('nav_last_community', url);
+    } else if (location.pathname.startsWith('/app/meetings')) {
+      sessionStorage.setItem('nav_last_meetings', url);
+    } else if (location.pathname.startsWith('/app/diagnostics')) {
+      sessionStorage.setItem('nav_last_diagnostics', url);
+    }
+  }, [location]);
+
+  const getNavTarget = (to: string) => {
+    const key = to === '/app' ? null : `nav_last_${to.replace('/app/', '')}`;
+    if (!key) return to;
+    const saved = sessionStorage.getItem(key);
+    return saved && saved.startsWith(to) ? saved : to;
+  };
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+    const target = getNavTarget(to);
+    if (target !== to) {
+      e.preventDefault();
+      navigate(target);
+    }
+    setMobileOpen(false);
+  };
+
   const sidebar = (
     <div
       className={`flex flex-col h-full bg-sidebar border-r border-sidebar-border ${collapsed ? "w-16" : "w-60"} transition-all duration-300`}
@@ -381,10 +418,10 @@ export const AppSidebar: React.FC = () => {
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
-            to={to}
-            onClick={() => setMobileOpen(false)}
+            to={getNavTarget(to)}
+            onClick={(e) => handleNavClick(e, to)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm transition-colors ${
-              location.pathname === to
+              isActiveSection(to)
                 ? "bg-primary/10 text-primary font-medium"
                 : "text-sidebar-foreground hover:bg-sidebar-accent"
             }`}
