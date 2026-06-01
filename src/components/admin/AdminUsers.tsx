@@ -396,10 +396,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     setShowDeleteConfirm(false); setActionUserId(null);
   };
 
-  const [resetPasswordEmail, setResetPasswordEmail] = useState<string | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<{ email: string; userId: string } | null>(null);
 
-  const openResetPasswordModal = (email: string) => {
-    setResetPasswordEmail(email);
+  const openResetPasswordModal = (email: string, userId: string) => {
+    setResetPasswordTarget({ email, userId });
   };
 
   const toggleAdmin = async (userId: string, isCurrentlyAdmin: boolean) => {
@@ -587,7 +587,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
             )}
             {showActions === 'approved' && (
               <>
-                <Button variant="ghost" size="sm" onClick={() => user.email && openResetPasswordModal(user.email)} className="text-blue-500 hover:text-blue-400" title="Redefinir Contraseña">
+                <Button variant="ghost" size="sm" onClick={() => user.email && openResetPasswordModal(user.email, user.user_id)} className="text-blue-500 hover:text-blue-400" title="Redefinir Contraseña">
                   <KeyRound className="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => toggleAdmin(user.user_id, isAdmin)} className={isAdmin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"} title={isAdmin ? "Quitar Admin" : "Hacer Admin"}>
@@ -1015,9 +1015,10 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       </Dialog>
 
       <AdminResetPasswordModal
-        open={!!resetPasswordEmail}
-        onOpenChange={(open) => { if (!open) setResetPasswordEmail(null); }}
-        userEmail={resetPasswordEmail || ''}
+        open={!!resetPasswordTarget}
+        onOpenChange={(open) => { if (!open) setResetPasswordTarget(null); }}
+        userEmail={resetPasswordTarget?.email || ''}
+        userId={resetPasswordTarget?.userId || ''}
       />
     </div>
   );

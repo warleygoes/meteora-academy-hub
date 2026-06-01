@@ -12,9 +12,10 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userEmail: string;
+  userId: string;
 }
 
-const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmail }) => {
+const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmail, userId }) => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [newPassword, setNewPassword] = useState('');
@@ -39,7 +40,7 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ email: userEmail, newPassword }),
+        body: JSON.stringify({ userId, email: userEmail, newPassword }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error');

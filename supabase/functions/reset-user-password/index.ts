@@ -55,9 +55,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, newPassword } = await req.json();
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Email is required" }), {
+    const { userId, email, newPassword } = await req.json();
+    if (!userId && !email) {
+      return new Response(JSON.stringify({ error: "userId or email is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -66,7 +66,6 @@ Deno.serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     if (newPassword) {
-      // Direct password update: find user by email, then update password
       if (newPassword.length < 6) {
         return new Response(JSON.stringify({ error: "Password must be at least 6 characters" }), {
           status: 400,
@@ -74,24 +73,28 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Find the user by email
-      const { data: usersData, error: listError } = await adminClient.auth.admin.listUsers();
-      if (listError) {
-        return new Response(JSON.stringify({ error: listError.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      let targetUserId = userId;
+
+      // Fallback: resolve ID from email if userId not provided
+      if (!targetUserId) {
+        const { data: usersData, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+        if (listError) {
+          return new Response(JSON.stringify({ error: listError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const found = usersData.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+        if (!found) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        targetUserId = found.id;
       }
 
-      const targetUser = usersData.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
-      if (!targetUser) {
-        return new Response(JSON.stringify({ error: "User not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUser.id, {
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
         password: newPassword,
       });
 
@@ -102,7 +105,13 @@ Deno.serve(async (req) => {
         });
       }
     } else {
-      // Fallback: generate recovery link
+      // Fallback: generate recovery link (requires email)
+      if (!email) {
+        return new Response(JSON.stringify({ error: "Email is required for recovery link" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { error } = await adminClient.auth.admin.generateLink({
         type: "recovery",
         email,
