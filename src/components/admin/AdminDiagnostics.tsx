@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import DiagnosticRulesManager from './DiagnosticRulesManager';
 import { FIELD_KEY_OPTIONS } from '@/lib/diagnosticComputedFields';
 
@@ -78,6 +79,8 @@ const AdminDiagnostics: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [globalSearch, setGlobalSearch] = useState('');
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
+  const [selectedAnswers, setSelectedAnswers] = useState<any[]>([]);
+  const [loadingAnswers, setLoadingAnswers] = useState(false);
   
   // Filters
   const [filterTemp, setFilterTemp] = useState('all');
@@ -235,6 +238,42 @@ const AdminDiagnostics: React.FC = () => {
   const mostCritical = Object.entries(criticalCounts).sort(([,a],[,b]) => b - a)[0];
 
   const getScoreColor = (val: number) => val < 5 ? 'text-destructive' : val < 7 ? 'text-amber-500' : 'text-emerald-500';
+
+  const formatAnswerValue = (question: any, value: any) => {
+    const options = Array.isArray(question?.options) ? question.options : [];
+    const getOptionLabel = (optionValue: any) => {
+      const option = options.find((o: any) => o.value === optionValue || o.label === optionValue || o.text === optionValue);
+      return option?.label || option?.text || option?.value || optionValue;
+    };
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.map(getOptionLabel).join(', ') : '—';
+    }
+
+    if (value === null || value === undefined || value === '') return '—';
+    if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(getOptionLabel(value));
+  };
+
+  const openSubmissionDetail = async (submission: any) => {
+    setSelectedSubmission(submission);
+    setSelectedAnswers([]);
+    setLoadingAnswers(true);
+
+    const { data, error } = await supabase
+      .from('diagnostic_answers')
+      .select('*')
+      .eq('diagnostic_id', submission.id);
+
+    if (error) {
+      toast({ title: 'Error al cargar respuestas', variant: 'destructive' });
+    } else {
+      setSelectedAnswers(data || []);
+    }
+
+    setLoadingAnswers(false);
+  };
 
   // Question CRUD
   const handleSaveQuestion = async () => {
@@ -398,7 +437,7 @@ const AdminDiagnostics: React.FC = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => setSelectedSubmission(d)} title="Ver detalle"><Eye className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => openSubmissionDetail(d)} title="Ver detalle"><Eye className="w-4 h-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => archiveDiagnostic(d.id)} title="Archivar"><Archive className="w-4 h-4 text-muted-foreground" /></Button>
                         </div>
                       </TableCell>
@@ -599,7 +638,7 @@ const AdminDiagnostics: React.FC = () => {
 
       {/* Detail Dialog */}
       <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle del Diagnóstico</DialogTitle></DialogHeader>
           {selectedSubmission && (() => {
             const d = selectedSubmission;
@@ -633,6 +672,40 @@ const AdminDiagnostics: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                <div>
+                  <h4 className="font-bold mb-3">Perguntas e respostas</h4>
+                  {loadingAnswers ? (
+                    <p className="text-sm text-muted-foreground py-3">Carregando respostas...</p>
+                  ) : selectedAnswers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-3">Nenhuma resposta registrada para este diagnóstico.</p>
+                  ) : (
+                    <Accordion type="multiple" className="rounded-lg border border-border">
+                      {questions
+                        .filter(q => selectedAnswers.some(a => a.question_id === q.id))
+                        .map((q, index) => {
+                          const answer = selectedAnswers.find(a => a.question_id === q.id);
+                          const sectionLabel = SECTION_OPTIONS.find(sec => sec.value === q.section)?.label || q.section;
+                          return (
+                            <AccordionItem key={q.id} value={q.id} className="px-4 last:border-b-0">
+                              <AccordionTrigger className="gap-3 text-left hover:no-underline">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium text-foreground">{index + 1}. {q.question_text}</p>
+                                  <p className="text-xs text-muted-foreground">{sectionLabel}</p>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="rounded-md bg-secondary/50 p-3">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Resposta do usuário</p>
+                                  <p className="text-sm text-foreground whitespace-pre-wrap">{formatAnswerValue(q, answer?.answer_value)}</p>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                    </Accordion>
+                  )}
+                </div>
 
                 <div>
                   <h4 className="font-bold mb-3">Lead Management</h4>

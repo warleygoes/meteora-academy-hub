@@ -75,6 +75,9 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   video: 'Video', text: 'Texto', image: 'Imagen', audio: 'Audio', link: 'Link', pdf: 'PDF',
 };
 
+const getFilledContents = (lesson: Lesson) =>
+  (lesson.contents || []).filter(content => (content.content || '').trim().length > 0);
+
 // Sortable module item
 const SortableModuleItem: React.FC<{
   mod: Module; mi: number; children: React.ReactNode;
@@ -805,6 +808,23 @@ const AdminCourses: React.FC = () => {
                                                   </div>
                                                 ) : (
                                                   <div className="flex items-center gap-3">
+                                                    {(() => {
+                                                      const filledContents = getFilledContents(lesson);
+                                                      const filledTypes = [...new Set(filledContents.map(content => content.type))];
+                                                      return filledTypes.length > 0 ? (
+                                                        <div className="flex items-center gap-1 shrink-0" aria-label="Anexos preenchidos">
+                                                          {filledTypes.map(type => (
+                                                            <span
+                                                              key={type}
+                                                              title={`${filledContents.filter(content => content.type === type).length} ${CONTENT_TYPE_LABELS[type] || type}`}
+                                                              className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary"
+                                                            >
+                                                              {CONTENT_TYPE_ICONS[type]}
+                                                            </span>
+                                                          ))}
+                                                        </div>
+                                                      ) : null;
+                                                    })()}
                                                     <button onClick={() => toggleLessonExpand(lesson.id)} className="text-muted-foreground hover:text-foreground shrink-0">
                                                       {expandedLessons.has(lesson.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                                     </button>
@@ -815,8 +835,8 @@ const AdminCourses: React.FC = () => {
                                                         {lesson.duration_minutes ? <span>{lesson.duration_minutes} min</span> : null}
                                                         {lesson.is_free && <Badge variant="secondary" className="text-xs py-0">{t('free') || 'Gratis'}</Badge>}
                                                         {(lesson as any).is_private && <Badge variant="outline" className="text-xs py-0 border-yellow-500/30 text-yellow-500">🔒 {t('privateLesson') || 'Privada'}</Badge>}
-                                                        {lesson.contents && lesson.contents.length > 0 && (
-                                                          <span>{lesson.contents.length} {t('contentsCount') || 'conteúdos'}</span>
+                                                        {getFilledContents(lesson).length > 0 && (
+                                                          <span>{getFilledContents(lesson).length} {t('contentsCount') || 'conteúdos'}</span>
                                                         )}
                                                       </div>
                                                     </div>
