@@ -150,11 +150,65 @@ const Diagnostico: React.FC = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
-      calculateAndSaveResults();
+      prepareDiagnosticResults();
     }
   };
 
-  const calculateAndSaveResults = async () => {
+  const saveDiagnosticToDB = async (finalScores: Record<string, number>, wi: number, level: string, detectedClientCount: number, raw: any, derived: any) => {
+    try {
+      // Save to DB
+      const { data: diagData, error: diagError } = await supabase.from('diagnostics').insert({
+        name, email, phone, country,
+        client_count: detectedClientCount.toString(),
+        scores: finalScores,
+        results: { weightedIndex: wi, level, rawData: raw, computed: derived },
+        status: 'completed'
+      }).select().single();
+
+      if (diagError) throw diagError;
+
+      // Atomic answers
+      const answerInserts = Object.entries(answers).map(([qId, val]) => ({
+        diagnostic_id: diagData.id,
+        question_id: qId,
+        answer_value: val
+      }));
+      
+      const { error: ansError } = await supabase.from('diagnostic_answers').insert(answerInserts);
+      if (ansError) console.error("Error saving answers:", ansError);
+
+      // Create lead tracking record
+      let autoTemp = 'cold';
+      if (finalScores.commitment >= 8) autoTemp = 'hot';
+      else if (finalScores.commitment >= 5) autoTemp = 'warm';
+
+      const matchedRules = recommendations.filter(rule => {
+        const conds: RuleCondition[] = (rule as any).conditions?.length > 0
+          ? (rule as any).conditions
+          : [{ field: rule.condition_field, operator: rule.condition_operator, value: rule.condition_value }];
+        const logic = ((rule as any).conditions_logic || 'and') as 'and' | 'or';
+        return evaluateConditions(conds, logic, finalScores, raw, derived);
+      });
+
+      await supabase.from('diagnostic_lead_tracking').insert({
+        diagnostic_id: diagData.id,
+        lead_temperature: autoTemp,
+        commercial_status: 'new',
+        assigned_level_auto: level.replace('diag', ''),
+        recommended_product_auto: matchedRules[0]?.title || null,
+        last_action: 'Completó diagnóstico',
+        last_action_at: new Date().toISOString(),
+      });
+      
+      setStep('results');
+    } catch (err) {
+      console.error(err);
+      toast({ title: t('errorOccurred'), variant: 'destructive' });
+      setStep('lead');
+    }
+  };
+
+  const prepareDiagnosticResults = async () => {
     setStep('processing');
     setLoading(true);
 
@@ -229,58 +283,19 @@ const Diagnostico: React.FC = () => {
       setRawData(raw);
       setComputedMetrics(derived);
 
-      // Save to DB
-      const { data: diagData, error: diagError } = await supabase.from('diagnostics').insert({
-        name, email, phone, country,
-        client_count: detectedClientCount.toString(),
-        scores: finalScores,
-        results: { weightedIndex: wi, level, rawData: raw, computed: derived },
-        status: 'completed'
-      }).select().single();
-
-      if (diagError) throw diagError;
-
-      // Atomic answers
-      const answerInserts = Object.entries(answers).map(([qId, val]) => ({
-        diagnostic_id: diagData.id,
-        question_id: qId,
-        answer_value: val
-      }));
-      await supabase.from('diagnostic_answers').insert(answerInserts);
-
-      // Create lead tracking record
-      const sorted = Object.entries(finalScores).sort(([, a], [, b]) => a - b);
-      const criticalArea = sorted[0]?.[0] || 'technical';
-      
-      // Determine auto lead temperature
-      let autoTemp = 'cold';
-      if (finalScores.commitment >= 8) autoTemp = 'hot';
-      else if (finalScores.commitment >= 5) autoTemp = 'warm';
-
-      // Match recommendations for auto product
-      const matchedRules = recommendations.filter(rule => {
-        const conds: RuleCondition[] = (rule as any).conditions?.length > 0
-          ? (rule as any).conditions
-          : [{ field: rule.condition_field, operator: rule.condition_operator, value: rule.condition_value }];
-        const logic = ((rule as any).conditions_logic || 'and') as 'and' | 'or';
-        return evaluateConditions(conds, logic, finalScores, raw, derived);
-      });
-
-      await supabase.from('diagnostic_lead_tracking').insert({
-        diagnostic_id: diagData.id,
-        lead_temperature: autoTemp,
-        commercial_status: 'new',
-        assigned_level_auto: level.replace('diag', ''),
-        recommended_product_auto: matchedRules[0]?.title || null,
-        last_action: 'Completó diagnóstico',
-        last_action_at: new Date().toISOString(),
-      });
+      // Save to state
+      setScores(finalScores);
+      setGeneralLevel(level);
+      setWeightedIndex(wi);
+      setClientCount(detectedClientCount);
+      setRawData(raw);
+      setComputedMetrics(derived);
 
       // Check if user is already logged in
       const { data: { session } } = await supabase.auth.getSession();
       if (session && session.user?.email === email) {
-        // Already logged in with this email - go straight to results
-        setStep('results');
+        // Already logged in - save directly
+        await saveDiagnosticToDB(finalScores, wi, level, detectedClientCount, raw, derived);
         setLoading(false);
         return;
       }
@@ -331,7 +346,12 @@ const Diagnostico: React.FC = () => {
           return;
         }
       }
-      setStep('results');
+      
+      // Wait a moment for auth to fully initialize
+      await new Promise(r => setTimeout(r, 500));
+      
+      // Now save the diagnostic to DB as authenticated user
+      await saveDiagnosticToDB(scores, weightedIndex, generalLevel, clientCount, rawData, computedMetrics);
     } catch (err) {
       console.error(err);
       toast({ title: t('errorOccurred'), variant: 'destructive' });
