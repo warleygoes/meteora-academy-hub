@@ -1,10 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, CheckCircle2, XCircle, Ban, Globe, ScrollText, ClipboardList, Link2 } from 'lucide-react';
+import { Trash2, CheckCircle2, XCircle, Ban, Globe, ScrollText, ClipboardList, Link2, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import UserPackagesManager from './UserPackagesManager';
+
+const SECTION_OPTIONS = [
+  { value: 'technical', label: 'Arquitectura Técnica' },
+  { value: 'financial', label: 'Gestión Financiera' },
+  { value: 'scale', label: 'Escala Comercial' },
+  { value: 'expansion', label: 'Potencial de Expansión' },
+  { value: 'commitment', label: 'Compromiso Estratégico' },
+];
+
+const formatAnswerValue = (question: any, value: any) => {
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const getOptionLabel = (optionValue: any) => {
+    const option = options.find((o: any) => o.value === optionValue || o.label === optionValue || o.text === optionValue);
+    return option?.label || option?.text || option?.value || optionValue;
+  };
+
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.map(getOptionLabel).join(', ') : '—';
+  }
+
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(getOptionLabel(value));
+};
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -65,6 +91,10 @@ const UserDetailContent: React.FC<Props> = ({
   const [loadingDiag, setLoadingDiag] = useState(false);
   const [diagChecked, setDiagChecked] = useState(false);
 
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [answersByDiagnostic, setAnswersByDiagnostic] = useState<Record<string, any[]>>({});
+  const [loadingAnswersFor, setLoadingAnswersFor] = useState<Record<string, boolean>>({});
+
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -86,7 +116,28 @@ const UserDetailContent: React.FC<Props> = ({
     setDiagnostics(data || []);
     setDiagChecked(true);
     setLoadingDiag(false);
-  }, [user.email, diagChecked]);
+
+    // Fetch questions if not already fetched
+    if (questions.length === 0) {
+      const { data: qData } = await supabase.from('diagnostic_questions').select('*').order('sort_order', { ascending: true });
+      if (qData) setQuestions(qData);
+    }
+  }, [user.email, diagChecked, questions.length]);
+
+  const loadAnswersForDiagnostic = async (diagnosticId: string) => {
+    if (answersByDiagnostic[diagnosticId] || loadingAnswersFor[diagnosticId]) return;
+    
+    setLoadingAnswersFor(prev => ({ ...prev, [diagnosticId]: true }));
+    const { data, error } = await supabase
+      .from('diagnostic_answers')
+      .select('*')
+      .eq('diagnostic_id', diagnosticId);
+      
+    if (!error && data) {
+      setAnswersByDiagnostic(prev => ({ ...prev, [diagnosticId]: data }));
+    }
+    setLoadingAnswersFor(prev => ({ ...prev, [diagnosticId]: false }));
+  };
 
   // Fetch user activity logs
   const fetchLogs = useCallback(async () => {
@@ -170,6 +221,43 @@ const UserDetailContent: React.FC<Props> = ({
                   {diagnostic.main_goals && (
                     <div><span className="text-muted-foreground">Objetivos:</span><p className="text-foreground mt-0.5">{diagnostic.main_goals}</p></div>
                   )}
+
+                  <div className="mt-4 pt-2 border-t border-border/50">
+                    <Accordion type="single" collapsible onValueChange={(val) => { if (val) loadAnswersForDiagnostic(diagnostic.id); }}>
+                      <AccordionItem value={`answers-${diagnostic.id}`} className="border-none">
+                        <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
+                          Ver preguntas y respuestas
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          {loadingAnswersFor[diagnostic.id] ? (
+                            <p className="text-xs text-muted-foreground py-2">Cargando respuestas...</p>
+                          ) : !answersByDiagnostic[diagnostic.id] || answersByDiagnostic[diagnostic.id].length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2">No hay respuestas registradas.</p>
+                          ) : (
+                            <div className="space-y-3 mt-2">
+                              {questions
+                                .filter(q => answersByDiagnostic[diagnostic.id].some(a => a.question_id === q.id))
+                                .map((q, index) => {
+                                  const answer = answersByDiagnostic[diagnostic.id].find(a => a.question_id === q.id);
+                                  const sectionLabel = SECTION_OPTIONS.find(sec => sec.value === q.section)?.label || q.section;
+                                  return (
+                                    <div key={q.id} className="border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                                      <p className="text-xs font-medium text-foreground mb-1">{index + 1}. {q.question_text}</p>
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{sectionLabel}</span>
+                                        <p className="text-xs text-muted-foreground bg-background rounded p-2 border border-border/50">
+                                          {formatAnswerValue(q, answer?.answer_value)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
                 </div>
               ))
             ) : (
