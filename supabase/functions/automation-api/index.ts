@@ -669,13 +669,13 @@ async function handleFindUser(
   // Get active packages (user_plans)
   const { data: plans } = await supabase
     .from("user_plans")
-    .select("id, package_id, status, assigned_at, expires_at, packages(name)")
+    .select("id, package_id, status, starts_at, expires_at, created_at, packages(id, name)")
     .eq("user_id", profile.user_id);
 
   // Get direct products (user_products)
   const { data: products } = await supabase
     .from("user_products")
-    .select("id, product_id, assigned_at, products(name)")
+    .select("id, product_id, created_at, expires_at, products(id, name)")
     .eq("user_id", profile.user_id);
 
   return json({
