@@ -111,6 +111,28 @@ const UserDetailContent: React.FC<Props> = ({
     { label: 'Plan más barato', value: diagnostic.cheapest_plan ? `U$ ${diagnostic.cheapest_plan}` : null },
   ].filter(item => item.value !== null && item.value !== undefined && item.value !== '');
 
+  const hasLegacyProfileDiagnostic = Boolean(
+    user.main_problems || user.main_desires || user.client_count || user.network_type || user.cheapest_plan_usd
+  );
+
+  const buildLegacyProfileDiagnostic = (): DiagnosticData => ({
+    id: user.user_id,
+    user_id: user.user_id,
+    name: user.display_name || user.email || 'Usuario',
+    email: user.email || '',
+    phone: user.phone,
+    company_name: user.company_name,
+    country: user.country,
+    role_type: user.role_type,
+    client_count: user.client_count,
+    network_type: user.network_type,
+    cheapest_plan: user.cheapest_plan_usd,
+    main_problems: user.main_problems,
+    main_goals: user.main_desires,
+    tech_knowledge: null,
+    created_at: user.created_at,
+  });
+
   // Check for matching diagnostics by linked user_id and email.
   const fetchDiagnostics = useCallback(async () => {
     if (diagChecked) return;
@@ -136,10 +158,16 @@ const UserDetailContent: React.FC<Props> = ({
       (data || []).forEach((diagnostic: DiagnosticData) => merged.set(diagnostic.id, diagnostic));
     });
 
-    setDiagnostics(
-      Array.from(merged.values()).sort(
+    const linkedDiagnostics = Array.from(merged.values()).sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
+      );
+
+    setDiagnostics(
+      linkedDiagnostics.length > 0
+        ? linkedDiagnostics
+        : hasLegacyProfileDiagnostic
+          ? [buildLegacyProfileDiagnostic()]
+          : []
     );
     setDiagChecked(true);
     setLoadingDiag(false);
@@ -149,7 +177,7 @@ const UserDetailContent: React.FC<Props> = ({
       const { data: qData } = await supabase.from('diagnostic_questions').select('*').order('sort_order', { ascending: true });
       if (qData) setQuestions(qData);
     }
-  }, [user.email, user.user_id, diagChecked, questions.length]);
+  }, [user, hasLegacyProfileDiagnostic, diagChecked, questions.length]);
 
   const loadAnswersForDiagnostic = async (diagnosticId: string) => {
     if (answersByDiagnostic[diagnosticId] || loadingAnswersFor[diagnosticId]) return;
