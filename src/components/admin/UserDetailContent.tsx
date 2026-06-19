@@ -232,13 +232,6 @@ const UserDetailContent: React.FC<Props> = ({
         )}
         <div><span className="text-muted-foreground">Status</span><p className="font-medium">{getStatusBadge(user)}</p></div>
       </div>
-      {user.main_problems && (
-        <div><p className="text-sm text-muted-foreground mb-1">{t('mainProblems')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{user.main_problems}</p></div>
-      )}
-      {user.main_desires && (
-        <div><p className="text-sm text-muted-foreground mb-1">{t('mainDesires')}</p><p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border">{user.main_desires}</p></div>
-      )}
-
       {/* Diagnostic Section */}
       <div className="border-t border-border pt-4">
         <button
