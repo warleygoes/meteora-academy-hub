@@ -66,6 +66,7 @@ interface DiagnosticData {
   country: string | null; role_type: string | null; client_count: string | null;
   network_type: string | null; cheapest_plan: number | null; main_problems: string | null;
   main_goals: string | null; tech_knowledge: string | null; created_at: string;
+  user_id: string | null;
 }
 
 interface LogEntry {
@@ -101,19 +102,45 @@ const UserDetailContent: React.FC<Props> = ({
   const [showLogs, setShowLogs] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
 
-  // Check for matching diagnostics by email only
+  const getLegacyAnswers = (diagnostic: DiagnosticData) => [
+    { label: 'Problemas', value: diagnostic.main_problems },
+    { label: 'Objetivos', value: diagnostic.main_goals },
+    { label: 'Conocimiento técnico', value: diagnostic.tech_knowledge },
+    { label: 'Clientes', value: diagnostic.client_count },
+    { label: 'Red', value: diagnostic.network_type },
+    { label: 'Plan más barato', value: diagnostic.cheapest_plan ? `U$ ${diagnostic.cheapest_plan}` : null },
+  ].filter(item => item.value !== null && item.value !== undefined && item.value !== '');
+
+  // Check for matching diagnostics by linked user_id and email.
   const fetchDiagnostics = useCallback(async () => {
     if (diagChecked) return;
     setLoadingDiag(true);
 
-    if (!user.email) {
+    if (!user.user_id && !user.email) {
       setDiagChecked(true);
       setLoadingDiag(false);
       return;
     }
 
-    const { data } = await supabase.from('diagnostics').select('*').eq('email', user.email).order('created_at', { ascending: false });
-    setDiagnostics(data || []);
+    const requests = [
+      supabase.from('diagnostics').select('*').eq('user_id', user.user_id),
+    ];
+
+    if (user.email) {
+      requests.push(supabase.from('diagnostics').select('*').ilike('email', user.email));
+    }
+
+    const results = await Promise.all(requests);
+    const merged = new Map<string, DiagnosticData>();
+    results.forEach(({ data }) => {
+      (data || []).forEach((diagnostic: DiagnosticData) => merged.set(diagnostic.id, diagnostic));
+    });
+
+    setDiagnostics(
+      Array.from(merged.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+    );
     setDiagChecked(true);
     setLoadingDiag(false);
 
@@ -122,7 +149,7 @@ const UserDetailContent: React.FC<Props> = ({
       const { data: qData } = await supabase.from('diagnostic_questions').select('*').order('sort_order', { ascending: true });
       if (qData) setQuestions(qData);
     }
-  }, [user.email, diagChecked, questions.length]);
+  }, [user.email, user.user_id, diagChecked, questions.length]);
 
   const loadAnswersForDiagnostic = async (diagnosticId: string) => {
     if (answersByDiagnostic[diagnosticId] || loadingAnswersFor[diagnosticId]) return;
@@ -232,7 +259,20 @@ const UserDetailContent: React.FC<Props> = ({
                           {loadingAnswersFor[diagnostic.id] ? (
                             <p className="text-xs text-muted-foreground py-2">Cargando respuestas...</p>
                           ) : !answersByDiagnostic[diagnostic.id] || answersByDiagnostic[diagnostic.id].length === 0 ? (
-                            <p className="text-xs text-muted-foreground py-2">No hay respuestas registradas.</p>
+                            getLegacyAnswers(diagnostic).length > 0 ? (
+                              <div className="space-y-3 mt-2">
+                                {getLegacyAnswers(diagnostic).map((item, index) => (
+                                  <div key={item.label} className="border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                                    <p className="text-xs font-medium text-foreground mb-1">{index + 1}. {item.label}</p>
+                                    <p className="text-xs text-muted-foreground bg-background rounded p-2 border border-border/50">
+                                      {String(item.value)}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground py-2">No hay respuestas registradas.</p>
+                            )
                           ) : (
                             <div className="space-y-3 mt-2">
                               {questions

@@ -156,9 +156,15 @@ const Diagnostico: React.FC = () => {
 
   const saveDiagnosticToDB = async (finalScores: Record<string, number>, wi: number, level: string, detectedClientCount: number, raw: any, derived: any) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const linkedUserId = session?.user?.email?.toLowerCase() === email.toLowerCase()
+        ? session.user.id
+        : null;
+
       // Save to DB
       const { data: diagData, error: diagError } = await supabase.from('diagnostics').insert({
         name, email, phone, country,
+        user_id: linkedUserId,
         client_count: detectedClientCount.toString(),
         scores: finalScores,
         results: { weightedIndex: wi, level, rawData: raw, computed: derived },

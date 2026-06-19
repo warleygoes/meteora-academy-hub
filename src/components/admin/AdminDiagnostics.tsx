@@ -256,6 +256,15 @@ const AdminDiagnostics: React.FC = () => {
     return String(getOptionLabel(value));
   };
 
+  const getLegacyAnswers = (diagnostic: any) => [
+    { label: 'Problemas', value: diagnostic.main_problems },
+    { label: 'Objetivos', value: diagnostic.main_goals },
+    { label: 'Conocimiento tecnico', value: diagnostic.tech_knowledge },
+    { label: 'Clientes', value: diagnostic.client_count },
+    { label: 'Red', value: diagnostic.network_type },
+    { label: 'Plan mas barato', value: diagnostic.cheapest_plan ? `U$ ${diagnostic.cheapest_plan}` : null },
+  ].filter(item => item.value !== null && item.value !== undefined && item.value !== '');
+
   const openSubmissionDetail = async (submission: any) => {
     setSelectedSubmission(submission);
     setSelectedAnswers([]);
@@ -678,7 +687,28 @@ const AdminDiagnostics: React.FC = () => {
                   {loadingAnswers ? (
                     <p className="text-sm text-muted-foreground py-3">Carregando respostas...</p>
                   ) : selectedAnswers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-3">Nenhuma resposta registrada para este diagnóstico.</p>
+                    getLegacyAnswers(d).length > 0 ? (
+                      <Accordion type="multiple" className="rounded-lg border border-border">
+                        {getLegacyAnswers(d).map((item, index) => (
+                          <AccordionItem key={item.label} value={`legacy-${item.label}`} className="px-4 last:border-b-0">
+                            <AccordionTrigger className="gap-3 text-left hover:no-underline">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-foreground">{index + 1}. {item.label}</p>
+                                <p className="text-xs text-muted-foreground">Diagnostico antigo</p>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="rounded-md bg-secondary/50 p-3">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Resposta do usuario</p>
+                                <p className="text-sm text-foreground whitespace-pre-wrap">{String(item.value)}</p>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-3">Nenhuma resposta registrada para este diagnóstico.</p>
+                    )
                   ) : (
                     <Accordion type="multiple" className="rounded-lg border border-border">
                       {questions
