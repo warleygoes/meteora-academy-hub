@@ -30,7 +30,7 @@ order by total_profiles desc, email;
 with unique_profiles as (
   select
     lower(trim(email)) as normalized_email,
-    min(user_id) as user_id
+    (array_agg(user_id))[1] as user_id
   from public.profiles
   where email is not null and trim(email) <> ''
   group by lower(trim(email))
