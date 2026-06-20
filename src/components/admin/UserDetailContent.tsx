@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, CheckCircle2, XCircle, Ban, Globe, ScrollText, ClipboardList, Link2, ChevronDown } from 'lucide-react';
+import { Trash2, CheckCircle2, XCircle, Ban, Globe, ScrollText, ClipboardList, Edit3, Save, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PhoneInput from '@/components/PhoneInput';
+import { useToast } from '@/hooks/use-toast';
 import UserPackagesManager from './UserPackagesManager';
 
 const SECTION_OPTIONS = [
@@ -42,6 +46,13 @@ const countryCodes: Record<string, string> = {
   'United States': 'us', 'Estados Unidos': 'us',
 };
 
+const countries = [
+  'Argentina', 'Bolivia', 'Brasil', 'Chile', 'Colombia', 'Costa Rica',
+  'Cuba', 'Ecuador', 'El Salvador', 'Guatemala', 'Honduras', 'Mexico',
+  'Nicaragua', 'Panama', 'Paraguay', 'Peru', 'Republica Dominicana',
+  'Uruguay', 'Venezuela', 'United States',
+];
+
 const FlagImg: React.FC<{ country: string | null; size?: number }> = ({ country, size = 16 }) => {
   if (!country) return null;
   const code = countryCodes[country];
@@ -78,6 +89,8 @@ interface Props {
   user: ProfileUser;
   t: (key: string) => string;
   getStatusBadge: (user: ProfileUser) => React.ReactNode;
+  canEditProfile?: boolean;
+  onUpdateProfile?: (userId: string, updates: Pick<ProfileUser, 'display_name' | 'country' | 'phone'>) => Promise<boolean>;
   approveUser: (userId: string) => void;
   rejectUser: (userId: string) => void;
   confirmSuspend: (userId: string) => void;
@@ -86,8 +99,9 @@ interface Props {
 }
 
 const UserDetailContent: React.FC<Props> = ({
-  user, t, getStatusBadge, approveUser, rejectUser, confirmSuspend, confirmDelete, fetchActivePlansCounts
+  user, t, getStatusBadge, canEditProfile = false, onUpdateProfile, approveUser, rejectUser, confirmSuspend, confirmDelete, fetchActivePlansCounts
 }) => {
+  const { toast } = useToast();
   const [diagnostics, setDiagnostics] = useState<DiagnosticData[]>([]);
   const [loadingDiag, setLoadingDiag] = useState(false);
   const [diagChecked, setDiagChecked] = useState(false);
@@ -101,6 +115,13 @@ const UserDetailContent: React.FC<Props> = ({
 
   const [showLogs, setShowLogs] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    display_name: user.display_name || '',
+    country: user.country || '',
+    phone: user.phone || '',
+  });
 
   const getLegacyAnswers = (diagnostic: DiagnosticData) => [
     { label: 'Problemas', value: diagnostic.main_problems },
@@ -212,14 +233,102 @@ const UserDetailContent: React.FC<Props> = ({
   }, [fetchDiagnostics]);
 
   useEffect(() => {
+    setProfileForm({
+      display_name: user.display_name || '',
+      country: user.country || '',
+      phone: user.phone || '',
+    });
+    setIsEditingProfile(false);
+  }, [user.user_id, user.display_name, user.country, user.phone]);
+
+  useEffect(() => {
     if (showLogs && logs.length === 0) fetchLogs();
   }, [showLogs, fetchLogs, logs.length]);
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-LA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+  const cancelProfileEdit = () => {
+    setProfileForm({
+      display_name: user.display_name || '',
+      country: user.country || '',
+      phone: user.phone || '',
+    });
+    setIsEditingProfile(false);
+  };
+
+  const saveProfileEdit = async () => {
+    if (!canEditProfile || !onUpdateProfile) {
+      toast({ title: 'Somente administradores podem editar usuários.', variant: 'destructive' });
+      return;
+    }
+
+    if (profileForm.phone && profileForm.phone.length > 20) {
+      toast({ title: 'O telefone deve ter no máximo 20 caracteres.', variant: 'destructive' });
+      return;
+    }
+
+    setSavingProfile(true);
+    const saved = await onUpdateProfile(user.user_id, profileForm);
+    setSavingProfile(false);
+    if (saved) setIsEditingProfile(false);
+  };
+
   return (
     <div className="space-y-4">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-foreground">Dados do usuário</p>
+          {canEditProfile && !isEditingProfile && (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsEditingProfile(true)}>
+              <Edit3 className="w-4 h-4" /> Editar
+            </Button>
+          )}
+        </div>
+
+        {isEditingProfile ? (
+          <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('displayName')}</label>
+              <Input
+                value={profileForm.display_name}
+                onChange={e => setProfileForm(prev => ({ ...prev, display_name: e.target.value }))}
+                className="bg-background border-border"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('country')}</label>
+              <Select value={profileForm.country} onValueChange={value => setProfileForm(prev => ({ ...prev, country: value }))}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder={t('selectCountry')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {countries.map(country => (
+                    <SelectItem key={country} value={country}>{country}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('phone')}</label>
+              <PhoneInput
+                value={profileForm.phone}
+                onChange={value => setProfileForm(prev => ({ ...prev, phone: value }))}
+                defaultCountry={profileForm.country}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1 gap-2" onClick={cancelProfileEdit} disabled={savingProfile}>
+                <X className="w-4 h-4" /> Cancelar
+              </Button>
+              <Button className="flex-1 gap-2" onClick={saveProfileEdit} disabled={savingProfile}>
+                {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        ) : (
       <div className="grid grid-cols-2 gap-3 text-sm">
+        <div><span className="text-muted-foreground">{t('displayName')}</span><p className="font-medium text-foreground">{user.display_name || '—'}</p></div>
         <div className="col-span-2"><span className="text-muted-foreground">Email</span><p className="font-medium text-foreground">{user.email || '—'}</p></div>
         <div><span className="text-muted-foreground">{t('roleType')}</span><p className="font-medium text-foreground">{user.role_type === 'owner' ? t('ispOwner') : t('ispEmployee')}</p></div>
         <div><span className="text-muted-foreground">{t('country')}</span><p className="font-medium text-foreground flex items-center gap-1.5">{user.country ? <><FlagImg country={user.country} size={18} /> {user.country}</> : '—'}</p></div>
@@ -231,6 +340,8 @@ const UserDetailContent: React.FC<Props> = ({
           <div><span className="text-muted-foreground">{t('cheapestPlan')}</span><p className="font-medium text-foreground">U$ {user.cheapest_plan_usd}</p></div>
         )}
         <div><span className="text-muted-foreground">Status</span><p className="font-medium">{getStatusBadge(user)}</p></div>
+      </div>
+        )}
       </div>
       {/* Diagnostic Section */}
       <div className="border-t border-border pt-4">

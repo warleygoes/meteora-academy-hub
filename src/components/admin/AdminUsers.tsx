@@ -22,6 +22,7 @@ import UserDetailContent from './UserDetailContent';
 import ImportUsersDialog from './ImportUsersDialog';
 import AdminResetPasswordModal from './AdminResetPasswordModal';
 import { logSystemEvent } from '@/lib/systemLog';
+import { useAuth } from '@/hooks/useAuth';
 
 const countryCodes: Record<string, string> = {
   'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
@@ -111,6 +112,7 @@ const CreateUserForm: React.FC<{
 const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('pending');
 
   const [pendingUsers, setPendingUsers] = useState<ProfileUser[]>([]);
@@ -480,6 +482,60 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
       toast({ title: err.message, variant: 'destructive' });
     }
     setCreatingUser(false);
+  };
+
+  const updateUserProfile = async (
+    userId: string,
+    updates: Pick<ProfileUser, 'display_name' | 'country' | 'phone'>
+  ) => {
+    if (!isAdmin) {
+      toast({ title: 'Somente administradores podem editar usuários.', variant: 'destructive' });
+      return false;
+    }
+
+    const payload = {
+      display_name: updates.display_name?.trim() || null,
+      country: updates.country?.trim() || null,
+      phone: updates.phone?.trim() || null,
+    };
+
+    const applyUpdatedUser = (updatedUser: ProfileUser) => {
+      setAllUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
+      setPendingUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
+      setApprovedUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
+      setRejectedUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
+      setSelectedUser(prev => prev && prev.user_id === userId ? updatedUser : prev);
+    };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('user_id', userId)
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      toast({ title: error.message, variant: 'destructive' });
+      return false;
+    }
+
+    if (data) {
+      applyUpdatedUser(data);
+      logSystemEvent({
+        action: 'Dados do usuário atualizados',
+        entity_type: 'user',
+        entity_id: userId,
+        level: 'info',
+        webhookEvent: 'user.updated',
+        webhookData: data,
+      });
+      toast({ title: 'Dados do usuário atualizados.' });
+    } else {
+      fetchAllUsers(); fetchPendingUsers(); fetchApprovedUsers(); fetchRejectedUsers();
+      toast({ title: 'Dados do usuário atualizados.' });
+    }
+
+    return true;
   };
 
 
@@ -945,6 +1001,8 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
               user={selectedUser}
               t={t}
               getStatusBadge={getStatusBadge}
+              canEditProfile={isAdmin}
+              onUpdateProfile={updateUserProfile}
               approveUser={approveUser}
               rejectUser={rejectUser}
               confirmSuspend={confirmSuspend}
