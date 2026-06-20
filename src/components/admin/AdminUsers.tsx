@@ -486,7 +486,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
 
   const updateUserProfile = async (
     userId: string,
-    updates: Pick<ProfileUser, 'display_name' | 'country' | 'phone'>
+    updates: Pick<ProfileUser, 'email' | 'display_name' | 'role_type' | 'country' | 'company_name' | 'phone' | 'client_count' | 'network_type' | 'cheapest_plan_usd' | 'status' | 'approved'>
   ) => {
     if (!isAdmin) {
       toast({ title: 'Somente administradores podem editar usuários.', variant: 'destructive' });
@@ -494,16 +494,30 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
     }
 
     const payload = {
+      email: updates.email?.trim() || null,
       display_name: updates.display_name?.trim() || null,
+      role_type: updates.role_type || null,
       country: updates.country?.trim() || null,
+      company_name: updates.company_name?.trim() || null,
       phone: updates.phone?.trim() || null,
+      client_count: updates.client_count?.trim() || null,
+      network_type: updates.network_type || null,
+      cheapest_plan_usd: updates.cheapest_plan_usd,
+      status: updates.status,
+      approved: updates.approved,
     };
 
     const applyUpdatedUser = (updatedUser: ProfileUser) => {
       setAllUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
-      setPendingUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
-      setApprovedUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
-      setRejectedUsers(prev => prev.map(u => u.user_id === userId ? updatedUser : u));
+      setPendingUsers(prev => updatedUser.status === 'pending'
+        ? [updatedUser, ...prev.filter(u => u.user_id !== userId)]
+        : prev.filter(u => u.user_id !== userId));
+      setApprovedUsers(prev => updatedUser.status === 'approved'
+        ? [updatedUser, ...prev.filter(u => u.user_id !== userId)]
+        : prev.filter(u => u.user_id !== userId));
+      setRejectedUsers(prev => updatedUser.status === 'rejected'
+        ? [updatedUser, ...prev.filter(u => u.user_id !== userId)]
+        : prev.filter(u => u.user_id !== userId));
       setSelectedUser(prev => prev && prev.user_id === userId ? updatedUser : prev);
     };
 

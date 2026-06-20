@@ -90,7 +90,7 @@ interface Props {
   t: (key: string) => string;
   getStatusBadge: (user: ProfileUser) => React.ReactNode;
   canEditProfile?: boolean;
-  onUpdateProfile?: (userId: string, updates: Pick<ProfileUser, 'display_name' | 'country' | 'phone'>) => Promise<boolean>;
+  onUpdateProfile?: (userId: string, updates: Pick<ProfileUser, 'email' | 'display_name' | 'role_type' | 'country' | 'company_name' | 'phone' | 'client_count' | 'network_type' | 'cheapest_plan_usd' | 'status' | 'approved'>) => Promise<boolean>;
   approveUser: (userId: string) => void;
   rejectUser: (userId: string) => void;
   confirmSuspend: (userId: string) => void;
@@ -118,9 +118,16 @@ const UserDetailContent: React.FC<Props> = ({
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
+    email: user.email || '',
     display_name: user.display_name || '',
+    role_type: user.role_type || '',
     country: user.country || '',
+    company_name: user.company_name || '',
     phone: user.phone || '',
+    client_count: user.client_count || '',
+    network_type: user.network_type || '',
+    cheapest_plan_usd: user.cheapest_plan_usd === null || user.cheapest_plan_usd === undefined ? '' : String(user.cheapest_plan_usd),
+    status: user.status || 'pending',
   });
 
   const getLegacyAnswers = (diagnostic: DiagnosticData) => [
@@ -234,12 +241,19 @@ const UserDetailContent: React.FC<Props> = ({
 
   useEffect(() => {
     setProfileForm({
+      email: user.email || '',
       display_name: user.display_name || '',
+      role_type: user.role_type || '',
       country: user.country || '',
+      company_name: user.company_name || '',
       phone: user.phone || '',
+      client_count: user.client_count || '',
+      network_type: user.network_type || '',
+      cheapest_plan_usd: user.cheapest_plan_usd === null || user.cheapest_plan_usd === undefined ? '' : String(user.cheapest_plan_usd),
+      status: user.status || 'pending',
     });
     setIsEditingProfile(false);
-  }, [user.user_id, user.display_name, user.country, user.phone]);
+  }, [user.user_id, user.email, user.display_name, user.role_type, user.country, user.company_name, user.phone, user.client_count, user.network_type, user.cheapest_plan_usd, user.status]);
 
   useEffect(() => {
     if (showLogs && logs.length === 0) fetchLogs();
@@ -249,9 +263,16 @@ const UserDetailContent: React.FC<Props> = ({
 
   const cancelProfileEdit = () => {
     setProfileForm({
+      email: user.email || '',
       display_name: user.display_name || '',
+      role_type: user.role_type || '',
       country: user.country || '',
+      company_name: user.company_name || '',
       phone: user.phone || '',
+      client_count: user.client_count || '',
+      network_type: user.network_type || '',
+      cheapest_plan_usd: user.cheapest_plan_usd === null || user.cheapest_plan_usd === undefined ? '' : String(user.cheapest_plan_usd),
+      status: user.status || 'pending',
     });
     setIsEditingProfile(false);
   };
@@ -267,8 +288,39 @@ const UserDetailContent: React.FC<Props> = ({
       return;
     }
 
+    if (profileForm.display_name && profileForm.display_name.length > 100) {
+      toast({ title: 'O nome deve ter no maximo 100 caracteres.', variant: 'destructive' });
+      return;
+    }
+
+    if (profileForm.company_name && profileForm.company_name.length > 200) {
+      toast({ title: 'A empresa deve ter no maximo 200 caracteres.', variant: 'destructive' });
+      return;
+    }
+
+    const cheapestPlan = profileForm.cheapest_plan_usd.trim()
+      ? Number(profileForm.cheapest_plan_usd)
+      : null;
+
+    if (cheapestPlan !== null && Number.isNaN(cheapestPlan)) {
+      toast({ title: 'Informe um valor valido para o plano mais barato.', variant: 'destructive' });
+      return;
+    }
+
     setSavingProfile(true);
-    const saved = await onUpdateProfile(user.user_id, profileForm);
+    const saved = await onUpdateProfile(user.user_id, {
+      email: profileForm.email,
+      display_name: profileForm.display_name,
+      role_type: profileForm.role_type,
+      country: profileForm.country,
+      company_name: profileForm.company_name,
+      phone: profileForm.phone,
+      client_count: profileForm.client_count,
+      network_type: profileForm.network_type,
+      cheapest_plan_usd: cheapestPlan,
+      status: profileForm.status,
+      approved: profileForm.status === 'approved',
+    });
     setSavingProfile(false);
     if (saved) setIsEditingProfile(false);
   };
@@ -296,6 +348,27 @@ const UserDetailContent: React.FC<Props> = ({
               />
             </div>
             <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+              <Input
+                type="email"
+                value={profileForm.email}
+                onChange={e => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                className="bg-background border-border"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('roleType')}</label>
+              <Select value={profileForm.role_type} onValueChange={value => setProfileForm(prev => ({ ...prev, role_type: value }))}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder={t('roleType')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">{t('ispOwner')}</SelectItem>
+                  <SelectItem value="employee">{t('ispEmployee')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <label className="text-xs text-muted-foreground mb-1 block">{t('country')}</label>
               <Select value={profileForm.country} onValueChange={value => setProfileForm(prev => ({ ...prev, country: value }))}>
                 <SelectTrigger className="bg-background border-border">
@@ -309,12 +382,65 @@ const UserDetailContent: React.FC<Props> = ({
               </Select>
             </div>
             <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('companyName')}</label>
+              <Input
+                value={profileForm.company_name}
+                onChange={e => setProfileForm(prev => ({ ...prev, company_name: e.target.value }))}
+                className="bg-background border-border"
+              />
+            </div>
+            <div>
               <label className="text-xs text-muted-foreground mb-1 block">{t('phone')}</label>
               <PhoneInput
                 value={profileForm.phone}
                 onChange={value => setProfileForm(prev => ({ ...prev, phone: value }))}
                 defaultCountry={profileForm.country}
               />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('clientCount')}</label>
+              <Input
+                value={profileForm.client_count}
+                onChange={e => setProfileForm(prev => ({ ...prev, client_count: e.target.value }))}
+                className="bg-background border-border"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('networkType')}</label>
+              <Select value={profileForm.network_type} onValueChange={value => setProfileForm(prev => ({ ...prev, network_type: value }))}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder={t('networkType')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="radio">Radio</SelectItem>
+                  <SelectItem value="fiber">Fibra</SelectItem>
+                  <SelectItem value="both">Ambos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">{t('cheapestPlan')}</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={profileForm.cheapest_plan_usd}
+                onChange={e => setProfileForm(prev => ({ ...prev, cheapest_plan_usd: e.target.value }))}
+                className="bg-background border-border"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Status</label>
+              <Select value={profileForm.status} onValueChange={value => setProfileForm(prev => ({ ...prev, status: value }))}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">{t('pending')}</SelectItem>
+                  <SelectItem value="approved">{t('approved')}</SelectItem>
+                  <SelectItem value="rejected">{t('rejected')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1 gap-2" onClick={cancelProfileEdit} disabled={savingProfile}>
