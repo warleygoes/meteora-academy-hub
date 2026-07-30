@@ -242,7 +242,7 @@ const CoursePage: React.FC = () => {
     }
 
     setLoading(false)
-  }, [courseId, user])
+  }, [courseId, user?.id])
 
   useEffect(() => {
     fetchData()
@@ -260,20 +260,30 @@ const CoursePage: React.FC = () => {
     setSearchParams({ lesson: lessonId }, { replace: true })
   }
 
-  const toggleComplete = async (lessonId: string) => {
+  const toggleComplete = async (lessonId: string, forceComplete?: boolean) => {
     if (!user || !courseId) return
     const isCompleted = completedLessons.has(lessonId)
+    
+    if (forceComplete && isCompleted) return;
+
+    const newStatus = forceComplete !== undefined ? forceComplete : !isCompleted;
+
     setCompletedLessons((prev) => {
       const next = new Set(prev)
-      isCompleted ? next.delete(lessonId) : next.add(lessonId)
+      if (newStatus) {
+        next.add(lessonId)
+      } else {
+        next.delete(lessonId)
+      }
       return next
     })
+    
     await supabase.from("lesson_progress").upsert(
       {
         user_id: user.id,
         course_id: courseId,
         lesson_id: lessonId,
-        completed: !isCompleted,
+        completed: newStatus,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,course_id,lesson_id" },
@@ -434,9 +444,16 @@ const CoursePage: React.FC = () => {
             className="p-6 max-w-4xl mx-auto space-y-6"
           >
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-display font-bold text-foreground">
-                {activeLesson.title}
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-display font-bold text-foreground">
+                  {activeLesson.title}
+                </h1>
+                {activeLesson.duration_minutes && (
+                  <Badge variant="secondary" className="text-sm font-normal">
+                    {activeLesson.duration_minutes} min
+                  </Badge>
+                )}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -465,7 +482,10 @@ const CoursePage: React.FC = () => {
             )}
 
             {activeLesson.video_url && (
-              <VideoPlayer url={activeLesson.video_url} />
+              <VideoPlayer 
+                url={activeLesson.video_url} 
+                onComplete={() => toggleComplete(activeLesson.id, true)}
+              />
             )}
 
             {activeLesson.contents.map((cont) => (
@@ -594,6 +614,16 @@ const CoursePage: React.FC = () => {
                     </Badge>
                   )}
                 </button>
+                {mod.lessons.length > 0 && (
+                  <div className="px-3 pb-2 pt-1">
+                    <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-300" 
+                        style={{ width: `${(mod.lessons.filter(l => completedLessons.has(l.id)).length / mod.lessons.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 {expandedModules.has(mod.id) && (
                   <div className="ml-4 space-y-0.5">
                     {mod.lessons.map((lesson, li) => {

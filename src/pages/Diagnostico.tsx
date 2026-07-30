@@ -442,7 +442,7 @@ const Diagnostico: React.FC = () => {
             <motion.div key="lead" {...fadeUp} className="space-y-6">
               <Card className="p-8 border-primary/20 bg-secondary/30 backdrop-blur-sm">
                 <h2 className="text-2xl font-display font-bold text-center mb-2">{t('diagPersonalTitle')}</h2>
-                <p className="text-sm text-muted-foreground text-center mb-6">Para enviarte tu diagnóstico personalizado y guardar tu progreso</p>
+                <p className="text-sm text-muted-foreground text-center mb-6">{t('diagPersonalSubtitle')}</p>
                 <div className="space-y-4">
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -452,14 +452,7 @@ const Diagnostico: React.FC = () => {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input type="email" placeholder={t('email')} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 h-12" />
                   </div>
-                  <PhoneInput value={phone} onChange={setPhone} className="h-12" />
-                  <select 
-                    value={country} onChange={(e) => setCountry(e.target.value)} 
-                    className="w-full h-12 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">{t('selectCountry')}</option>
-                    {LATAM_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <PhoneInput value={phone} onChange={setPhone} onCountryChange={setCountry} className="h-12" />
                   <Button onClick={handleStartQuestions} className="w-full h-12 glow-primary text-lg font-bold" disabled={!name || !email || !phone || !country}>
                     Comenzar Diagnóstico <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>

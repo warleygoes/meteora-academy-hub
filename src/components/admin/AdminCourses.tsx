@@ -560,9 +560,65 @@ const AdminCourses: React.FC = () => {
         const { data: p } = await supabase.from('profiles').select('display_name, email, company_name').eq('user_id', e.user_id).single();
         enriched.push({ id: e.id, user_id: e.user_id, enrolled_at: e.enrolled_at, profile: p || undefined });
       }
-    setStudents(enriched);
+      setStudents(enriched);
     } else { setStudents([]); }
     setShowStudentList(true);
+  };
+
+  // Export course structure to .md
+  const exportCourseStructure = async (course: Course) => {
+    let modules = courseModules[course.id];
+    if (!modules) {
+      const { data: modsData } = await supabase.from('course_modules').select('*').eq('course_id', course.id).order('sort_order');
+      const moduleIds = (modsData || []).map(m => m.id);
+      const { data: lessonsData } = moduleIds.length > 0
+        ? await supabase.from('course_lessons').select('*').in('module_id', moduleIds).order('sort_order')
+        : { data: [] };
+      const lessonIds = (lessonsData || []).map(l => l.id);
+      const { data: contentsData } = lessonIds.length > 0
+        ? await supabase.from('lesson_contents').select('*').in('lesson_id', lessonIds).order('sort_order')
+        : { data: [] };
+
+      modules = (modsData || []).map(m => ({
+        ...m,
+        lessons: (lessonsData || []).filter(l => l.module_id === m.id).map(l => ({
+          ...l,
+          contents: ((contentsData || []) as LessonContent[]).filter(c => c.lesson_id === l.id),
+        })),
+      }));
+    }
+
+    let mdContent = '';
+    modules.forEach((mod, modIdx) => {
+      if (modIdx > 0) mdContent += '\n';
+      mdContent += `${mod.title}\n`;
+      (mod.lessons || []).forEach(lesson => {
+        mdContent += `    ${lesson.title}\n`;
+        if (lesson.video_url && lesson.video_url.trim()) {
+          mdContent += `        ${lesson.video_url.trim()}\n`;
+        }
+        const filledContents = (lesson.contents || []).filter(c => (c.content || '').trim().length > 0);
+        filledContents.forEach(c => {
+          const text = (c.content || '').trim();
+          if ((c.type === 'video' || c.type === 'link' || text.startsWith('http://') || text.startsWith('https://')) && text !== lesson.video_url?.trim()) {
+            mdContent += `        ${text}\n`;
+          }
+        });
+      });
+    });
+
+    const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeTitle = (course.title || 'curso').replace(/[^a-zA-Z0-9-_\s]/g, '_').trim();
+    link.setAttribute('download', `${safeTitle}_estrutura.md`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: 'Estrutura exportada em .md com sucesso!' });
   };
 
   // Private lesson user access management
@@ -718,6 +774,9 @@ const AdminCourses: React.FC = () => {
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => openStudentList(course.id)} title={t('students')}>
                     <Users className="w-4 h-4" /><span className="ml-1 text-xs">{course.enrollment_count}</span>
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => exportCourseStructure(course)} title="Exportar estrutura (.md)">
+                    <FileDown className="w-4 h-4" />
                   </Button>
                 </div>
               </div>

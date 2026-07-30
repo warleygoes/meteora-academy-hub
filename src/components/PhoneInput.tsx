@@ -34,6 +34,7 @@ interface PhoneInputProps {
   error?: boolean;
   success?: boolean;
   defaultCountry?: string;
+  onCountryChange?: (country: string) => void;
 }
 
 /**
@@ -78,6 +79,13 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const [localNumber, setLocalNumber] = useState(parsed.localNumber);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (onCountryChange) {
+      const match = COUNTRY_PHONE_CODES.find(c => c.code === selectedCode);
+      if (match) onCountryChange(match.country);
+    }
+  }, [selectedCode, onCountryChange]);
 
   // Sync when defaultCountry changes and no value set
   useEffect(() => {

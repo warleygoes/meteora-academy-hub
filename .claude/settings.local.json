@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python c:\\\\Users\\\\akyno\\\\Downloads\\\\meteora-academy-hub\\\\ssh_debug.py)",
+      "PowerShell(python c:\\\\Users\\\\akyno\\\\Downloads\\\\meteora-academy-hub\\\\ssh_fix_key.py)",
+      "Bash(git push *)",
+      "PowerShell(python c:\\\\Users\\\\akyno\\\\Downloads\\\\meteora-academy-hub\\\\ssh_ml.py)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "PowerShell(python c:\\\\Users\\\\akyno\\\\Downloads\\\\meteora-academy-hub\\\\ssh_fix_ml.py)",
+      "PowerShell(python c:\\\\Users\\\\akyno\\\\Downloads\\\\meteora-academy-hub\\\\ssh_tmp.py)",
+      "Bash(git commit *)"
+    ]
+  }
+}

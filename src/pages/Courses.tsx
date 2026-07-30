@@ -161,6 +161,20 @@ const CoursesPage: React.FC = () => {
                   <span className="flex items-center gap-1"><Users className="w-3 h-3" />{product.enrollment_count} {t('students')}</span>
                 )}
               </div>
+              {product.progress !== undefined && product.lesson_count > 0 && (
+                <div className="space-y-1 mt-3">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Progresso</span>
+                    <span>{product.progress}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary rounded-full transition-all duration-300" 
+                      style={{ width: `${product.progress}%` }} 
+                    />
+                  </div>
+                </div>
+              )}
               {product.type === 'saas' && product.saas_url && (
                 <Button size="sm" variant="secondary" className="gap-1 w-full text-xs mt-2"
                   onClick={(e) => { e.stopPropagation(); window.open(product.saas_url!, '_blank', 'noopener'); }}>

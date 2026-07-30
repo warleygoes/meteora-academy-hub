@@ -8,6 +8,9 @@ export const languageNames: Record<Language, string> = {
 
 export const translations: Record<Language, Record<string, string>> = {
   es: {
+    myDiagnostics: 'Mis Diagnósticos',
+    featuredProducts: 'Productos Destacados',
+    freeProducts: 'Productos Gratuitos',
     // Nav
     home: 'Inicio',
     courses: 'Contenidos',
@@ -203,7 +206,8 @@ export const translations: Record<Language, Record<string, string>> = {
     back: 'Volver',
     step: 'Paso',
     of: 'de',
-    diagPersonalTitle: 'Para enviarte tu diagnóstico personalizado y guardar tu progreso',
+    diagPersonalTitle: 'Diagnóstico',
+    diagPersonalSubtitle: 'Para enviarte tu diagnóstico personalizado y guardar tu progreso',
     diagProcessing: 'Estamos procesando tu diagnóstico...',
     diagAccountExists: 'Tu cuenta ya existe. Solo confirma tu acceso.',
     diagCreatePassword: 'Crea tu contraseña para acceder a tu diagnóstico completo.',
@@ -756,6 +760,9 @@ export const translations: Record<Language, Record<string, string>> = {
     writeReply: 'Escribe tu respuesta...',
   },
   pt: {
+    myDiagnostics: 'Meus Diagnósticos',
+    featuredProducts: 'Produtos Destaques',
+    freeProducts: 'Produtos Gratuitos',
     home: 'Início',
     courses: 'Conteúdos',
     community: 'Comunidade',
@@ -1163,6 +1170,8 @@ export const translations: Record<Language, Record<string, string>> = {
     lpFinalTitle: 'O próximo passo é clareza.',
     lpFinalText: 'Não tome decisões no escuro. Descubra exatamente o que seu ISP precisa agora.',
     lpFinalCta: 'Fazer Diagnóstico Gratuito do Meu ISP',
+    diagPersonalTitle: 'Diagnóstico',
+    diagPersonalSubtitle: 'Para enviar seu diagnóstico personalizado e salvar seu progresso',
     diagPageTitle: 'Diagnóstico Gratuito do ISP',
     diagPageSubtitle: 'Complete o formulário e descubra os próximos passos para seu provedor de internet.',
     diagStep1Title: 'Dados Pessoais',
@@ -1444,6 +1453,9 @@ export const translations: Record<Language, Record<string, string>> = {
     writeReply: 'Escreva sua resposta...',
   },
   en: {
+    myDiagnostics: 'My Diagnostics',
+    featuredProducts: 'Featured Products',
+    freeProducts: 'Free Products',
     home: 'Home',
     courses: 'Content',
     community: 'Community',
@@ -1850,6 +1862,8 @@ export const translations: Record<Language, Record<string, string>> = {
     lpFinalTitle: 'The next step is clarity.',
     lpFinalText: 'Don\'t make decisions in the dark. Discover exactly what your ISP needs now.',
     lpFinalCta: 'Get My Free ISP Diagnostic',
+    diagPersonalTitle: 'Diagnostic',
+    diagPersonalSubtitle: 'To send your personalized diagnostic and save your progress',
     diagPageTitle: 'Free ISP Diagnostic',
     diagPageSubtitle: 'Complete the form and discover the next steps for your internet provider.',
     diagStep1Title: 'Personal Data',

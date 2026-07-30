@@ -3,6 +3,8 @@ import React from 'react';
 interface VideoPlayerProps {
   url: string;
   className?: string;
+  onProgress?: (percentage: number) => void;
+  onComplete?: () => void;
 }
 
 function getEmbedUrl(url: string): { type: 'iframe' | 'video'; src: string } | null {
@@ -37,8 +39,49 @@ function getEmbedUrl(url: string): { type: 'iframe' | 'video'; src: string } | n
   return { type: 'iframe', src: url };
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, className = '' }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, className = '', onProgress, onComplete }) => {
   const embed = getEmbedUrl(url);
+  const completedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    completedRef.current = false;
+  }, [url]);
+
+  React.useEffect(() => {
+    if (!embed || embed.type !== 'iframe') return;
+
+    const handleMessage = (event: MessageEvent) => {
+      let data = event.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (e) {
+          return;
+        }
+      }
+
+      if (!data) return;
+
+      // Extract current time and duration, trying common video player message structures (especially Adilo)
+      const currentTime = data.currentTime ?? data.value ?? data.data?.currentTime;
+      const duration = data.duration ?? data.data?.duration;
+
+      if (typeof currentTime === 'number' && typeof duration === 'number' && duration > 0) {
+        const percentage = (currentTime / duration) * 100;
+        
+        if (onProgress) onProgress(percentage);
+
+        if (percentage >= 90 && !completedRef.current) {
+          completedRef.current = true;
+          if (onComplete) onComplete();
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [embed, url, onProgress, onComplete]);
+
   if (!embed) return null;
 
   if (embed.type === 'video') {
