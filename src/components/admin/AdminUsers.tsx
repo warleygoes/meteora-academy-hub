@@ -43,26 +43,6 @@ const FlagImg: React.FC<{ country: string | null; size?: number }> = ({ country,
       width={size} height={Math.round(size * 0.75)} alt={country}
       className="inline-block rounded-sm object-cover" style={{ width: size, height: Math.round(size * 0.75) }} />
   );
-
-const countryCodes: Record<string, string> = {
-  'Argentina': 'ar', 'Brasil': 'br', 'Brazil': 'br', 'Colombia': 'co', 'Venezuela': 've',
-  'Perú': 'pe', 'Peru': 'pe', 'Ecuador': 'ec', 'Chile': 'cl', 'Uruguay': 'uy',
-  'Paraguay': 'py', 'Bolivia': 'bo', 'México': 'mx', 'Mexico': 'mx', 'Panamá': 'pa',
-  'Panama': 'pa', 'Costa Rica': 'cr', 'Guatemala': 'gt', 'Honduras': 'hn',
-  'El Salvador': 'sv', 'Nicaragua': 'ni', 'Cuba': 'cu', 'República Dominicana': 'do',
-  'Dominican Republic': 'do', 'Puerto Rico': 'pr', 'España': 'es', 'Spain': 'es',
-  'United States': 'us', 'Estados Unidos': 'us',
-};
-
-const FlagImg: React.FC<{ country: string | null; size?: number }> = ({ country, size = 16 }) => {
-  if (!country) return null;
-  const code = countryCodes[country];
-  if (!code) return <Globe className="w-4 h-4 text-muted-foreground" />;
-  return (
-    <img src={`https://flagcdn.com/w40/${code}.png`} srcSet={`https://flagcdn.com/w80/${code}.png 2x`}
-      width={size} height={Math.round(size * 0.75)} alt={country}
-      className="inline-block rounded-sm object-cover" style={{ width: size, height: Math.round(size * 0.75) }} />
-  );
 };
 
 interface ProfileUser {
@@ -70,7 +50,7 @@ interface ProfileUser {
   company_name: string | null; country: string | null; phone: string | null;
   role_type: string | null; client_count: string | null; network_type: string | null;
   cheapest_plan_usd: number | null; main_problems: string | null; main_desires: string | null;
-  approved: boolean; status: string; created_at: string; last_sign_in_at?: string | null; last_login?: string | null;
+  approved: boolean; status: string; created_at: string;
 }
 
 interface AdminUser { user_id: string; display_name: string | null; email: string | null; }
@@ -134,6 +114,77 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ stats, onStatsUpdate }) => {
   const { toast } = useToast();
   const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('pending');
+
+  const [pendingUsers, setPendingUsers] = useState<ProfileUser[]>([]);
+  const [rejectedUsers, setRejectedUsers] = useState<ProfileUser[]>([]);
+  const [approvedUsers, setApprovedUsers] = useState<ProfileUser[]>([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+  const [loadingRejected, setLoadingRejected] = useState(true);
+  const [loadingApproved, setLoadingApproved] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<ProfileUser | null>(null);
+
+  const [allUsers, setAllUsers] = useState<ProfileUser[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all');
+
+  const [showAdminManager, setShowAdminManager] = useState(false);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [adding, setAdding] = useState(false);
+
+  const [adminUserIds, setAdminUserIds] = useState<Set<string>>(new Set());
+  const [activePlansCounts, setActivePlansCounts] = useState<Record<string, number>>({});
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
+  const [showApproveAllConfirm, setShowApproveAllConfirm] = useState(false);
+  const [showApproveAllFromAllConfirm, setShowApproveAllFromAllConfirm] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', phone: '' });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [globalSearch, setGlobalSearch] = useState('');
+
+  // Flexible column configuration
+  type SortDir = 'asc' | 'desc' | null;
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
+    name: true, company: true, country: true, phone: true, clients: true, network: true, plans: true, created: true,
+  });
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
+
+  const columnDefs = [
+    { id: 'name', label: t('displayName'), minWidth: 140 },
+    { id: 'company', label: t('companyName'), minWidth: 100 },
+    { id: 'country', label: t('country'), minWidth: 80 },
+    { id: 'phone', label: t('phone'), minWidth: 100 },
+    { id: 'clients', label: t('clientCount'), minWidth: 80 },
+    { id: 'network', label: t('networkType'), minWidth: 80 },
+    { id: 'plans', label: t('activePlans'), minWidth: 60 },
+    { id: 'created', label: t('createdAt') || 'Fecha de Registro', minWidth: 130 },
+  ];
+
+  const getColumnValue = (user: ProfileUser, colId: string): string | number => {
+    switch (colId) {
+      case 'name': return user.display_name || '';
+      case 'company': return user.company_name || '';
+      case 'country': return user.country || '';
+      case 'phone': return user.phone || '';
+      case 'clients': return user.client_count || '';
+      case 'network': return user.network_type || '';
+      case 'plans': return activePlansCounts[user.user_id] || 0;
+      case 'created': return user.created_at || '';
+      default: return '';
+    }
+  };
+
+  const handleSort = (colId: string) => {
+    if (sortColumn === colId) {
       if (sortDir === 'asc') setSortDir('desc');
       else if (sortDir === 'desc') { setSortColumn(null); setSortDir(null); }
     } else {
