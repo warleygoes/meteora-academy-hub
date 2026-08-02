@@ -6,6 +6,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function findAuthUserByEmail(adminClient: any, email: string) {
+  let page = 1;
+  const perPage = 1000;
+  const target = email.trim().toLowerCase();
+  while (true) {
+    const { data: usersData, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+    if (error || !usersData?.users || usersData.users.length === 0) break;
+    const found = usersData.users.find((u: any) => u.email?.trim().toLowerCase() === target);
+    if (found) return found;
+    if (usersData.users.length < perPage) break;
+    page++;
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -55,8 +70,20 @@ Deno.serve(async (req) => {
 
     const bodyPayload = await req.json();
     const targetUserId = bodyPayload.userId || bodyPayload.user_id;
-    const targetEmail = bodyPayload.email ? String(bodyPayload.email).trim().toLowerCase() : null;
+    let targetEmail = bodyPayload.email ? String(bodyPayload.email).trim().toLowerCase() : null;
     const newPassword = bodyPayload.newPassword;
+
+    // Resolve email from profiles if missing in request body
+    if (!targetEmail && targetUserId) {
+      const { data: prof } = await adminClient
+        .from("profiles")
+        .select("email")
+        .or(`user_id.eq.${targetUserId},id.eq.${targetUserId}`)
+        .maybeSingle();
+      if (prof?.email) {
+        targetEmail = String(prof.email).trim().toLowerCase();
+      }
+    }
 
     if (!targetUserId && !targetEmail) {
       return new Response(JSON.stringify({ error: "userId or email is required" }), {
@@ -64,8 +91,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     if (newPassword) {
       if (newPassword.length < 6) {
@@ -77,7 +102,7 @@ Deno.serve(async (req) => {
 
       let updated = false;
 
-      // 1. Try updating directly by targetUserId if provided
+      // 1. Try updating directly by targetUserId in auth.users
       if (targetUserId) {
         const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
           password: newPassword,
@@ -87,12 +112,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 2. Fallback: If update by targetUserId failed or was not provided, look up in auth.users by email
+      // 2. Fallback: Search auth.users by targetEmail across all pages
       if (!updated && targetEmail) {
-        const { data: usersData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-        const foundUser = usersData?.users?.find(
-          (u: any) => u.email?.toLowerCase() === targetEmail
-        );
+        const foundUser = await findAuthUserByEmail(adminClient, targetEmail);
 
         if (foundUser) {
           const { error: updateByEmailError } = await adminClient.auth.admin.updateUserById(foundUser.id, {
@@ -102,7 +124,7 @@ Deno.serve(async (req) => {
             updated = true;
             // Sync profiles table user_id if targetUserId differed or was invalid
             if (targetUserId && targetUserId !== foundUser.id) {
-              await adminClient.from("profiles").update({ user_id: foundUser.id }).eq("user_id", targetUserId);
+              await adminClient.from("profiles").update({ user_id: foundUser.id }).or(`user_id.eq.${targetUserId},id.eq.${targetUserId}`);
             }
           }
         } else {
@@ -117,7 +139,7 @@ Deno.serve(async (req) => {
             updated = true;
             const newAuthId = createAuthData.user.id;
             if (targetUserId) {
-              await adminClient.from("profiles").update({ user_id: newAuthId }).eq("user_id", targetUserId);
+              await adminClient.from("profiles").update({ user_id: newAuthId }).or(`user_id.eq.${targetUserId},id.eq.${targetUserId}`);
             } else {
               await adminClient.from("profiles").update({ user_id: newAuthId }).eq("email", targetEmail);
             }
