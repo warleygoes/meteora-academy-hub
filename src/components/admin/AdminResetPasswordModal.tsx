@@ -45,61 +45,46 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
       let resetSuccess = false;
       let lastErrorMessage = '';
 
-      // TIER 1: Try Database RPC admin_reset_user_password directly
-      try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('admin_reset_user_password' as any, {
-          target_email: cleanEmail,
-          new_password: newPassword,
+      // Helper function to invoke reset-user-password edge function
+      const tryEdgeReset = async (payload: { userId?: string; email?: string; newPassword: string }) => {
+        const { data, error } = await supabase.functions.invoke('reset-user-password', {
+          body: payload,
         });
 
-        if (!rpcError && (rpcData as any)?.success) {
-          resetSuccess = true;
-        } else if ((rpcData as any)?.error && (rpcData as any).error !== 'USER_NOT_FOUND_IN_AUTH') {
-          lastErrorMessage = (rpcData as any).error;
+        if (!error && !data?.error) {
+          return { ok: true, error: null };
         }
-      } catch {
-        // RPC might not exist on cloud database yet
+
+        let errMsg = data?.error || '';
+        if (error) {
+          try {
+            if ('context' in error && typeof (error as any).context?.json === 'function') {
+              const json = await (error as any).context.json();
+              if (json?.error) errMsg = json.error;
+            }
+          } catch { /* ignore */ }
+          if (!errMsg) errMsg = error.message;
+        }
+        return { ok: false, error: errMsg };
+      };
+
+      // 1. Try reset-user-password edge function with userId + email
+      if (userId) {
+        const res1 = await tryEdgeReset({ userId, email: cleanEmail, newPassword });
+        if (res1.ok) resetSuccess = true;
+        else if (res1.error) lastErrorMessage = res1.error;
       }
 
-      // TIER 2: Try Edge Function reset-user-password with userId & email
+      // 2. Try reset-user-password edge function with email only
       if (!resetSuccess) {
-        const tryEdge = async (payload: any) => {
-          const { data, error } = await supabase.functions.invoke('reset-user-password', { body: payload });
-          if (!error && !data?.error) return { ok: true, error: null };
-          let msg = data?.error || '';
-          if (error) {
-            try {
-              if ('context' in error && typeof (error as any).context?.json === 'function') {
-                const json = await (error as any).context.json();
-                if (json?.error) msg = json.error;
-              }
-            } catch { /* ignore */ }
-            if (!msg) msg = error.message;
-          }
-          return { ok: false, error: msg };
-        };
-
-        if (userId) {
-          const res1 = await tryEdge({ userId, email: cleanEmail, newPassword });
-          if (res1.ok) resetSuccess = true;
-          else if (res1.error) lastErrorMessage = res1.error;
-        }
-
-        if (!resetSuccess) {
-          const res2 = await tryEdge({ email: cleanEmail, newPassword });
-          if (res2.ok) resetSuccess = true;
-          else if (res2.error) lastErrorMessage = res2.error;
-        }
-
-        if (!resetSuccess && userEmail && userEmail !== cleanEmail) {
-          const res3 = await tryEdge({ email: userEmail.trim(), newPassword });
-          if (res3.ok) resetSuccess = true;
-          else if (res3.error) lastErrorMessage = res3.error;
-        }
+        const res2 = await tryEdgeReset({ email: cleanEmail, newPassword });
+        if (res2.ok) resetSuccess = true;
+        else if (res2.error) lastErrorMessage = res2.error;
       }
 
-      // TIER 3: Account Creation or Guaranteed Recovery Email Fallback
+      // 3. Fallback: Re-create/sync auth user via import-users Edge Function
       if (!resetSuccess) {
+        // First try creating user directly in auth.users
         const { data: importData, error: importError } = await supabase.functions.invoke('import-users', {
           body: {
             users: [{ name: cleanEmail.split('@')[0], email: cleanEmail }],
@@ -109,12 +94,48 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
 
         if (!importError && importData?.created > 0) {
           resetSuccess = true;
-        } else if (importData?.exists > 0 || lastErrorMessage.includes('User not found') || lastErrorMessage.includes('não encontrado')) {
-          // If user exists in auth.users, send official Supabase password reset link
-          const { error: recoveryErr } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-            redirectTo: `${window.location.origin}/login`,
+        } else if (importData?.exists > 0) {
+          // The user exists in auth.users under a mismatched/orphaned ID.
+          // Delete old mismatched auth user and recreate fresh with newPassword
+          if (userId) {
+            try {
+              await supabase.functions.invoke('import-users', {
+                method: 'DELETE',
+                body: { user_id: userId },
+              });
+            } catch { /* ignore delete error */ }
+          }
+
+          // Re-create user in auth.users with the new password and link profile
+          const { data: recreateData, error: recreateError } = await supabase.functions.invoke('import-users', {
+            body: {
+              users: [{ name: cleanEmail.split('@')[0], email: cleanEmail }],
+              defaultPassword: newPassword,
+            },
           });
 
+          if (!recreateError && (recreateData?.created > 0 || recreateData?.exists > 0)) {
+            resetSuccess = true;
+          } else {
+            // Ultimate fallback: Send official Supabase password reset email
+            const { error: recoveryErr } = await supabase.auth.resetPasswordForEmail(cleanEmail);
+            if (!recoveryErr) {
+              toast({
+                title: 'Link de redefinição enviado',
+                description: `Um e-mail de redefinição de senha foi enviado para ${cleanEmail}.`,
+              });
+              setNewPassword('');
+              setConfirmPassword('');
+              onOpenChange(false);
+              setSaving(false);
+              return;
+            } else {
+              throw new Error(recreateError?.message || importError?.message || lastErrorMessage || 'Erro ao atualizar a senha');
+            }
+          }
+        } else if (importError || importData?.error) {
+          // Ultimate fallback: Send official Supabase password reset email
+          const { error: recoveryErr } = await supabase.auth.resetPasswordForEmail(cleanEmail);
           if (!recoveryErr) {
             toast({
               title: 'Link de redefinição enviado',
@@ -126,10 +147,8 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
             setSaving(false);
             return;
           } else {
-            throw new Error(recoveryErr.message || lastErrorMessage || 'Erro ao atualizar a senha.');
+            throw new Error(importData?.error || importError?.message || lastErrorMessage);
           }
-        } else if (importError || importData?.error) {
-          throw new Error(importData?.error || importError?.message || lastErrorMessage);
         }
       }
 
