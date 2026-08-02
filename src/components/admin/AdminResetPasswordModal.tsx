@@ -45,51 +45,60 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
       let resetSuccess = false;
       let lastErrorMessage = '';
 
-      // 1. Try resetting password by email lookup on the edge function (omitting userId so edge function resolves auth.users by email)
-      const { data, error } = await supabase.functions.invoke('reset-user-password', {
-        body: { email: cleanEmail, newPassword },
-      });
+      // Helper function to invoke reset-user-password and parse errors cleanly
+      const tryReset = async (payload: { userId?: string; email?: string; newPassword: string }) => {
+        const { data, error } = await supabase.functions.invoke('reset-user-password', {
+          body: payload,
+        });
 
-      if (!error && !data?.error) {
-        resetSuccess = true;
-      } else {
+        if (!error && !data?.error) {
+          return { ok: true, error: null };
+        }
+
+        let errMsg = data?.error || '';
         if (error) {
           try {
             if ('context' in error && typeof (error as any).context?.json === 'function') {
               const json = await (error as any).context.json();
-              if (json?.error) lastErrorMessage = json.error;
+              if (json?.error) errMsg = json.error;
             }
           } catch { /* ignore */ }
-          if (!lastErrorMessage) lastErrorMessage = error.message;
-        } else if (data?.error) {
-          lastErrorMessage = data.error;
+          if (!errMsg) errMsg = error.message;
         }
-      }
+        return { ok: false, error: errMsg };
+      };
 
-      // 2. If edge function couldn't find user by email alone, try passing userId
-      if (!resetSuccess && userId) {
-        const { data: retryData, error: retryError } = await supabase.functions.invoke('reset-user-password', {
-          body: { userId, email: cleanEmail, newPassword },
-        });
-
-        if (!retryError && !retryData?.error) {
+      // Attempt 1: Try with userId + email (Most reliable for existing auth users)
+      if (userId) {
+        const res1 = await tryReset({ userId, email: cleanEmail, newPassword });
+        if (res1.ok) {
           resetSuccess = true;
-        } else if (retryError || retryData?.error) {
-          let retryMsg = retryData?.error;
-          if (retryError) {
-            try {
-              if ('context' in retryError && typeof (retryError as any).context?.json === 'function') {
-                const json = await (retryError as any).context.json();
-                if (json?.error) retryMsg = json.error;
-              }
-            } catch { /* ignore */ }
-            if (!retryMsg) retryMsg = retryError.message;
-          }
-          if (retryMsg) lastErrorMessage = retryMsg;
+        } else {
+          lastErrorMessage = res1.error || '';
         }
       }
 
-      // 3. If user does not exist in auth.users at all (e.g. imported profile), create their auth account with the new password
+      // Attempt 2: Try with email only (for users where userId wasn't provided or differed)
+      if (!resetSuccess) {
+        const res2 = await tryReset({ email: cleanEmail, newPassword });
+        if (res2.ok) {
+          resetSuccess = true;
+        } else {
+          if (res2.error) lastErrorMessage = res2.error;
+        }
+      }
+
+      // Attempt 3: Try with raw userEmail (untrimmed/original case) if cleanEmail failed
+      if (!resetSuccess && userEmail && userEmail !== cleanEmail) {
+        const res3 = await tryReset({ email: userEmail.trim(), newPassword });
+        if (res3.ok) {
+          resetSuccess = true;
+        } else {
+          if (res3.error) lastErrorMessage = res3.error;
+        }
+      }
+
+      // Attempt 4: If user does not exist in auth.users at all (only in profiles), create their auth user with the new password
       if (!resetSuccess && (lastErrorMessage.includes('User not found') || lastErrorMessage.includes('não encontrado'))) {
         const { data: importData, error: importError } = await supabase.functions.invoke('import-users', {
           body: {
@@ -98,13 +107,19 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
           },
         });
 
-        if (!importError && (importData?.created > 0 || importData?.exists > 0)) {
+        if (!importError && importData?.created > 0) {
           resetSuccess = true;
+        } else if (importData?.exists > 0) {
+          // If import-users reports exists > 0, the email DOES exist in auth.users, but reset-user-password couldn't update it.
+          // Throw explicit error so we never fake success when password wasn't changed!
+          throw new Error(`O usuário ${cleanEmail} existe, mas não foi possível atualizar a senha no sistema de autenticação. Verifique se o e-mail está correto.`);
         } else if (importError || importData?.error) {
           throw new Error(importData?.error || importError?.message || lastErrorMessage);
         }
-      } else if (!resetSuccess) {
-        throw new Error(lastErrorMessage || 'Error al actualizar la contraseña');
+      }
+
+      if (!resetSuccess) {
+        throw new Error(lastErrorMessage || 'Erro ao atualizar a senha.');
       }
 
       toast({ title: t('resetPasswordSuccess') });
