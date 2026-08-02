@@ -34,24 +34,77 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
       return;
     }
 
+    const cleanEmail = userEmail ? userEmail.trim().toLowerCase() : '';
+    if (!cleanEmail) {
+      toast({ title: 'E-mail do usuário é obrigatório.', variant: 'destructive' });
+      return;
+    }
+
     setSaving(true);
     try {
+      let resetSuccess = false;
+      let lastErrorMessage = '';
+
+      // 1. Try resetting password by email lookup on the edge function (omitting userId so edge function resolves auth.users by email)
       const { data, error } = await supabase.functions.invoke('reset-user-password', {
-        body: { userId, email: userEmail, newPassword },
+        body: { email: cleanEmail, newPassword },
       });
 
-      if (error) {
-        let errMsg = error.message;
-        try {
-          if ('context' in error && typeof (error as any).context?.json === 'function') {
-            const json = await (error as any).context.json();
-            if (json?.error) errMsg = json.error;
-          }
-        } catch { /* fallback to error.message */ }
-        throw new Error(errMsg);
+      if (!error && !data?.error) {
+        resetSuccess = true;
+      } else {
+        if (error) {
+          try {
+            if ('context' in error && typeof (error as any).context?.json === 'function') {
+              const json = await (error as any).context.json();
+              if (json?.error) lastErrorMessage = json.error;
+            }
+          } catch { /* ignore */ }
+          if (!lastErrorMessage) lastErrorMessage = error.message;
+        } else if (data?.error) {
+          lastErrorMessage = data.error;
+        }
       }
-      if (data?.error) {
-        throw new Error(data.error);
+
+      // 2. If edge function couldn't find user by email alone, try passing userId
+      if (!resetSuccess && userId) {
+        const { data: retryData, error: retryError } = await supabase.functions.invoke('reset-user-password', {
+          body: { userId, email: cleanEmail, newPassword },
+        });
+
+        if (!retryError && !retryData?.error) {
+          resetSuccess = true;
+        } else if (retryError || retryData?.error) {
+          let retryMsg = retryData?.error;
+          if (retryError) {
+            try {
+              if ('context' in retryError && typeof (retryError as any).context?.json === 'function') {
+                const json = await (retryError as any).context.json();
+                if (json?.error) retryMsg = json.error;
+              }
+            } catch { /* ignore */ }
+            if (!retryMsg) retryMsg = retryError.message;
+          }
+          if (retryMsg) lastErrorMessage = retryMsg;
+        }
+      }
+
+      // 3. If user does not exist in auth.users at all (e.g. imported profile), create their auth account with the new password
+      if (!resetSuccess && (lastErrorMessage.includes('User not found') || lastErrorMessage.includes('não encontrado'))) {
+        const { data: importData, error: importError } = await supabase.functions.invoke('import-users', {
+          body: {
+            users: [{ name: cleanEmail.split('@')[0], email: cleanEmail }],
+            defaultPassword: newPassword,
+          },
+        });
+
+        if (!importError && (importData?.created > 0 || importData?.exists > 0)) {
+          resetSuccess = true;
+        } else if (importError || importData?.error) {
+          throw new Error(importData?.error || importError?.message || lastErrorMessage);
+        }
+      } else if (!resetSuccess) {
+        throw new Error(lastErrorMessage || 'Error al actualizar la contraseña');
       }
 
       toast({ title: t('resetPasswordSuccess') });
