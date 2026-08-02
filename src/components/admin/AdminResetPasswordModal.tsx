@@ -36,14 +36,14 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
 
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ userId, email: userEmail, newPassword }),
+      const { data, error } = await supabase.functions.invoke('reset-user-password', {
+        body: { userId, email: userEmail, newPassword },
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Error');
+
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || 'Error');
+      }
+
       toast({ title: t('resetPasswordSuccess') });
       setNewPassword('');
       setConfirmPassword('');

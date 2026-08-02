@@ -8,7 +8,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -38,13 +38,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const adminCallerId = claimsData.claims.sub;
 
     // Check admin role
     const { data: roleData } = await userClient
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
+      .eq("user_id", adminCallerId)
       .eq("role", "admin")
       .maybeSingle();
 
@@ -55,8 +55,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { userId, email, newPassword } = await req.json();
-    if (!userId && !email) {
+    const bodyPayload = await req.json();
+    const targetUserId = bodyPayload.userId || bodyPayload.user_id;
+    const targetEmail = bodyPayload.email ? String(bodyPayload.email).trim().toLowerCase() : null;
+    const newPassword = bodyPayload.newPassword;
+
+    if (!targetUserId && !targetEmail) {
       return new Response(JSON.stringify({ error: "userId or email is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -73,40 +77,70 @@ Deno.serve(async (req) => {
         });
       }
 
-      let targetUserId = userId;
+      let updated = false;
 
-      // Fallback: resolve ID from email if userId not provided
-      if (!targetUserId) {
-        const { data: usersData, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-        if (listError) {
-          return new Response(JSON.stringify({ error: listError.message }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+      // 1. Try updating directly by targetUserId if provided
+      if (targetUserId) {
+        const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+          password: newPassword,
+        });
+        if (!updateError) {
+          updated = true;
         }
-        const found = usersData.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
-        if (!found) {
-          return new Response(JSON.stringify({ error: "User not found" }), {
-            status: 404,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        targetUserId = found.id;
       }
 
-      const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
-        password: newPassword,
-      });
+      // 2. Fallback: If update by targetUserId failed or was not provided, look up in auth.users by email
+      if (!updated && targetEmail) {
+        const { data: usersData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+        const foundUser = usersData?.users?.find(
+          (u: any) => u.email?.toLowerCase() === targetEmail
+        );
 
-      if (updateError) {
-        return new Response(JSON.stringify({ error: updateError.message }), {
-          status: 500,
+        if (foundUser) {
+          const { error: updateByEmailError } = await adminClient.auth.admin.updateUserById(foundUser.id, {
+            password: newPassword,
+          });
+          if (!updateByEmailError) {
+            updated = true;
+            // Sync profiles table user_id if targetUserId differed or was invalid
+            if (targetUserId && targetUserId !== foundUser.id) {
+              await adminClient.from("profiles").update({ user_id: foundUser.id }).eq("user_id", targetUserId);
+            }
+          }
+        } else {
+          // 3. User does not exist in auth.users at all -> create account in auth.users
+          const { data: createAuthData, error: createAuthError } = await adminClient.auth.admin.createUser({
+            email: targetEmail,
+            password: newPassword,
+            email_confirm: true,
+          });
+
+          if (!createAuthError && createAuthData?.user) {
+            updated = true;
+            const newAuthId = createAuthData.user.id;
+            if (targetUserId) {
+              await adminClient.from("profiles").update({ user_id: newAuthId }).eq("user_id", targetUserId);
+            } else {
+              await adminClient.from("profiles").update({ user_id: newAuthId }).eq("email", targetEmail);
+            }
+          } else if (createAuthError) {
+            return new Response(JSON.stringify({ error: createAuthError.message }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+      }
+
+      if (!updated) {
+        return new Response(JSON.stringify({ error: "User not found" }), {
+          status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     } else {
-      // Fallback: generate recovery link (requires email)
-      if (!email) {
+      // Recovery link generation
+      if (!targetEmail) {
         return new Response(JSON.stringify({ error: "Email is required for recovery link" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -114,7 +148,7 @@ Deno.serve(async (req) => {
       }
       const { error } = await adminClient.auth.admin.generateLink({
         type: "recovery",
-        email,
+        email: targetEmail,
       });
 
       if (error) {
@@ -129,8 +163,8 @@ Deno.serve(async (req) => {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err?.message || "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
