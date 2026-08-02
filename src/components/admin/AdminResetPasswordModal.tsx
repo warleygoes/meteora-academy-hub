@@ -40,8 +40,18 @@ const AdminResetPasswordModal: React.FC<Props> = ({ open, onOpenChange, userEmai
         body: { userId, email: userEmail, newPassword },
       });
 
-      if (error || data?.error) {
-        throw new Error(data?.error || error?.message || 'Error');
+      if (error) {
+        let errMsg = error.message;
+        try {
+          if ('context' in error && typeof (error as any).context?.json === 'function') {
+            const json = await (error as any).context.json();
+            if (json?.error) errMsg = json.error;
+          }
+        } catch { /* fallback to error.message */ }
+        throw new Error(errMsg);
+      }
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       toast({ title: t('resetPasswordSuccess') });

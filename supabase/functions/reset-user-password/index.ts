@@ -24,27 +24,25 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify caller is admin
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    // Verify authenticated user
+    const { data: { user: caller }, error: authError } = await userClient.auth.getUser();
+    if (authError || !caller) {
+      return new Response(JSON.stringify({ error: "Unauthorized: invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const adminCallerId = claimsData.claims.sub;
-
-    // Check admin role
-    const { data: roleData } = await userClient
+    // Check admin role using adminClient (service_role) to bypass RLS
+    const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
-      .eq("user_id", adminCallerId)
+      .eq("user_id", caller.id)
       .eq("role", "admin")
       .maybeSingle();
 
